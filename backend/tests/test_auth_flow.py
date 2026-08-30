@@ -87,6 +87,23 @@ async def test_login_success_sets_cookies_and_returns_access_token(
     assert "tvtimes_refresh" in resp.cookies
     assert "tvtimes_csrf" in resp.cookies
 
+    # The CSRF cookie must be readable by the SPA on any route, so it is scoped
+    # to "/", not the auth path — otherwise a page reload can't do the silent
+    # token refresh and the user is bounced to login. The refresh token stays
+    # narrowly scoped (only the server reads it).
+    set_cookie_headers = [v for k, v in resp.headers.multi_items() if k.lower() == "set-cookie"]
+    # The real CSRF cookie carries a value (an expiry-clearing header for the
+    # legacy path may also be present).
+    csrf_hdr = next(
+        h
+        for h in set_cookie_headers
+        if h.startswith("tvtimes_csrf=") and not h.startswith('tvtimes_csrf=""')
+    )
+    refresh_hdr = next(h for h in set_cookie_headers if h.startswith("tvtimes_refresh="))
+    assert "Path=/;" in f"{csrf_hdr};" and "Path=/api/auth" not in csrf_hdr
+    assert "Path=/api/auth" in refresh_hdr
+    assert "HttpOnly" in refresh_hdr and "HttpOnly" not in csrf_hdr
+
     token = resp.json()["access_token"]
     me = await app_client.get("/api/account/me", headers=auth_header(token))
     assert me.status_code == 200
