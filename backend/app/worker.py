@@ -49,8 +49,10 @@ async def refresh_source(ctx: dict[str, Any], source_id: str) -> None:
         if source is None:
             _log.warning("worker.refresh.missing", source_id=source_id)
             return
-        await src_svc.refresh_source(session, source)
-        epg_source = await epg_svc.ensure_epg_source_for(session, source)
+        channels_changed = await src_svc.refresh_source(session, source)
+        epg_source = await epg_svc.ensure_epg_source_for(
+            session, source, reset_cache=channels_changed
+        )
         await session.commit()
     if epg_source is not None:
         await ctx["redis"].enqueue_job("refresh_epg_source", str(epg_source.id))
