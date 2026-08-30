@@ -37,7 +37,7 @@ def _check_timezone(name: str | None) -> None:
     try:
         zoneinfo.ZoneInfo(name)
     except (zoneinfo.ZoneInfoNotFoundError, ValueError) as exc:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Unknown timezone") from exc
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Unknown timezone") from exc
 
 
 @router.get("", response_model=list[SourceOut])

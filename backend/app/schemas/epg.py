@@ -44,3 +44,20 @@ class ScheduleOut(BaseModel):
     channel_name: str
     timezone: str
     programmes: list[ProgrammeOut]
+
+
+class GuideChannelOut(BaseModel):
+    id: uuid.UUID
+    name: str
+    number: int | None
+    logo_url: str | None
+    group_title: str | None
+    is_hd: bool
+    timezone: str
+    programmes: list[ProgrammeOut]
+
+
+class GuideOut(BaseModel):
+    from_: datetime = Field(serialization_alias="from")
+    to: datetime
+    channels: list[GuideChannelOut]

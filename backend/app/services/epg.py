@@ -7,6 +7,7 @@ import contextlib
 import uuid
 import zoneinfo
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import delete, func, select
@@ -292,6 +293,87 @@ async def channel_schedule(
             )
         )
     return out, tz_name
+
+
+@dataclass(slots=True)
+class GuideRow:
+    channel: Channel
+    timezone: str
+    programmes: list[tuple[Programme, datetime, datetime]]
+
+
+def _resolve_tz(name: str) -> tuple[zoneinfo.ZoneInfo, str]:
+    try:
+        return zoneinfo.ZoneInfo(name), name
+    except (zoneinfo.ZoneInfoNotFoundError, ValueError):
+        return zoneinfo.ZoneInfo("UTC"), "UTC"
+
+
+async def guide(
+    session: AsyncSession,
+    tenant_id: uuid.UUID,
+    *,
+    start: datetime,
+    end: datetime,
+    source_id: uuid.UUID | None = None,
+    group: str | None = None,
+    channel_ids: Sequence[uuid.UUID] | None = None,
+    limit: int = 300,
+) -> list[GuideRow]:
+    """Programmes for many channels in ``[start, end)``, one row per channel,
+    each with times already resolved to that channel's display timezone."""
+    stmt = select(Channel).where(Channel.tenant_id == tenant_id)
+    if source_id is not None:
+        stmt = stmt.where(Channel.source_id == source_id)
+    if group:
+        stmt = stmt.where(Channel.group_title == group)
+    if channel_ids:
+        stmt = stmt.where(Channel.id.in_(list(channel_ids)))
+    stmt = stmt.order_by(
+        Channel.number.is_(None), Channel.number, Channel.sort_order, Channel.name
+    ).limit(limit)
+    channels = list(await session.scalars(stmt))
+    if not channels:
+        return []
+
+    source_ids = {c.source_id for c in channels}
+    sources = {
+        s.id: s for s in await session.scalars(select(Source).where(Source.id.in_(source_ids)))
+    }
+    tenant = await session.get(Tenant, tenant_id)
+    default_tz = tenant.default_timezone if tenant else "UTC"
+
+    ids = [c.id for c in channels]
+    programmes = await session.scalars(
+        select(Programme)
+        .where(
+            Programme.channel_id.in_(ids),
+            Programme.stop_utc > start,
+            Programme.start_utc < end,
+        )
+        .order_by(Programme.start_utc)
+    )
+    by_channel: dict[uuid.UUID, list[Programme]] = {cid: [] for cid in ids}
+    for p in programmes:
+        by_channel[p.channel_id].append(p)
+
+    rows: list[GuideRow] = []
+    for channel in channels:
+        source = sources.get(channel.source_id)
+        override = source.timezone_override if source else None
+        tz, tz_name = _resolve_tz(override or default_tz)
+        shift = timedelta(seconds=_shift_seconds(channel, source))
+        rows.append(
+            GuideRow(
+                channel=channel,
+                timezone=tz_name,
+                programmes=[
+                    (p, (p.start_utc + shift).astimezone(tz), (p.stop_utc + shift).astimezone(tz))
+                    for p in by_channel[channel.id]
+                ],
+            )
+        )
+    return rows
 
 
 async def programme_counts(session: AsyncSession, epg_source_id: uuid.UUID) -> int:

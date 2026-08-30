@@ -119,6 +119,50 @@ async def test_epg_refresh_populates_schedule(
     assert [p["title"] for p in body["programmes"]] == ["Headlines"]
 
 
+async def test_guide_returns_rows_per_channel(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    headers, source_id = await _seed_source_with_channels(app_client, captured_emails, monkeypatch)
+
+    async def fake_fetch(url: str, **kw: object) -> BytesResult:
+        return BytesResult(200, _xml(), etag=None, last_modified=None)
+
+    monkeypatch.setattr("app.services.epg.fetch_bytes", fake_fetch)
+    await _run_epg_refresh()
+
+    resp = await app_client.get(
+        "/api/guide",
+        params={
+            "from": (_BASE - timedelta(hours=1)).isoformat(),
+            "to": (_BASE + timedelta(hours=3)).isoformat(),
+            "source_id": source_id,
+        },
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["channels"][0]["name"] == "News HD"
+    assert body["channels"][0]["timezone"] == "UTC"
+    assert [p["title"] for p in body["channels"][0]["programmes"]] == ["Headlines"]
+    assert "from" in body
+
+
+async def test_guide_rejects_over_wide_window(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    await register_and_verify(app_client, captured_emails)
+    headers = auth_header(await login(app_client))
+    resp = await app_client.get(
+        "/api/guide",
+        params={
+            "from": _BASE.isoformat(),
+            "to": (_BASE + timedelta(days=3)).isoformat(),
+        },
+        headers=headers,
+    )
+    assert resp.status_code == 422
+
+
 async def test_conditional_get_304_keeps_programmes(
     app_client: AsyncClient, captured_emails: list[dict[str, str]], monkeypatch: pytest.MonkeyPatch
 ) -> None:
