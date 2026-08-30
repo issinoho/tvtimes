@@ -27,6 +27,24 @@ jobs:
       - run: uv run mypy .
       - run: uv run pytest -q
 
+  connector:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: connector
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          version: '0.10.x'
+      - run: uv python install 3.12
+      - run: uv venv --python 3.12
+      - run: uv pip install -e ".[dev]"
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy .
+      - run: uv run pytest -q
+
   frontend:
     runs-on: ubuntu-latest
     defaults:

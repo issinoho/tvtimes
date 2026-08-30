@@ -21,6 +21,7 @@ class SourceKind(enum.StrEnum):
     m3u = "m3u"
     xtream = "xtream"
     stalker = "stalker"
+    connector = "connector"
 
 
 class SourceStatus(enum.StrEnum):

@@ -4,7 +4,16 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from app.api.routers import account, auth, epg, health, hero, sources
+from app.api.routers import (
+    account,
+    auth,
+    connector,
+    connectors,
+    epg,
+    health,
+    hero,
+    sources,
+)
 
 api_router = APIRouter()
 api_router.include_router(health.router)
@@ -13,5 +22,7 @@ api_router.include_router(account.router)
 api_router.include_router(sources.router)
 api_router.include_router(epg.router)
 api_router.include_router(hero.router)
+api_router.include_router(connectors.router)
+api_router.include_router(connector.router)
 
 __all__ = ["api_router"]

@@ -556,6 +556,109 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/connectors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Connectors */
+        get: operations["list_connectors_api_connectors_get"];
+        put?: never;
+        /** Create Connector */
+        post: operations["create_connector_api_connectors_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/connectors/{connector_id}/pairing-code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** New Pairing Code */
+        post: operations["new_pairing_code_api_connectors__connector_id__pairing_code_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/connectors/{connector_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Connector */
+        delete: operations["delete_connector_api_connectors__connector_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/connector/pair": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pair */
+        post: operations["pair_api_connector_pair_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/connector/heartbeat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Heartbeat */
+        post: operations["heartbeat_api_connector_heartbeat_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/connector/lineup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Submit Lineup */
+        post: operations["submit_lineup_api_connector_lineup_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -600,6 +703,78 @@ export interface components {
             limit: number;
             /** Offset */
             offset: number;
+        };
+        /** ConnectorCreateIn */
+        ConnectorCreateIn: {
+            /**
+             * Name
+             * @default Home network
+             */
+            name: string;
+        };
+        /** ConnectorCreatedOut */
+        ConnectorCreatedOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Status */
+            status: string;
+            /** Version */
+            version: string | null;
+            /** Last Seen At */
+            last_seen_at: string | null;
+            /** Pairing Code */
+            pairing_code: string | null;
+            /** Pairing Expires At */
+            pairing_expires_at: string | null;
+            /** Devices */
+            devices: {
+                [key: string]: unknown;
+            }[];
+            /** Source Id */
+            source_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Install Hint */
+            install_hint: string;
+        };
+        /** ConnectorOut */
+        ConnectorOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Status */
+            status: string;
+            /** Version */
+            version: string | null;
+            /** Last Seen At */
+            last_seen_at: string | null;
+            /** Pairing Code */
+            pairing_code: string | null;
+            /** Pairing Expires At */
+            pairing_expires_at: string | null;
+            /** Devices */
+            devices: {
+                [key: string]: unknown;
+            }[];
+            /** Source Id */
+            source_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /** EnrichmentOut */
         EnrichmentOut: {
@@ -714,6 +889,21 @@ export interface components {
             /** Version */
             version: string;
         };
+        /** HeartbeatIn */
+        HeartbeatIn: {
+            /** Version */
+            version?: string | null;
+        };
+        /** HeartbeatOut */
+        HeartbeatOut: {
+            /**
+             * Ok
+             * @default true
+             */
+            ok: boolean;
+            /** Heartbeat Interval */
+            heartbeat_interval: number;
+        };
         /** HeroOut */
         HeroOut: {
             /**
@@ -752,6 +942,48 @@ export interface components {
             /** Enriching */
             enriching: boolean;
             enrichment: components["schemas"]["EnrichmentOut"] | null;
+        };
+        /** LineupChannelIn */
+        LineupChannelIn: {
+            /** Name */
+            name: string;
+            /** Stream Url */
+            stream_url: string;
+            /** Number */
+            number?: number | null;
+            /**
+             * Hd
+             * @default false
+             */
+            hd: boolean;
+        };
+        /** LineupIn */
+        LineupIn: {
+            /** Device Id */
+            device_id: string;
+            /**
+             * Friendly Name
+             * @default HDHomeRun
+             */
+            friendly_name: string;
+            /** Model */
+            model?: string | null;
+            /** Tuner Count */
+            tuner_count?: number | null;
+            /** Epg Url */
+            epg_url?: string | null;
+            /** Channels */
+            channels?: components["schemas"]["LineupChannelIn"][];
+        };
+        /** LineupOut */
+        LineupOut: {
+            /**
+             * Ok
+             * @default true
+             */
+            ok: boolean;
+            /** Channels */
+            channels: number;
         };
         /** LoginIn */
         LoginIn: {
@@ -833,6 +1065,23 @@ export interface components {
         OptionsOut: {
             /** Options */
             options: string;
+        };
+        /** PairIn */
+        PairIn: {
+            /** Code */
+            code: string;
+        };
+        /** PairOut */
+        PairOut: {
+            /**
+             * Connector Id
+             * Format: uuid
+             */
+            connector_id: string;
+            /** Token */
+            token: string;
+            /** Heartbeat Interval */
+            heartbeat_interval: number;
         };
         /** PasskeyOut */
         PasskeyOut: {
@@ -2445,6 +2694,241 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HeroOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_connectors_api_connectors_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectorOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_connector_api_connectors_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConnectorCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectorCreatedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    new_pairing_code_api_connectors__connector_id__pairing_code_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                connector_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_connector_api_connectors__connector_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                connector_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pair_api_connector_pair_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PairIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PairOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    heartbeat_api_connector_heartbeat_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HeartbeatIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeartbeatOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submit_lineup_api_connector_lineup_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LineupIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LineupOut"];
                 };
             };
             /** @description Validation Error */

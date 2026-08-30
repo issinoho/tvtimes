@@ -246,9 +246,12 @@ async def list_channels(
 
 
 async def due_for_refresh(session: AsyncSession) -> list[uuid.UUID]:
-    """Ids of enabled sources whose refresh interval has elapsed."""
+    """Ids of enabled, fetch-backed sources whose refresh interval has elapsed.
+    Connector sources are pushed, not pulled, so they are excluded."""
     now = _now()
-    rows = await session.scalars(select(Source).where(Source.enabled.is_(True)))
+    rows = await session.scalars(
+        select(Source).where(Source.enabled.is_(True), Source.kind != SourceKind.connector)
+    )
     due: list[uuid.UUID] = []
     for s in rows:
         if (
