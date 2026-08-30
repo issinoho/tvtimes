@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     database_url: str = "sqlite+aiosqlite:///./tvtimes.sqlite3"
     redis_url: str = "redis://localhost:6379/0"
 
+    # slowapi/limits storage. "memory://" for dev/test; "redis://..." in prod.
+    ratelimit_storage_uri: str = "memory://"
+    ratelimit_enabled: bool = True
+
     # Secrets
     encryption_key: str = "dev-insecure-key-change-me-0000000000000000000"
     jwt_private_key_pem: str = ""
