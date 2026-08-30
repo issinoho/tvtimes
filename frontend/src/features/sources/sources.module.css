@@ -1,0 +1,241 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.head h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+.head p {
+  margin: 0.25rem 0 0;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--bg-raised) 82%, transparent);
+  text-decoration: none;
+  color: inherit;
+}
+.card:hover {
+  border-color: color-mix(in srgb, var(--brand-violet) 50%, var(--line));
+}
+.card h3 {
+  margin: 0 0 0.15rem;
+  font-size: 1rem;
+}
+.card .sub {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  word-break: break-all;
+}
+
+.kindTag {
+  text-transform: uppercase;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  padding: 0.12rem 0.4rem;
+  border-radius: 4px;
+  background: var(--bg-overlay);
+  color: var(--text-dim);
+  margin-right: 0.4rem;
+}
+
+.pill {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.pill.ok {
+  background: color-mix(in srgb, var(--genre-doc) 22%, transparent);
+  color: #b9f5d3;
+}
+.pill.error {
+  background: color-mix(in srgb, var(--genre-news) 22%, transparent);
+  color: #ffcaca;
+}
+.pill.pending {
+  background: color-mix(in srgb, var(--brand-violet) 22%, transparent);
+  color: var(--text);
+}
+
+.btn {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+.btn.primary {
+  border: 0;
+  color: #fff;
+  background-image: var(--grad-brand);
+  font-weight: 600;
+}
+.btn.danger {
+  color: #ffcaca;
+  border-color: color-mix(in srgb, var(--genre-news) 45%, transparent);
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 2, 10, 0.6);
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  z-index: 50;
+}
+.dialog {
+  width: 100%;
+  max-width: 460px;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-hero);
+}
+.dialog h2 {
+  margin: 0 0 1rem;
+  font-size: 1.2rem;
+}
+
+.kinds {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.kinds button {
+  flex: 1;
+  font: inherit;
+  padding: 0.5rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.kinds button[data-active='true'] {
+  border-color: var(--brand-violet);
+  color: var(--text);
+  background: var(--bg-overlay);
+}
+
+.field {
+  display: block;
+  margin-bottom: 0.85rem;
+}
+.field > span {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  margin-bottom: 0.3rem;
+}
+.field input {
+  width: 100%;
+  padding: 0.6rem 0.7rem;
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.actions {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: flex-end;
+  margin-top: 1.1rem;
+}
+.err {
+  color: #ffbcbc;
+  font-size: 0.85rem;
+  margin: 0 0 0.75rem;
+}
+
+.detailHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.toolbar {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.search {
+  font: inherit;
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--text);
+  min-width: 200px;
+}
+
+.channels {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.channels th,
+.channels td {
+  text-align: left;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--line);
+}
+.channels th {
+  color: var(--text-dim);
+  font-weight: 500;
+  font-size: 0.78rem;
+}
+.logo {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  border-radius: 4px;
+  background: var(--bg-overlay);
+}
+.pager {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  margin-top: 0.9rem;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}

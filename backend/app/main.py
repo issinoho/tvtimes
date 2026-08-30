@@ -16,6 +16,7 @@ from app.auth.errors import AuthError, MfaRequired
 from app.auth.ratelimit import limiter
 from app.config import get_settings
 from app.db import dispose_engine
+from app.ingest.errors import SourceError
 from app.logging import configure_logging, get_logger
 
 
@@ -40,6 +41,12 @@ def _install_error_handlers(app: FastAPI) -> None:
         if isinstance(exc, MfaRequired):
             body["mfa_token"] = exc.mfa_token
         return JSONResponse(status_code=exc.status_code, content=body)
+
+    @app.exception_handler(SourceError)
+    async def _source_error(_request: Request, exc: SourceError) -> JSONResponse:
+        return JSONResponse(
+            status_code=422, content={"code": "source_error", "message": exc.message}
+        )
 
     @app.exception_handler(RateLimitExceeded)
     async def _rate_limited(_request: Request, exc: RateLimitExceeded) -> JSONResponse:

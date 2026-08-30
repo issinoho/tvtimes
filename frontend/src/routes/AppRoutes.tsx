@@ -9,6 +9,8 @@ import { ResetPasswordPage } from '@/features/auth/ResetPasswordPage';
 import { SignUpPage } from '@/features/auth/SignUpPage';
 import { VerifyEmailPage } from '@/features/auth/VerifyEmailPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
+import { SourceDetailPage } from '@/features/sources/SourceDetailPage';
+import { SourcesPage } from '@/features/sources/SourcesPage';
 import { RequireAuth } from '@/routes/RequireAuth';
 
 export function AppRoutes() {
@@ -38,6 +40,8 @@ export function AppRoutes() {
         }
       >
         <Route index element={<HomePage />} />
+        <Route path="sources" element={<SourcesPage />} />
+        <Route path="sources/:sourceId" element={<SourceDetailPage />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>
 

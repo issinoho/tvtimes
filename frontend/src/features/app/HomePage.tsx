@@ -18,12 +18,16 @@ export function HomePage() {
       <div className={styles.hero}>
         <h1>Hi{user ? `, ${user.display_name}` : ''} — the guide is next</h1>
         <p>
-          Your account is set up. Connecting TV sources and the colourful set-top-box guide land in
-          the next phases. For now you can manage your{' '}
+          Your account is set up.{' '}
+          <Link to="/sources" className="linkish">
+            Connect a source
+          </Link>{' '}
+          (M3U, Xtream or Stalker) to start pulling in channels — the colourful set-top-box guide
+          itself arrives in a later phase. You can also manage your{' '}
           <Link to="/settings" className="linkish">
             security settings
-          </Link>{' '}
-          — passkeys, two-factor, active sessions, and your timezone.
+          </Link>
+          .
         </p>
       </div>
     </div>
