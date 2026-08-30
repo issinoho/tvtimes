@@ -28,6 +28,16 @@ a {
   color: inherit;
 }
 
+.linkish {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--brand-pink);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
 :focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;

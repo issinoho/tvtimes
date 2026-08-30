@@ -33,3 +33,6 @@ secrets/
 data/
 *.sqlite3
 *.db
+
+# TypeScript incremental build info
+*.tsbuildinfo

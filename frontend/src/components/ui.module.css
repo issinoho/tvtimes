@@ -1,0 +1,148 @@
+.authShell {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 2rem 1.25rem;
+}
+
+.card {
+  width: 100%;
+  max-width: 420px;
+  background: color-mix(in srgb, var(--bg-raised) 88%, transparent);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1.75rem;
+  box-shadow: var(--shadow-hero);
+  backdrop-filter: blur(6px);
+}
+
+.brandRow {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.25rem;
+}
+.brandRow svg {
+  width: 168px;
+  height: auto;
+}
+
+.heading {
+  margin: 0 0 0.35rem;
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.sub {
+  margin: 0 0 1.4rem;
+  color: var(--text-dim);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.field {
+  display: block;
+  margin-bottom: 1rem;
+}
+.field > span {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  margin-bottom: 0.35rem;
+}
+.field input {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+.field input:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.7rem 1rem;
+  font: inherit;
+  font-weight: 600;
+  color: #fff;
+  background-image: var(--grad-brand);
+  border: 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.button:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+.button.secondary {
+  background: transparent;
+  background-image: none;
+  color: var(--text);
+  border: 1px solid var(--line);
+}
+.button.ghost {
+  background: none;
+  color: var(--brand-pink);
+  width: auto;
+  padding: 0.2rem 0;
+  font-weight: 500;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0.75rem 0;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+}
+.row::before,
+.row::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+.callout {
+  padding: 0.7rem 0.8rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.86rem;
+  line-height: 1.45;
+  margin-bottom: 1rem;
+  border: 1px solid transparent;
+}
+.callout.error {
+  color: #ffd7d7;
+  background: color-mix(in srgb, var(--genre-news) 22%, transparent);
+  border-color: color-mix(in srgb, var(--genre-news) 45%, transparent);
+}
+.callout.info {
+  color: var(--text);
+  background: color-mix(in srgb, var(--brand-violet) 18%, transparent);
+  border-color: color-mix(in srgb, var(--brand-violet) 40%, transparent);
+}
+.callout.success {
+  color: #d7ffe9;
+  background: color-mix(in srgb, var(--genre-doc) 20%, transparent);
+  border-color: color-mix(in srgb, var(--genre-doc) 42%, transparent);
+}
+
+.footNote {
+  margin-top: 1.1rem;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+.footNote a {
+  color: var(--brand-pink);
+  text-decoration: none;
+}
