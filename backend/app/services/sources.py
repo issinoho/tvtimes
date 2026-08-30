@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import uuid
 from collections.abc import Sequence
@@ -176,12 +177,14 @@ async def _ingest(kind: SourceKind, config: dict[str, object]) -> Playlist:
 
 
 def _dedupe_key(ch: ParsedChannel) -> str:
-    """Identity for collapsing repeated playlist entries. Keyed on tvg-id *and*
-    name so East/West or SD/HD variants that share a tvg-id are kept as
-    separate channels (EPG matching still keys on the shared tvg-id); only a
-    genuine duplicate line — same id and same name — is dropped."""
-    parts = [(ch.tvg_id or "").strip().lower(), ch.name.strip().lower()]
-    return ("|".join(p for p in parts if p) or "channel")[:400]
+    """Identity for collapsing repeated playlist lines. Two entries collapse
+    only when their tvg-id, name *and* stream target all match, so East/West or
+    SD/HD variants — which often share a tvg-id and sometimes even a name — are
+    all kept as separate channels. EPG matching still keys on the shared
+    tvg-id / name, so both variants still get programmes."""
+    digest = hashlib.sha1((ch.stream_ref or "").encode("utf-8"), usedforsecurity=False)
+    parts = [(ch.tvg_id or "").strip().lower(), ch.name.strip().lower(), digest.hexdigest()[:12]]
+    return "|".join(p for p in parts if p)[:400] or "channel"
 
 
 async def refresh_source(session: AsyncSession, source: Source) -> None:
