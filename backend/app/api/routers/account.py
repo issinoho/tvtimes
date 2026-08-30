@@ -14,7 +14,7 @@ from app.auth.deps import ClientMetaDep, CurrentUser, SessionDep, VerifiedUser
 from app.auth.ratelimit import WEBAUTHN_LIMIT, limiter
 from app.auth.tokens import hash_refresh_token
 from app.models.credentials import WebAuthnCredential
-from app.schemas.account import TimezoneIn
+from app.schemas.account import TimezoneIn, TmdbTokenIn
 from app.schemas.auth import (
     MeOut,
     MessageOut,
@@ -26,6 +26,7 @@ from app.schemas.auth import (
     TotpConfirmIn,
     WebAuthnRegisterCompleteIn,
 )
+from app.services import tmdb as tmdb_svc
 
 router = APIRouter(prefix="/account", tags=["account"])
 
@@ -47,7 +48,25 @@ async def me(user: CurrentUser, session: SessionDep) -> MeOut:
         default_timezone=user.tenant.default_timezone,
         totp_enabled=user.totp is not None and user.totp.confirmed_at is not None,
         passkey_count=passkeys or 0,
+        tmdb_connected=bool(user.tenant.tmdb_token_encrypted),
     )
+
+
+@router.put("/tmdb-token", response_model=MessageOut)
+async def set_tmdb_token(body: TmdbTokenIn, user: VerifiedUser, session: SessionDep) -> MessageOut:
+    if not await tmdb_svc.token_looks_valid(body.token):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "TMDB didn't accept that key. Use a v4 API Read Access Token.",
+        )
+    await tmdb_svc.set_token(session, user.tenant_id, body.token)
+    return MessageOut(message="TMDB connected.")
+
+
+@router.delete("/tmdb-token", response_model=MessageOut)
+async def clear_tmdb_token(user: VerifiedUser, session: SessionDep) -> MessageOut:
+    await tmdb_svc.clear_token(session, user.tenant_id)
+    return MessageOut(message="TMDB disconnected.")
 
 
 @router.put("/timezone", response_model=MessageOut)

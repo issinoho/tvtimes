@@ -6,7 +6,9 @@ Jobs:
   - ``refresh_source(source_id)`` — fetch + parse + replace a source's channels,
     then (re)discover its EPG source and queue that too
   - ``refresh_epg_source(epg_source_id)`` — conditional GET + parse XMLTV +
-    replace programmes
+    replace programmes, then queue a TMDB enrichment pass
+  - ``enrich_epg(tenant_id)`` — warm the TMDB cache for the coming week
+  - ``enrich_programme(tenant_id, programme_id)`` — on-demand single enrichment
   - ``sweep`` (cron, every 15 min) — enqueue refreshes that are due
 """
 
@@ -25,6 +27,7 @@ from app.models.epg import EpgSource
 from app.models.source import Source
 from app.services import epg as epg_svc
 from app.services import sources as src_svc
+from app.services import tmdb as tmdb_svc
 
 _log = get_logger("worker")
 
@@ -53,13 +56,30 @@ async def refresh_source(ctx: dict[str, Any], source_id: str) -> None:
         await ctx["redis"].enqueue_job("refresh_epg_source", str(epg_source.id))
 
 
-async def refresh_epg_source(_ctx: dict[str, Any], epg_source_id: str) -> None:
+async def refresh_epg_source(ctx: dict[str, Any], epg_source_id: str) -> None:
     async with get_sessionmaker()() as session:
         row = await session.get(EpgSource, uuid.UUID(epg_source_id))
         if row is None:
             _log.warning("worker.epg.missing", epg_source_id=epg_source_id)
             return
         await epg_svc.refresh_epg_source(session, row)
+        tenant_id = row.tenant_id
+        await session.commit()
+    await ctx["redis"].enqueue_job("enrich_epg", str(tenant_id))
+
+
+async def enrich_epg(_ctx: dict[str, Any], tenant_id: str) -> None:
+    async with get_sessionmaker()() as session:
+        token = await tmdb_svc.token_for(session, uuid.UUID(tenant_id))
+        if token is None:
+            return
+        await tmdb_svc.enrich_epg_window(session, uuid.UUID(tenant_id), token)
+        await session.commit()
+
+
+async def enrich_programme(_ctx: dict[str, Any], tenant_id: str, programme_id: str) -> None:
+    async with get_sessionmaker()() as session:
+        await tmdb_svc.enrich_programme(session, uuid.UUID(tenant_id), uuid.UUID(programme_id))
         await session.commit()
 
 
@@ -76,7 +96,12 @@ async def sweep(ctx: dict[str, Any]) -> None:
 
 
 class WorkerSettings:
-    functions: ClassVar[list[Any]] = [refresh_source, refresh_epg_source]
+    functions: ClassVar[list[Any]] = [
+        refresh_source,
+        refresh_epg_source,
+        enrich_epg,
+        enrich_programme,
+    ]
     cron_jobs: ClassVar[list[Any]] = [cron(sweep, minute=set(range(0, 60, 15)))]
     on_startup = startup
     on_shutdown = shutdown

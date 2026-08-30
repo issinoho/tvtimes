@@ -116,3 +116,4 @@ class MeOut(BaseModel):
     default_timezone: str
     totp_enabled: bool
     passkey_count: int
+    tmdb_connected: bool = False

@@ -45,3 +45,7 @@ async def enqueue_source_refresh(source_id: uuid.UUID) -> None:
 
 async def enqueue_epg_refresh(epg_source_id: uuid.UUID) -> None:
     await _enqueue("refresh_epg_source", str(epg_source_id))
+
+
+async def enqueue_programme_enrich(tenant_id: uuid.UUID, programme_id: uuid.UUID) -> None:
+    await _enqueue("enrich_programme", str(tenant_id), str(programme_id))
