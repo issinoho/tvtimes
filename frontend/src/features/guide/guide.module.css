@@ -132,12 +132,12 @@
   height: 34px;
   object-fit: contain;
   border-radius: 5px;
-  /* A light plate so dark / transparent channel logos (the common case) are
-     legible on the dark guide. */
-  background: #f2f0f4;
+  /* A neutral mid-grey plate: dark, coloured and white/transparent channel
+     logos all stay legible against the dark guide. */
+  background: #aab0ba;
   padding: 3px;
   flex: none;
-  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 8%);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 12%);
 }
 .chanLogoEmpty {
   width: 40px;
