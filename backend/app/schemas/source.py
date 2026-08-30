@@ -61,7 +61,20 @@ class StalkerSourceIn(_CommonIn):
         }
 
 
-SourceIn = Annotated[M3uSourceIn | XtreamSourceIn | StalkerSourceIn, Field(discriminator="kind")]
+class HdhomerunSourceIn(_CommonIn):
+    kind: Literal["hdhomerun"] = "hdhomerun"
+    # Blank ⇒ auto-discover on the LAN (needs UDP broadcast). Otherwise the
+    # tuner's address on the home network, e.g. http://192.168.1.50.
+    device_url: str = Field(default="", max_length=2048)
+
+    def config_dict(self) -> dict[str, object]:
+        return {"device_url": self.device_url}
+
+
+SourceIn = Annotated[
+    M3uSourceIn | XtreamSourceIn | StalkerSourceIn | HdhomerunSourceIn,
+    Field(discriminator="kind"),
+]
 
 
 class SourcePatchIn(BaseModel):

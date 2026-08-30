@@ -184,6 +184,12 @@
   font-size: 0.85rem;
   margin: 0 0 0.75rem;
 }
+.hint {
+  color: var(--text-dim, #9aa);
+  font-size: 0.8rem;
+  line-height: 1.4;
+  margin: -0.3rem 0 0.6rem;
+}
 
 .detailHead {
   display: flex;

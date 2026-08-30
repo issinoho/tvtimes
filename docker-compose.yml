@@ -1,67 +1,89 @@
+# tvtimes — self-hosted stack.
+#
+#   1. cp .env.example .env   &&   edit .env   (set TVTIMES_PUBLIC_ORIGIN)
+#   2. docker compose up -d
+#   3. open the origin you configured; create your account
+#
+# Uses the published image; nothing to build. `docker compose pull && up -d`
+# upgrades. Postgres + Redis data and the generated secrets live in named
+# volumes, so your accounts and sessions survive upgrades.
+#
+# Developing tvtimes itself? Use docker-compose.dev.yml instead.
+
 name: tvtimes
 
+x-app: &app
+  image: ${TVTIMES_IMAGE:-issinoho/tvtimes:latest}
+  restart: unless-stopped
+  environment:
+    TVTIMES_ENV: prod
+    TVTIMES_DATABASE_URL: postgresql+asyncpg://tvtimes:${POSTGRES_PASSWORD:-tvtimes}@db:5432/tvtimes
+    TVTIMES_REDIS_URL: redis://redis:6379/0
+    TVTIMES_RATELIMIT_STORAGE_URI: redis://redis:6379/1
+    TVTIMES_PUBLIC_ORIGIN: ${TVTIMES_PUBLIC_ORIGIN:?set TVTIMES_PUBLIC_ORIGIN in .env}
+    TVTIMES_WEBAUTHN_RP_ID: ${TVTIMES_WEBAUTHN_RP_ID:-localhost}
+    TVTIMES_WEBAUTHN_RP_NAME: ${TVTIMES_WEBAUTHN_RP_NAME:-tvtimes}
+    TVTIMES_EMAIL_PROVIDER: ${TVTIMES_EMAIL_PROVIDER:-console}
+    TVTIMES_EMAIL_FROM: ${TVTIMES_EMAIL_FROM:-tvtimes <no-reply@localhost>}
+    TVTIMES_SMTP_HOST: ${TVTIMES_SMTP_HOST:-}
+    TVTIMES_SMTP_PORT: ${TVTIMES_SMTP_PORT:-587}
+    TVTIMES_SMTP_USERNAME: ${TVTIMES_SMTP_USERNAME:-}
+    TVTIMES_SMTP_PASSWORD: ${TVTIMES_SMTP_PASSWORD:-}
+    TVTIMES_RESEND_API_KEY: ${TVTIMES_RESEND_API_KEY:-}
+  volumes:
+    - secrets:/data
+  depends_on:
+    db: { condition: service_healthy }
+    redis: { condition: service_healthy }
+
 services:
+  tvtimes:
+    <<: *app
+    command: ["web"]
+    ports:
+      - "${TVTIMES_HTTP_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/healthz', timeout=3).status==200 else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  worker:
+    <<: *app
+    command: ["worker"]
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      tvtimes: { condition: service_started }
+
   db:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: tvtimes
-      POSTGRES_PASSWORD: tvtimes
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tvtimes}
       POSTGRES_DB: tvtimes
-    ports: ['5432:5432']
-    volumes: ['pgdata:/var/lib/postgresql/data']
+    volumes:
+      - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U tvtimes']
-      interval: 5s
+      test: ["CMD-SHELL", "pg_isready -U tvtimes"]
+      interval: 10s
       timeout: 3s
       retries: 10
 
   redis:
     image: redis:7-alpine
-    ports: ['6379:6379']
+    restart: unless-stopped
+    volumes:
+      - redisdata:/data
     healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
-      interval: 5s
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
       timeout: 3s
       retries: 10
 
-  backend:
-    build: ./backend
-    command: >
-      sh -c "alembic upgrade head &&
-             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
-    environment:
-      TVTIMES_ENV: dev
-      TVTIMES_DATABASE_URL: postgresql+asyncpg://tvtimes:tvtimes@db:5432/tvtimes
-      TVTIMES_REDIS_URL: redis://redis:6379/0
-      TVTIMES_PUBLIC_ORIGIN: http://localhost:5173
-      TVTIMES_WEBAUTHN_RP_ID: localhost
-      TVTIMES_ENCRYPTION_KEY: ${TVTIMES_ENCRYPTION_KEY:-dev-insecure-key-change-me-0000000000000000000}
-    volumes: ['./backend:/app']
-    ports: ['8000:8000']
-    depends_on:
-      db: { condition: service_healthy }
-      redis: { condition: service_healthy }
-
-  worker:
-    build: ./backend
-    command: arq app.worker.WorkerSettings
-    environment:
-      TVTIMES_ENV: dev
-      TVTIMES_DATABASE_URL: postgresql+asyncpg://tvtimes:tvtimes@db:5432/tvtimes
-      TVTIMES_REDIS_URL: redis://redis:6379/0
-      TVTIMES_ENCRYPTION_KEY: ${TVTIMES_ENCRYPTION_KEY:-dev-insecure-key-change-me-0000000000000000000}
-    volumes: ['./backend:/app']
-    depends_on:
-      db: { condition: service_healthy }
-      redis: { condition: service_healthy }
-
-  frontend:
-    build: ./frontend
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    ports: ['5173:5173']
-    depends_on: ['backend']
-
 volumes:
   pgdata:
+  redisdata:
+  secrets:

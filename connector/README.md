@@ -4,6 +4,10 @@ A small agent you run on your home network so tvtimes can use **HDHomeRun**
 tuners it can't reach directly. It only makes **outbound HTTPS** calls — nothing
 listens for inbound connections, no ports to open.
 
+> If the tvtimes server is on the **same network** as the tuner, you don't need
+> this — add a native **HDHomeRun** source instead (Settings → Sources). The
+> connector is for tuners on a different network from the server.
+
 ## Install
 
 Requires Python 3.10+.
@@ -17,7 +21,7 @@ or run it in Docker:
 ```sh
 docker run --network host -v tvtimes-connector:/config \
   -e TVTIMES_CONNECTOR_CONFIG=/config/config.json \
-  ghcr.io/issinoho/tvtimes-connector run
+  issinoho/tvtimes-connector run          # or ghcr.io/issinoho/tvtimes-connector
 ```
 
 (`--network host` lets it see HDHomeRun devices on your LAN.)

@@ -1,0 +1,70 @@
+# Development stack: builds from source, hot-reloads the API, runs the Vite dev
+# server with HMR. For self-hosting a release, use docker-compose.yml instead.
+
+name: tvtimes-dev
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: tvtimes
+      POSTGRES_PASSWORD: tvtimes
+      POSTGRES_DB: tvtimes
+    ports: ['5432:5432']
+    volumes: ['pgdata:/var/lib/postgresql/data']
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U tvtimes']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports: ['6379:6379']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ./backend
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    environment:
+      TVTIMES_ENV: dev
+      TVTIMES_DATABASE_URL: postgresql+asyncpg://tvtimes:tvtimes@db:5432/tvtimes
+      TVTIMES_REDIS_URL: redis://redis:6379/0
+      TVTIMES_PUBLIC_ORIGIN: http://localhost:5173
+      TVTIMES_WEBAUTHN_RP_ID: localhost
+      TVTIMES_ENCRYPTION_KEY: ${TVTIMES_ENCRYPTION_KEY:-dev-insecure-key-change-me-0000000000000000000}
+    volumes: ['./backend:/app']
+    ports: ['8000:8000']
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  worker:
+    build: ./backend
+    command: arq app.worker.WorkerSettings
+    environment:
+      TVTIMES_ENV: dev
+      TVTIMES_DATABASE_URL: postgresql+asyncpg://tvtimes:tvtimes@db:5432/tvtimes
+      TVTIMES_REDIS_URL: redis://redis:6379/0
+      TVTIMES_ENCRYPTION_KEY: ${TVTIMES_ENCRYPTION_KEY:-dev-insecure-key-change-me-0000000000000000000}
+    volumes: ['./backend:/app']
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  frontend:
+    build: ./frontend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports: ['5173:5173']
+    depends_on: ['backend']
+
+volumes:
+  pgdata:

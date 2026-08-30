@@ -50,4 +50,7 @@ def source_config_summary(kind: str, config: dict[str, object]) -> str:
     if kind == "stalker":
         p = urlsplit(str(config.get("portal_url", "")))
         return f"{p.hostname}{p.path} · {redact_mac(str(config.get('mac', '')))}"
+    if kind == "hdhomerun":
+        url = str(config.get("device_url", "")).strip()
+        return url or "auto-discover on LAN"
     return "unknown source"

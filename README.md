@@ -2,13 +2,46 @@
 
 # tvtimes
 
-A modern, multi-tenant TV schedule (EPG) site. Create a free account, connect TV
-sources (M3U / Xtream / Stalker / HDHomeRun via a LAN connector), and browse a
-colourful set-top-box-style guide enriched with channel logos, release years and
-a cinematic TMDB "hero" panel.
+A modern, self-hostable TV schedule (EPG) site. Create an account, connect TV
+sources (M3U / Xtream / Stalker / HDHomeRun), and browse a colourful
+set-top-box-style guide enriched with channel logos, release years and a
+cinematic TMDB "hero" panel. Passkeys-first auth, long-lived sessions, works on
+phones and tablets, installable as a PWA.
 
-Hosted at **tvtimes.issinoho.com**. Build plan: [`docs/plan.md`](docs/plan.md) ·
-Brand: [`docs/brand.md`](docs/brand.md) · Deploy: [`docs/deploy.md`](docs/deploy.md)
+Build plan: [`docs/plan.md`](docs/plan.md) · Brand: [`docs/brand.md`](docs/brand.md)
+· Self-hosting: [`docs/homelab.md`](docs/homelab.md) · Ops notes: [`docs/deploy.md`](docs/deploy.md)
+
+## Run it (Docker Compose)
+
+You need Docker with the Compose plugin. Nothing to build — it pulls a
+published image.
+
+```sh
+curl -O https://raw.githubusercontent.com/issinoho/tvtimes/main/docker-compose.yml
+curl -o .env https://raw.githubusercontent.com/issinoho/tvtimes/main/.env.example
+# edit .env: set TVTIMES_PUBLIC_ORIGIN (and TVTIMES_WEBAUTHN_RP_ID for a domain)
+docker compose up -d
+```
+
+Open the origin you set and create the first account. One container serves both
+the API and the web app on port 8000; a second runs the background worker.
+Postgres, Redis, and the auto-generated secrets live in named volumes, so
+accounts and sessions survive `docker compose pull && docker compose up -d`.
+
+Full walkthrough — reverse proxy + TLS, HDHomeRun, email, backups, upgrades — in
+[`docs/homelab.md`](docs/homelab.md).
+
+### Images
+
+| Image | Purpose |
+|-------|---------|
+| `issinoho/tvtimes` (`ghcr.io/issinoho/tvtimes`) | all-in-one: API + worker + web app |
+| `issinoho/tvtimes-connector` (`ghcr.io/issinoho/tvtimes-connector`) | optional LAN agent for HDHomeRun tuners on a network the server can't reach |
+
+Native HDHomeRun support is built in — add an **HDHomeRun** source and either
+let it auto-discover or enter the tuner's LAN address (needed when tvtimes runs
+on Docker's default bridge network, which can't receive discovery broadcasts).
+The connector is only for tuners on a different network from the server.
 
 ## Status
 
@@ -21,35 +54,34 @@ Brand: [`docs/brand.md`](docs/brand.md) · Deploy: [`docs/deploy.md`](docs/deplo
 | 5 | Guide UI | done |
 | 6 | TMDB enrichment + hero overlay | done |
 | 7 | LAN connector (HDHomeRun) | done |
-| 8 | Polish (theme toggle, a11y, docs) | in review ([#7](https://github.com/issinoho/tvtimes/pull/7)) |
+| 8 | Polish (theme toggle, a11y, docs) | done |
+| — | Homelab packaging + native HDHomeRun | done |
 
 ## Layout
 
 ```
 backend/     FastAPI + SQLAlchemy 2.0 (async) + Alembic + arq worker
 frontend/    React 18 + Vite + TypeScript SPA (PWA)
-connector/   Downloadable LAN agent for HDHomeRun tuners
-docs/        Plan, brand, and deploy docs
+connector/   Optional LAN agent for off-network HDHomeRun tuners
+docker/      Container entrypoint
+docs/        Plan, brand, self-hosting, and ops docs
 ```
 
 ## Local development
 
-Requires Docker (Postgres + Redis) and [uv](https://docs.astral.sh/uv/) + Node 20+.
+Requires Docker and [uv](https://docs.astral.sh/uv/) + Node 22+.
 
 ```sh
-cp .env.example .env
-docker compose up --build
+docker compose -f docker-compose.dev.yml up --build
 ```
 
 - API + docs: http://localhost:8000/docs
-- SPA (Vite dev server): http://localhost:5173
+- SPA (Vite dev server, HMR): http://localhost:5173
 
-Run the backend without Docker (SQLite fallback, no worker):
+Backend only (SQLite fallback, no worker):
 
 ```sh
-cd backend
-uv sync
-uv run uvicorn app.main:app --reload
+cd backend && uv sync && uv run uvicorn app.main:app --reload
 ```
 
 ## Tests

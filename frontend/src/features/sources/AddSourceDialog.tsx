@@ -9,6 +9,7 @@ const KIND_LABEL: Record<SourceKind, string> = {
   m3u: 'M3U playlist',
   xtream: 'Xtream Codes',
   stalker: 'Stalker portal',
+  hdhomerun: 'HDHomeRun',
 };
 
 function Field({
@@ -73,7 +74,7 @@ export function AddSourceDialog({ onClose }: { onClose: () => void }) {
         password: f.password ?? '',
         output: 'ts',
       };
-    } else {
+    } else if (kind === 'stalker') {
       body = {
         ...common,
         kind: 'stalker',
@@ -83,6 +84,8 @@ export function AddSourceDialog({ onClose }: { onClose: () => void }) {
         device_id: null,
         stb_type: 'MAG250',
       };
+    } else {
+      body = { ...common, kind: 'hdhomerun', device_url: f.device_url ?? '' };
     }
     try {
       await create.mutateAsync(body);
@@ -160,6 +163,20 @@ export function AddSourceDialog({ onClose }: { onClose: () => void }) {
                 onChange={set('mac')}
                 placeholder="00:1A:79:xx:xx:xx"
               />
+            </>
+          )}
+          {kind === 'hdhomerun' && (
+            <>
+              <Field
+                label="Device address (optional)"
+                value={f.device_url ?? ''}
+                onChange={set('device_url')}
+                placeholder="http://192.168.1.50"
+              />
+              <p className={styles.hint}>
+                Leave blank to auto-discover on your network. Running tvtimes in Docker? Set the
+                address — the default bridge network can’t receive discovery broadcasts.
+              </p>
             </>
           )}
 

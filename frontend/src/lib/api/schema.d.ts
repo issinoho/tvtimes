@@ -879,6 +879,33 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** HdhomerunSourceIn */
+        HdhomerunSourceIn: {
+            /** Display Name */
+            display_name: string;
+            /** Timezone Override */
+            timezone_override?: string | null;
+            /**
+             * Clock Shift Seconds
+             * @default 0
+             */
+            clock_shift_seconds: number;
+            /**
+             * Refresh Interval Minutes
+             * @default 360
+             */
+            refresh_interval_minutes: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "hdhomerun";
+            /**
+             * Device Url
+             * @default
+             */
+            device_url: string;
+        };
         /** Health */
         Health: {
             /**
@@ -2270,7 +2297,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["M3uSourceIn"] | components["schemas"]["XtreamSourceIn"] | components["schemas"]["StalkerSourceIn"];
+                "application/json": components["schemas"]["M3uSourceIn"] | components["schemas"]["XtreamSourceIn"] | components["schemas"]["StalkerSourceIn"] | components["schemas"]["HdhomerunSourceIn"];
             };
         };
         responses: {
