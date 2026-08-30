@@ -5,7 +5,11 @@ import { AuthShell, Button, Callout, FootNote, Heading } from '@/components/ui';
 import { useAuth } from '@/lib/auth/AuthProvider';
 import { SKIP_PASSKEY_KEY } from '@/lib/auth/constants';
 import { registerPasskey } from '@/lib/auth/passkeys';
-import { browserSupportsPasskeys, passkeysNeedSecureContext } from '@/lib/auth/webauthn';
+import {
+  browserSupportsPasskeys,
+  describePasskeyError,
+  passkeysNeedSecureContext,
+} from '@/lib/auth/webauthn';
 
 export function OnboardingPasskeyPage() {
   const { refreshMe } = useAuth();
@@ -20,10 +24,8 @@ export function OnboardingPasskeyPage() {
       await registerPasskey('This device');
       await refreshMe();
       navigate('/', { replace: true });
-    } catch {
-      setError(
-        'Passkey setup was cancelled or not supported here. You can add one later in Settings.',
-      );
+    } catch (err) {
+      setError(`${describePasskeyError(err)} You can also add one later in Settings.`);
     } finally {
       setBusy(false);
     }

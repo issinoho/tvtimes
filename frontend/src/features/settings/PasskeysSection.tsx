@@ -3,7 +3,11 @@ import { useState } from 'react';
 
 import { api, ApiError, unwrap } from '@/lib/api/client';
 import { registerPasskey } from '@/lib/auth/passkeys';
-import { browserSupportsPasskeys, passkeysNeedSecureContext } from '@/lib/auth/webauthn';
+import {
+  browserSupportsPasskeys,
+  describePasskeyError,
+  passkeysNeedSecureContext,
+} from '@/lib/auth/webauthn';
 import styles from '@/features/settings/settings.module.css';
 
 const fmtDate = (iso: string) => new Date(iso).toLocaleDateString();
@@ -30,7 +34,7 @@ export function PasskeysSection() {
       await registerPasskey(nickname);
       await qc.invalidateQueries({ queryKey: ['passkeys'] });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Passkey setup was cancelled or failed.');
+      setError(err instanceof ApiError ? err.message : describePasskeyError(err));
     } finally {
       setBusy(false);
     }
