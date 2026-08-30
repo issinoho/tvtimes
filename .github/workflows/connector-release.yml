@@ -73,4 +73,7 @@ jobs:
       - name: Attach to the GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: connector/dist/*
+          fail_on_unmatched_files: true
+          files: |
+            connector/dist/*.whl
+            connector/dist/*.tar.gz
