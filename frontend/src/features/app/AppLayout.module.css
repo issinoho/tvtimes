@@ -1,0 +1,84 @@
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1.25rem;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--bg-raised) 70%, transparent);
+  backdrop-filter: blur(8px);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.header svg {
+  height: 26px;
+  width: auto;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.navLink {
+  padding: 0.4rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.88rem;
+  color: var(--text-dim);
+  text-decoration: none;
+}
+.navLink [data-active='true'] {
+  color: var(--text);
+  background: var(--bg-overlay);
+  border-radius: 999px;
+  padding: 0.4rem 0.7rem;
+  margin: -0.4rem -0.7rem;
+}
+
+.signout {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+}
+
+.hero {
+  text-align: center;
+  padding: 3rem 1rem;
+}
+.hero h1 {
+  font-size: clamp(1.8rem, 5vw, 2.8rem);
+  margin: 0 0 0.5rem;
+  background: var(--grad-brand);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.hero p {
+  color: var(--text-dim);
+  max-width: 48ch;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+.verifyBanner {
+  margin: 0 0 1.5rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--brand-amber) 45%, transparent);
+  background: color-mix(in srgb, var(--brand-amber) 15%, transparent);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+}

@@ -1,0 +1,145 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.title {
+  margin: 0 0 0.25rem;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.section {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--bg-raised) 82%, transparent);
+  padding: 1.25rem;
+}
+.section h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.05rem;
+}
+.section .hint {
+  margin: 0 0 1rem;
+  color: var(--text-dim);
+  font-size: 0.87rem;
+  line-height: 1.5;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  font-size: 0.9rem;
+}
+.item .meta {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+}
+
+.badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--brand-violet) 30%, transparent);
+  color: var(--text);
+  margin-left: 0.4rem;
+}
+
+.btn {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn.primary {
+  border: 0;
+  color: #fff;
+  background-image: var(--grad-brand);
+  font-weight: 600;
+}
+.btn.danger {
+  color: #ffcaca;
+  border-color: color-mix(in srgb, var(--genre-news) 45%, transparent);
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.actions {
+  margin-top: 1rem;
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.select {
+  font: inherit;
+  padding: 0.55rem 0.7rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--text);
+  max-width: 320px;
+}
+
+.totpSetup {
+  display: flex;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+.totpSetup img {
+  width: 168px;
+  height: 168px;
+  border-radius: var(--radius-sm);
+  background: #fff;
+  padding: 8px;
+}
+.secret {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+  word-break: break-all;
+  color: var(--text-dim);
+}
+
+.codes {
+  columns: 2;
+  gap: 1rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9rem;
+  margin: 0.5rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.error {
+  color: #ffbcbc;
+  font-size: 0.85rem;
+  margin: 0.5rem 0 0;
+}
+.ok {
+  color: #b9f5d3;
+  font-size: 0.85rem;
+  margin: 0.5rem 0 0;
+}
