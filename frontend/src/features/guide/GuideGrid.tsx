@@ -158,7 +158,7 @@ export function GuideGrid({ channels, windowStart, onOpen }: Props) {
                 {ch.logo_url ? (
                   <img className={styles.chanLogo} src={ch.logo_url} alt="" loading="lazy" />
                 ) : (
-                  <span className={styles.chanLogo} aria-hidden />
+                  <span className={styles.chanLogoEmpty} aria-hidden />
                 )}
                 <span className={styles.chanName}>{ch.name}</span>
               </div>
