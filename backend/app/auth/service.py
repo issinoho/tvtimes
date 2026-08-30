@@ -307,10 +307,14 @@ async def issue_session(
 ) -> IssuedSession:
     raw_refresh, refresh_hash = tokens.new_refresh_token()
     expires = tokens.refresh_expiry()
+    chain_started_at = (
+        (parent.chain_started_at or parent.created_at) if parent is not None else _now()
+    )
     row = AuthSession(
         user_id=user.id,
         token_hash=refresh_hash,
         parent_id=parent.id if parent else None,
+        chain_started_at=chain_started_at,
         expires_at=expires,
         user_agent=(meta.user_agent if meta else None),
         ip=(meta.ip if meta else None),
@@ -318,7 +322,7 @@ async def issue_session(
     session.add(row)
     await session.flush()
     user.last_login_at = _now()
-    access, access_exp = tokens.issue_access_token(user.id, user.tenant_id)
+    access, access_exp = tokens.issue_access_token(user.id, user.tenant_id, row.id)
     if parent is None:
         await _audit(session, "session_issued", user=user, meta=meta, method=method)
     return IssuedSession(
@@ -372,9 +376,16 @@ async def logout(session: AsyncSession, *, raw_refresh: str) -> None:
 
 
 async def list_sessions(session: AsyncSession, user: User) -> list[AuthSession]:
+    """Live sessions — one row per rotation chain (the un-rotated head), not
+    every refresh. A superseded token has ``rotated_at`` set and is inert."""
     rows = await session.scalars(
         select(AuthSession)
-        .where(AuthSession.user_id == user.id, AuthSession.revoked_at.is_(None))
+        .where(
+            AuthSession.user_id == user.id,
+            AuthSession.revoked_at.is_(None),
+            AuthSession.rotated_at.is_(None),
+            AuthSession.expires_at > _now(),
+        )
         .order_by(AuthSession.created_at.desc())
     )
     return list(rows)

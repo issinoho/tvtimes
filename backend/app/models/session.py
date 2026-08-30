@@ -33,6 +33,10 @@ class AuthSession(PkUuidMixin, TimestampMixin, Base):
     rotated_at: Mapped[datetime | None] = mapped_column(TZDateTime)
     revoked_at: Mapped[datetime | None] = mapped_column(TZDateTime)
     expires_at: Mapped[datetime] = mapped_column(TZDateTime, nullable=False)
+    # When the *first* token in this rotation chain was issued (i.e. the actual
+    # sign-in time). Carried forward on every rotation so the sessions list can
+    # show "signed in since" rather than "last refreshed".
+    chain_started_at: Mapped[datetime | None] = mapped_column(TZDateTime)
 
     user_agent: Mapped[str | None] = mapped_column(String(400))
     ip: Mapped[str | None] = mapped_column(String(64))
