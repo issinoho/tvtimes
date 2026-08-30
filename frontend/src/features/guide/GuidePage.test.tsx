@@ -70,10 +70,30 @@ function mockFetch() {
             default_timezone: 'UTC',
             totp_enabled: false,
             passkey_count: 1,
+            tmdb_connected: false,
           }),
         );
       if (path === '/api/sources') return Promise.resolve(json([]));
       if (path === '/api/guide') return Promise.resolve(json(GUIDE));
+      if (path.startsWith('/api/guide/programme/'))
+        return Promise.resolve(
+          json({
+            programme_id: 'p1',
+            channel_name: 'News HD',
+            title: 'The Big Film',
+            sub_title: null,
+            start: NOW.toISOString(),
+            stop: NOW.toISOString(),
+            description: 'A thing happens.',
+            categories: ['News'],
+            episode_num: null,
+            year: '1999',
+            is_movie: true,
+            tmdb_connected: false,
+            enriching: false,
+            enrichment: null,
+          }),
+        );
       return Promise.resolve(json({ code: 'nf' }, 404));
     }),
   );

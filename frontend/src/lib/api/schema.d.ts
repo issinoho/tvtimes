@@ -225,6 +225,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/account/tmdb-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Tmdb Token */
+        put: operations["set_tmdb_token_api_account_tmdb_token_put"];
+        post?: never;
+        /** Clear Tmdb Token */
+        delete: operations["clear_tmdb_token_api_account_tmdb_token_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/account/timezone": {
         parameters: {
             query?: never;
@@ -521,10 +539,37 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/guide/programme/{programme_id}/hero": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Programme Hero */
+        get: operations["programme_hero_api_guide_programme__programme_id__hero_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** CastMember */
+        CastMember: {
+            /** Name */
+            name: string;
+            /**
+             * Character
+             * @default
+             */
+            character: string;
+        };
         /** ChannelOut */
         ChannelOut: {
             /**
@@ -555,6 +600,35 @@ export interface components {
             limit: number;
             /** Offset */
             offset: number;
+        };
+        /** EnrichmentOut */
+        EnrichmentOut: {
+            /** Tmdb Id */
+            tmdb_id: number | null;
+            /** Title */
+            title: string | null;
+            /** Release Year */
+            release_year: string | null;
+            /** Overview */
+            overview: string | null;
+            /** Tagline */
+            tagline: string | null;
+            /** Rating */
+            rating: number | null;
+            /** Runtime */
+            runtime: number | null;
+            /** Director */
+            director: string | null;
+            /** Genres */
+            genres: string[];
+            /** Cast */
+            cast: components["schemas"]["CastMember"][];
+            /** Backdrop Url */
+            backdrop_url: string | null;
+            /** Poster Url */
+            poster_url: string | null;
+            /** Logo Url */
+            logo_url: string | null;
         };
         /** EpgSourceIn */
         EpgSourceIn: {
@@ -640,6 +714,45 @@ export interface components {
             /** Version */
             version: string;
         };
+        /** HeroOut */
+        HeroOut: {
+            /**
+             * Programme Id
+             * Format: uuid
+             */
+            programme_id: string;
+            /** Channel Name */
+            channel_name: string;
+            /** Title */
+            title: string;
+            /** Sub Title */
+            sub_title: string | null;
+            /**
+             * Start
+             * Format: date-time
+             */
+            start: string;
+            /**
+             * Stop
+             * Format: date-time
+             */
+            stop: string;
+            /** Description */
+            description: string | null;
+            /** Categories */
+            categories: string[];
+            /** Episode Num */
+            episode_num: string | null;
+            /** Year */
+            year: string | null;
+            /** Is Movie */
+            is_movie: boolean;
+            /** Tmdb Connected */
+            tmdb_connected: boolean;
+            /** Enriching */
+            enriching: boolean;
+            enrichment: components["schemas"]["EnrichmentOut"] | null;
+        };
         /** LoginIn */
         LoginIn: {
             /**
@@ -698,6 +811,11 @@ export interface components {
             totp_enabled: boolean;
             /** Passkey Count */
             passkey_count: number;
+            /**
+             * Tmdb Connected
+             * @default false
+             */
+            tmdb_connected: boolean;
         };
         /** MessageOut */
         MessageOut: {
@@ -946,6 +1064,11 @@ export interface components {
         TimezoneIn: {
             /** Timezone */
             timezone: string;
+        };
+        /** TmdbTokenIn */
+        TmdbTokenIn: {
+            /** Token */
+            token: string;
         };
         /** TokenOut */
         TokenOut: {
@@ -1420,6 +1543,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_tmdb_token_api_account_tmdb_token_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TmdbTokenIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    clear_tmdb_token_api_account_tmdb_token_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"];
                 };
             };
             /** @description Validation Error */
@@ -2223,6 +2412,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GuideOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    programme_hero_api_guide_programme__programme_id__hero_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                programme_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeroOut"];
                 };
             };
             /** @description Validation Error */

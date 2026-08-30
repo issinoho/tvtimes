@@ -254,6 +254,20 @@ def _shift_seconds(channel: Channel, source: Source | None) -> int:
     return channel.clock_shift_seconds or (source.clock_shift_seconds if source else 0)
 
 
+async def local_times(
+    session: AsyncSession, channel: Channel, start_utc: datetime, stop_utc: datetime
+) -> tuple[datetime, datetime, str]:
+    """Resolve one programme's UTC start/stop into the channel's display tz."""
+    source = await session.get(Source, channel.source_id)
+    override = source.timezone_override if source and source.timezone_override else None
+    if override is None:
+        tenant = await session.get(Tenant, channel.tenant_id)
+        override = tenant.default_timezone if tenant else "UTC"
+    tz, tz_name = _resolve_tz(override)
+    shift = timedelta(seconds=_shift_seconds(channel, source))
+    return (start_utc + shift).astimezone(tz), (stop_utc + shift).astimezone(tz), tz_name
+
+
 async def channel_schedule(
     session: AsyncSession,
     channel: Channel,

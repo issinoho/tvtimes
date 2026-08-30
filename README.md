@@ -20,8 +20,8 @@ Early development. See [`docs/plan.md`](docs/plan.md) for the build plan and
 | 2 | Auth (passkeys-first, TOTP, rotating sessions) | done |
 | 3 | Cloud sources (M3U / Xtream / Stalker) | done |
 | 4 | EPG ingest (XMLTV) + timezones | done |
-| 5 | Guide UI | in review ([#4](https://github.com/issinoho/tvtimes/pull/4)) |
-| 6 | TMDB enrichment + hero overlay | — |
+| 5 | Guide UI | done |
+| 6 | TMDB enrichment + hero overlay | in review ([#5](https://github.com/issinoho/tvtimes/pull/5)) |
 | 7 | LAN connector (HDHomeRun / local files) | — |
 | 8 | Polish | — |
 

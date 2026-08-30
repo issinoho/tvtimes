@@ -52,6 +52,7 @@ const ME = {
   default_timezone: 'UTC',
   totp_enabled: false,
   passkey_count: 1,
+  tmdb_connected: false,
 };
 
 beforeEach(() => {

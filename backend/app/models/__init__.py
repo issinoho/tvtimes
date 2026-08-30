@@ -19,6 +19,7 @@ from app.models.epg import EpgSource, EpgStatus, Programme
 from app.models.session import AuthSession
 from app.models.source import Channel, Source, SourceKind, SourceStatus
 from app.models.tenant import Tenant
+from app.models.tmdb import MediaType, TmdbEnrichment
 from app.models.token import (
     EmailToken,
     EmailTokenPurpose,
@@ -36,12 +37,14 @@ __all__ = [
     "EmailTokenPurpose",
     "EpgSource",
     "EpgStatus",
+    "MediaType",
     "PasswordCredential",
     "Programme",
     "Source",
     "SourceKind",
     "SourceStatus",
     "Tenant",
+    "TmdbEnrichment",
     "TotpSecret",
     "User",
     "WebAuthnChallenge",
