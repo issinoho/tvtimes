@@ -163,6 +163,31 @@ async def test_refresh_rotates_and_detects_reuse(
     assert after.status_code == 401  # whole chain revoked
 
 
+async def test_repeated_refresh_stays_one_session(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    await register_and_verify(app_client, captured_emails)
+    token = await login(app_client)
+    headers = auth_header(token)
+
+    listed = await app_client.get("/api/account/sessions", headers=headers)
+    assert len(listed.json()) == 1
+    signed_in_at = listed.json()[0]["created_at"]
+
+    # Every reload / access-token expiry rotates the refresh token; that must
+    # not spawn a new "active session" per rotation.
+    for _ in range(4):
+        r = await app_client.post("/api/auth/refresh", headers=csrf_header(app_client))
+        assert r.status_code == 200
+        headers = auth_header(r.json()["access_token"])
+
+    again = await app_client.get("/api/account/sessions", headers=headers)
+    body = again.json()
+    assert len(body) == 1
+    assert body[0]["current"] is True
+    assert body[0]["created_at"] == signed_in_at  # "since" is the sign-in, not the last refresh
+
+
 async def test_refresh_requires_csrf_header(
     app_client: AsyncClient, captured_emails: list[dict[str, str]]
 ) -> None:

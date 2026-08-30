@@ -20,17 +20,22 @@ def client_meta(request: Request) -> ClientMeta:
     return ClientMeta(ip=ip, user_agent=request.headers.get("user-agent"))
 
 
-async def current_user(
-    session: Annotated[AsyncSession, Depends(get_session)],
+async def access_claims(
     authorization: Annotated[str | None, Header()] = None,
-) -> User:
+) -> tokens.AccessClaims:
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Missing bearer token")
     token = authorization.split(" ", 1)[1].strip()
     try:
-        claims = tokens.decode_access_token(token)
+        return tokens.decode_access_token(token)
     except jwt.PyJWTError as exc:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired token") from exc
+
+
+async def current_user(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    claims: Annotated[tokens.AccessClaims, Depends(access_claims)],
+) -> User:
     user = await session.get(User, claims.user_id)
     if user is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Unknown user")
@@ -44,6 +49,7 @@ async def verified_user(user: Annotated[User, Depends(current_user)]) -> User:
 
 
 CurrentUser = Annotated[User, Depends(current_user)]
+CurrentClaims = Annotated[tokens.AccessClaims, Depends(access_claims)]
 VerifiedUser = Annotated[User, Depends(verified_user)]
 ClientMetaDep = Annotated[ClientMeta, Depends(client_meta)]
 SessionDep = Annotated[AsyncSession, Depends(get_session)]

@@ -10,9 +10,14 @@ from fastapi import APIRouter, HTTPException, Request, status
 from sqlalchemy import func, select
 
 from app.auth import service
-from app.auth.deps import ClientMetaDep, CurrentUser, SessionDep, VerifiedUser
+from app.auth.deps import (
+    ClientMetaDep,
+    CurrentClaims,
+    CurrentUser,
+    SessionDep,
+    VerifiedUser,
+)
 from app.auth.ratelimit import WEBAUTHN_LIMIT, limiter
-from app.auth.tokens import hash_refresh_token
 from app.models.credentials import WebAuthnCredential
 from app.schemas.account import TimezoneIn, TmdbTokenIn
 from app.schemas.auth import (
@@ -157,17 +162,14 @@ async def totp_disable(user: VerifiedUser, session: SessionDep, meta: ClientMeta
 
 @router.get("/sessions", response_model=list[SessionOut])
 async def list_sessions(
-    request: Request, user: CurrentUser, session: SessionDep
+    user: CurrentUser, claims: CurrentClaims, session: SessionDep
 ) -> list[SessionOut]:
     rows = await service.list_sessions(session, user)
-    current_hash = None
-    cookie = request.cookies.get("tvtimes_refresh")
-    if cookie:
-        current_hash = hash_refresh_token(cookie)
     out: list[SessionOut] = []
     for r in rows:
         item = SessionOut.model_validate(r)
-        item.current = r.token_hash == current_hash
+        item.created_at = r.chain_started_at or r.created_at  # sign-in time, not last refresh
+        item.current = claims.session_id is not None and r.id == claims.session_id
         out.append(item)
     return out
 
@@ -182,15 +184,11 @@ async def revoke_session(
 
 @router.delete("/sessions", response_model=MessageOut)
 async def revoke_other_sessions(
-    request: Request, user: CurrentUser, session: SessionDep
+    user: CurrentUser, claims: CurrentClaims, session: SessionDep
 ) -> MessageOut:
-    keep = None
-    cookie = request.cookies.get("tvtimes_refresh")
-    if cookie:
-        keep = hash_refresh_token(cookie)
     rows = await service.list_sessions(session, user)
     now = datetime.now(UTC)
     for r in rows:
-        if r.token_hash != keep:
+        if r.id != claims.session_id:
             r.revoked_at = now
     return MessageOut(message="Other sessions revoked.")

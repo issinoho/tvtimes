@@ -60,14 +60,18 @@ class AccessClaims:
     tenant_id: uuid.UUID
     jti: str
     expires_at: datetime
+    session_id: uuid.UUID | None = None
 
 
-def issue_access_token(user_id: uuid.UUID, tenant_id: uuid.UUID) -> tuple[str, datetime]:
+def issue_access_token(
+    user_id: uuid.UUID, tenant_id: uuid.UUID, session_id: uuid.UUID
+) -> tuple[str, datetime]:
     now = datetime.now(UTC)
     exp = now + timedelta(seconds=get_settings().access_token_ttl_seconds)
     payload = {
         "sub": str(user_id),
         "tid": str(tenant_id),
+        "sid": str(session_id),
         "iat": int(now.timestamp()),
         "exp": int(exp.timestamp()),
         "jti": secrets.token_urlsafe(12),
@@ -101,11 +105,13 @@ def decode_access_token(token: str) -> AccessClaims:
     data = jwt.decode(token, _public_pem(), algorithms=[_ALG], options={"require": ["exp", "sub"]})
     if data.get("typ") != "access":
         raise jwt.InvalidTokenError("wrong token type")
+    sid = data.get("sid")
     return AccessClaims(
         user_id=uuid.UUID(data["sub"]),
         tenant_id=uuid.UUID(data["tid"]),
         jti=data["jti"],
         expires_at=datetime.fromtimestamp(data["exp"], tz=UTC),
+        session_id=uuid.UUID(sid) if sid else None,
     )
 
 
