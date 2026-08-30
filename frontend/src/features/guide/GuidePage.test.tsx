@@ -161,7 +161,10 @@ test('mobile: the agenda lists programmes and a tap opens the detail sheet', asy
   await waitFor(() => expect(screen.getByText('The Big Film')).toBeInTheDocument());
   await user.click(screen.getByText('The Big Film'));
 
-  const sheet = within(await screen.findByRole('dialog', { name: 'The Big Film' }));
+  const dialog = await screen.findByRole('dialog', { name: 'The Big Film' });
+  const sheet = within(dialog);
   expect(sheet.getByText('A thing happens.')).toBeInTheDocument();
   expect(sheet.getByText('1999', { exact: false })).toBeInTheDocument();
+  // focus moved into the dialog on open
+  expect(dialog.contains(document.activeElement)).toBe(true);
 });

@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { ApiError } from '@/lib/api/client';
+import { useDialogFocus } from '@/lib/useDialogFocus';
 import { useCreateSource, type SourceCreate, type SourceKind } from '@/features/sources/api';
 import styles from '@/features/sources/sources.module.css';
 
@@ -38,10 +39,17 @@ function Field({
 
 export function AddSourceDialog({ onClose }: { onClose: () => void }) {
   const create = useCreateSource();
+  const dialogRef = useDialogFocus<HTMLDivElement>();
   const [kind, setKind] = useState<SourceKind>('m3u');
   const [displayName, setDisplayName] = useState('');
   const [f, setF] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
 
   const set = (k: string) => (v: string) => setF((prev) => ({ ...prev, [k]: v }));
 
@@ -87,10 +95,12 @@ export function AddSourceDialog({ onClose }: { onClose: () => void }) {
   return (
     <div className={styles.overlay} onClick={onClose}>
       <div
+        ref={dialogRef}
         className={styles.dialog}
         role="dialog"
         aria-modal="true"
         aria-label="Add a source"
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
       >
         <h2>Add a source</h2>

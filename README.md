@@ -3,16 +3,14 @@
 # tvtimes
 
 A modern, multi-tenant TV schedule (EPG) site. Create a free account, connect TV
-sources (M3U / Xtream / Stalker / HDHomeRun / local files), and browse a
+sources (M3U / Xtream / Stalker / HDHomeRun via a LAN connector), and browse a
 colourful set-top-box-style guide enriched with channel logos, release years and
 a cinematic TMDB "hero" panel.
 
-Hosted at **tvtimes.issinoho.com**.
+Hosted at **tvtimes.issinoho.com**. Build plan: [`docs/plan.md`](docs/plan.md) ·
+Brand: [`docs/brand.md`](docs/brand.md) · Deploy: [`docs/deploy.md`](docs/deploy.md)
 
 ## Status
-
-Early development. See [`docs/plan.md`](docs/plan.md) for the build plan and
-[`docs/brand.md`](docs/brand.md) for the visual identity.
 
 | Phase | Scope | State |
 |------:|-------|-------|
@@ -22,16 +20,16 @@ Early development. See [`docs/plan.md`](docs/plan.md) for the build plan and
 | 4 | EPG ingest (XMLTV) + timezones | done |
 | 5 | Guide UI | done |
 | 6 | TMDB enrichment + hero overlay | done |
-| 7 | LAN connector (HDHomeRun) | in review ([#6](https://github.com/issinoho/tvtimes/pull/6)) |
-| 8 | Polish | — |
+| 7 | LAN connector (HDHomeRun) | done |
+| 8 | Polish (theme toggle, a11y, docs) | in review ([#7](https://github.com/issinoho/tvtimes/pull/7)) |
 
 ## Layout
 
 ```
 backend/     FastAPI + SQLAlchemy 2.0 (async) + Alembic + arq worker
-frontend/    React 18 + Vite + TypeScript SPA
-connector/   Downloadable LAN agent (built in phase 7)
-docs/        Plan and brand docs
+frontend/    React 18 + Vite + TypeScript SPA (PWA)
+connector/   Downloadable LAN agent for HDHomeRun tuners
+docs/        Plan, brand, and deploy docs
 ```
 
 ## Local development

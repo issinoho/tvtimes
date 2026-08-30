@@ -89,6 +89,7 @@ export function SourceDetailPage() {
       <div className={styles.toolbar}>
         <input
           className={styles.search}
+          aria-label="Filter channels"
           placeholder="Filter channels…"
           value={search}
           onChange={(e) => {

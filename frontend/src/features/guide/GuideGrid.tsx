@@ -185,6 +185,7 @@ export function GuideGrid({ channels, windowStart, onOpen }: Props) {
                 className={styles.row}
                 style={{ top: vr.start, height: vr.size }}
                 role="row"
+                aria-label={ch.name}
               >
                 {ch.programmes.map((p, col) => {
                   const left = Math.max(0, xOf(windowStart, new Date(p.start)));
@@ -192,10 +193,16 @@ export function GuideGrid({ channels, windowStart, onOpen }: Props) {
                   const w = right - left;
                   if (w < 2) return null;
                   const live = now >= new Date(p.start) && now < new Date(p.stop);
+                  const at = new Date(p.start).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false,
+                  });
                   return (
                     <button
                       key={p.id}
                       type="button"
+                      role="gridcell"
                       className={styles.cell}
                       style={{
                         left,
@@ -204,16 +211,14 @@ export function GuideGrid({ channels, windowStart, onOpen }: Props) {
                       }}
                       data-now={live}
                       data-focused={focus?.row === vr.index && focus?.col === col}
+                      aria-selected={focus?.row === vr.index && focus?.col === col}
                       onClick={() => onOpen(ch, p)}
+                      aria-label={`${ch.name}, ${at}, ${p.title}${live ? ', on now' : ''}`}
                       title={p.title}
                     >
                       <div className={styles.cellTitle}>{p.title}</div>
                       <div className={styles.cellMeta}>
-                        {new Date(p.start).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          hour12: false,
-                        })}
+                        {at}
                         {p.is_movie && p.year ? ` · ${p.year}` : ''}
                       </div>
                     </button>

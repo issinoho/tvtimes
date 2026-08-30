@@ -105,6 +105,7 @@ export function GuidePage() {
         <input
           className={styles.search}
           placeholder="Find a channel…"
+          aria-label="Find a channel"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
