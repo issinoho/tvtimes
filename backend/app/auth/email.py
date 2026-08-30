@@ -19,17 +19,31 @@ _log = get_logger("auth.email")
 
 
 async def send_email(*, to: str, subject: str, body_text: str) -> None:
+    """Deliver a transactional email. Fail-open: a provider error is logged
+    (along with the message body, so the link is recoverable) but not raised —
+    a broken mailer must not 500 registration or password reset, nor become an
+    account-enumeration oracle."""
     provider = get_settings().email_provider
     if provider == "console":
         _log.info("email.console", to=to, subject=subject, body=body_text)
         return
-    if provider == "smtp":
-        await anyio.to_thread.run_sync(_send_smtp, to, subject, body_text)
-        return
-    if provider == "resend":
-        await _send_resend(to, subject, body_text)
-        return
-    raise RuntimeError(f"unknown email provider {provider!r}")
+    try:
+        if provider == "smtp":
+            await anyio.to_thread.run_sync(_send_smtp, to, subject, body_text)
+        elif provider == "resend":
+            await _send_resend(to, subject, body_text)
+        else:
+            raise RuntimeError(f"unknown email provider {provider!r}")
+    except Exception as exc:
+        _log.error(
+            "email.delivery_failed",
+            provider=provider,
+            to=to,
+            subject=subject,
+            error=f"{type(exc).__name__}: {exc}",
+        )
+        # Surface the content so an operator can complete the flow by hand.
+        _log.warning("email.undelivered_body", to=to, subject=subject, body=body_text)
 
 
 def _build_message(to: str, subject: str, body_text: str) -> EmailMessage:
