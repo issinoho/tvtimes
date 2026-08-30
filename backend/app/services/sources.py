@@ -11,7 +11,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.crypto import decrypt, encrypt
-from app.ingest import m3u, stalker, xtream
+from app.ingest import hdhomerun, m3u, stalker, xtream
 from app.ingest.errors import SourceError, SourceRejected, SourceUnreachable
 from app.ingest.models import Channel as ParsedChannel
 from app.ingest.models import Playlist
@@ -57,6 +57,8 @@ def _normalize_config(kind: SourceKind, config: dict[str, object]) -> dict[str, 
             ),
             "stb_type": str(config.get("stb_type") or "MAG250"),
         }
+    if kind is SourceKind.hdhomerun:
+        return {"device_url": str(config.get("device_url") or "").strip().rstrip("/")}
     raise ValueError(f"unknown source kind {kind!r}")
 
 
@@ -67,7 +69,12 @@ def decrypt_config(source: Source) -> dict[str, object]:
 async def assert_config_url_allowed(kind: SourceKind, config: dict[str, object]) -> None:
     """Reject a private/loopback/bad-scheme URL up front. A transient DNS
     failure is left for the refresh to report."""
-    url = str(config[_CONFIG_URL_FIELD[kind]])
+    field = _CONFIG_URL_FIELD.get(kind)
+    if field is None:
+        # hdhomerun: the device URL is meant to be a LAN address; it gets its
+        # own private-address check at ingest time, not the public-only guard.
+        return
+    url = str(config[field])
     try:
         await assert_allowed_url(url)
     except SourceRejected:
@@ -163,6 +170,8 @@ async def _ingest(kind: SourceKind, config: dict[str, object]) -> Playlist:
         return await xtream.load_xtream_playlist(xtream.XtreamCreds.from_config(config))
     if kind is SourceKind.stalker:
         return await stalker.load_stalker_playlist(stalker.StalkerCreds.from_config(config))
+    if kind is SourceKind.hdhomerun:
+        return await hdhomerun.load_hdhomerun_playlist(config)
     raise ValueError(f"unknown source kind {kind!r}")
 
 

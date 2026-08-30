@@ -29,10 +29,24 @@ def test_production_rejects_default_encryption_key() -> None:
         _prod(encryption_key="dev-insecure-key-abc").assert_production_ready()
 
 
-def test_production_requires_https_origin() -> None:
-    with pytest.raises(RuntimeError, match="https"):
-        _prod(public_origin="http://tvtimes.issinoho.com").assert_production_ready()
+def test_production_warns_but_allows_http_origin(capsys: pytest.CaptureFixture[str]) -> None:
+    # Self-hosters often terminate TLS at their own reverse proxy, so a plain
+    # http:// origin is a warning, not a hard failure.
+    _prod(public_origin="http://tvtimes.lan").assert_production_ready()
+    assert "https" in capsys.readouterr().err.lower()
 
 
 def test_dev_config_is_not_checked() -> None:
     Settings(env="dev").assert_production_ready()  # no raise despite dev defaults
+
+
+def test_database_url_scheme_is_normalised() -> None:
+    assert (
+        Settings(database_url="postgres://u:p@h:5432/db").database_url
+        == "postgresql+asyncpg://u:p@h:5432/db"
+    )
+    assert (
+        Settings(database_url="postgresql://u:p@h/db").database_url
+        == "postgresql+asyncpg://u:p@h/db"
+    )
+    assert Settings(database_url="sqlite+aiosqlite:///./x.db").database_url.startswith("sqlite")

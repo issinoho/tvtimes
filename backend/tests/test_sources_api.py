@@ -122,6 +122,50 @@ async def test_xtream_config_summary_hides_password(
     assert "panel.example.com" in resp.json()["config_summary"]
 
 
+async def test_create_hdhomerun_source(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    headers = await _auth(app_client, captured_emails, "sam@example.com")
+    resp = await app_client.post(
+        "/api/sources",
+        json={
+            "kind": "hdhomerun",
+            "display_name": "Living room tuner",
+            "device_url": "http://192.168.1.50",
+        },
+        headers=headers,
+    )
+    assert resp.status_code == 201, resp.text
+    source = resp.json()
+    assert source["kind"] == "hdhomerun"
+    assert source["config_summary"] == "http://192.168.1.50"
+
+    async def fake_ingest(_kind: object, _config: object) -> Playlist:
+        return Playlist(
+            channels=[ParsedChannel(name="BBC One HD", stream_ref="http://192.168.1.50/auto/v2.1")],
+            epg_url="https://api.hdhomerun.com/api/xmltv?DeviceAuth=x",
+        )
+
+    monkeypatch.setattr("app.services.sources._ingest", fake_ingest)
+    await _run_refresh(source["id"])
+    detail = await app_client.get(f"/api/sources/{source['id']}", headers=headers)
+    assert detail.json()["last_status"] == "ok"
+    assert detail.json()["channel_count"] == 1
+
+
+async def test_hdhomerun_blank_url_means_auto_discover(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    headers = await _auth(app_client, captured_emails, "sam@example.com")
+    resp = await app_client.post(
+        "/api/sources",
+        json={"kind": "hdhomerun", "display_name": "Auto"},
+        headers=headers,
+    )
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["config_summary"] == "auto-discover on LAN"
+
+
 async def test_sources_are_tenant_isolated(
     app_client: AsyncClient, captured_emails: list[dict[str, str]]
 ) -> None:

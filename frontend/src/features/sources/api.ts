@@ -5,12 +5,13 @@ import type { components } from '@/lib/api/schema';
 
 export type SourceOut = components['schemas']['SourceOut'];
 export type ChannelOut = components['schemas']['ChannelOut'];
-export type SourceKind = 'm3u' | 'xtream' | 'stalker';
+export type SourceKind = 'm3u' | 'xtream' | 'stalker' | 'hdhomerun';
 
 export type SourceCreate =
   | components['schemas']['M3uSourceIn']
   | components['schemas']['XtreamSourceIn']
-  | components['schemas']['StalkerSourceIn'];
+  | components['schemas']['StalkerSourceIn']
+  | components['schemas']['HdhomerunSourceIn'];
 
 export function useSources() {
   return useQuery({

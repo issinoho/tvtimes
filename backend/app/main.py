@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from slowapi.errors import RateLimitExceeded
 
 from app import __version__
@@ -81,7 +83,33 @@ def create_app() -> FastAPI:
 
     _install_error_handlers(app)
     app.include_router(api_router, prefix="/api")
+    _mount_spa(app, settings.static_dir)
     return app
+
+
+def _mount_spa(app: FastAPI, static_dir: str) -> None:
+    """Serve the built SPA from the same origin as the API. Real files (hashed
+    assets, the service worker, icons) are returned directly; everything else
+    falls back to ``index.html`` so client-side routes work on a hard refresh.
+    Registered after the ``/api`` router so API routes always win."""
+    root = Path(static_dir)
+    if not static_dir or not (root / "index.html").is_file():
+        return
+
+    assets = root / "assets"
+    if assets.is_dir():
+        app.mount("/assets", StaticFiles(directory=assets), name="assets")
+
+    index = root / "index.html"
+
+    @app.get("/{path:path}", include_in_schema=False)
+    async def spa(path: str) -> FileResponse:
+        if path.startswith("api/") or path in {"openapi.json", "docs", "redoc"}:
+            raise HTTPException(status_code=404)
+        candidate = (root / path).resolve()
+        if path and root.resolve() in candidate.parents and candidate.is_file():
+            return FileResponse(candidate)
+        return FileResponse(index)
 
 
 app = create_app()

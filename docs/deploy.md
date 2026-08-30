@@ -1,66 +1,81 @@
-# Deploying tvtimes
+# Operating tvtimes
 
-Production target: **`tvtimes.issinoho.com`** — the SPA and API served from one
-origin (`/api/*` to the backend, the built SPA at the root).
+This is the reference for what the app expects from its environment. For a
+step-by-step self-hosting walkthrough see [`homelab.md`](homelab.md).
 
-## Components
+The all-in-one image (`issinoho/tvtimes`) contains the API, the arq worker and
+the built web app. The API serves the SPA from the same origin (`/api/*` to the
+backend, everything else to the SPA with a client-routing fallback), so there is
+no CORS and the refresh cookie is first-party.
 
-| | runs as | notes |
+## Processes
+
+| | command | notes |
 |---|---|---|
-| API | `uvicorn app.main:app` | stateless; scale horizontally |
-| Worker | `arq app.worker.WorkerSettings` | one is enough; refreshes sources/EPG, warms TMDB |
-| Postgres 16 | managed | the only stateful store |
-| Redis 7 | managed | arq queue + rate-limit storage |
-| Object storage (optional) | S3-compatible | raw XMLTV blobs; falls back to a local dir |
-| SPA | static files | `cd frontend && npm ci && npm run build` → serve `dist/` |
+| Web/API | `entrypoint web` | runs `alembic upgrade head`, then `uvicorn` with `--proxy-headers`. Stateless; scale horizontally behind a load balancer. |
+| Worker | `entrypoint worker` | `arq app.worker.WorkerSettings`. One is enough — refreshes sources/EPG, warms the TMDB cache. |
+| Postgres 16 | — | the only stateful store |
+| Redis 7 | — | arq queue + rate-limit storage |
 
-## Required environment (prefix `TVTIMES_`)
+The container entrypoint generates `TVTIMES_JWT_PRIVATE_KEY_PEM` and
+`TVTIMES_ENCRYPTION_KEY` into `/data` on first run and reuses them forever.
+Persist `/data` (a volume) or supply your own via the environment — if those
+values ever change, existing sessions and every stored credential become
+unreadable.
 
-The API **refuses to start** in `env=prod` unless these are real
-(`Settings.assert_production_ready`):
+## Environment (prefix `TVTIMES_`)
+
+**Hard requirements in `env=prod`** — the API refuses to start without them
+(`Settings.assert_production_ready`), though the container entrypoint satisfies
+the two secrets automatically:
 
 - `TVTIMES_ENV=prod`
-- `TVTIMES_PUBLIC_ORIGIN=https://tvtimes.issinoho.com` — must be `https://`
-- `TVTIMES_JWT_PRIVATE_KEY_PEM` — an Ed25519 private key (PKCS#8 PEM). Generate:
-  `python -c "from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey as K; from cryptography.hazmat.primitives import serialization as s; print(K.generate().private_bytes(s.Encoding.PEM, s.PrivateFormat.PKCS8, s.NoEncryption()).decode())"`
-- `TVTIMES_ENCRYPTION_KEY` — 32 urlsafe-base64 bytes (Fernet key); encrypts
-  source credentials, TOTP seeds and the TMDB token at rest. Generate:
-  `python -c "import base64,secrets;print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())"`
-- `TVTIMES_DATABASE_URL=postgresql+asyncpg://…`
-- `TVTIMES_REDIS_URL=redis://…`
-- `TVTIMES_RATELIMIT_STORAGE_URI=redis://…` (share the Redis; `memory://` only
-  works for a single API process)
-- `TVTIMES_WEBAUTHN_RP_ID=tvtimes.issinoho.com` — must equal the origin host
-- `TVTIMES_EMAIL_PROVIDER=smtp|resend` plus the matching creds
-  (`console` logs the verification link and must not be used in prod)
+- `TVTIMES_JWT_PRIVATE_KEY_PEM` — Ed25519 private key, PKCS#8 PEM
+- `TVTIMES_ENCRYPTION_KEY` — 32 urlsafe-base64 bytes (Fernet key)
+- `TVTIMES_DATABASE_URL` — `postgres://`, `postgresql://` and
+  `postgresql+asyncpg://` are all accepted (the first two are rewritten)
+- `TVTIMES_REDIS_URL`
+
+**Expected in any real deployment:**
+
+- `TVTIMES_PUBLIC_ORIGIN` — the exact origin the browser uses. Not `https://`
+  is only a warning (self-hosters terminate TLS at their own proxy), but
+  passkeys and `Secure` cookies need HTTPS or `localhost`.
+- `TVTIMES_WEBAUTHN_RP_ID` — the registrable domain of that origin (no scheme,
+  no port); `localhost` for a bare-IP setup. Changing it later invalidates
+  every passkey.
+- `TVTIMES_RATELIMIT_STORAGE_URI=redis://…` — share the Redis so limits hold
+  across API replicas (`memory://` is per-process).
+- `TVTIMES_EMAIL_PROVIDER=smtp|resend` + creds — `console` only writes the
+  verification/reset link to the log (acceptable for a single-user install).
 
 Full list with defaults: [`.env.example`](../.env.example).
 
-## Rollout
+## Edge / reverse proxy
 
-1. `cd backend && uv sync` on the release image.
-2. `alembic upgrade head` (run once per deploy, before starting the new API).
-3. Start/replace the API and the worker.
-4. Build and publish the SPA; point the edge at `dist/` for everything except
-   `/api` and `/openapi.json`, which proxy to the API.
+- Terminate TLS at the proxy and forward `X-Forwarded-Proto` / `X-Forwarded-For`
+  (uvicorn runs with `--proxy-headers --forwarded-allow-ips '*'`; the rate
+  limiter and audit log read the client IP).
+- Proxy **all** paths to the container — the SPA and API are one origin.
+- Recommended headers: HSTS; CSP with `connect-src 'self'`, `script-src 'self'`,
+  `img-src 'self' data: https://image.tmdb.org https://iptv-org.github.io`.
+- The refresh cookie is `HttpOnly; Secure; SameSite=Lax`, path `/api/auth`.
 
-## Edge / TLS
+## Upgrades
 
-- Terminate TLS at the proxy; set `X-Forwarded-For` (the rate limiter and audit
-  log read it).
-- `HSTS`, and a CSP that allows `connect-src 'self'`, `img-src` also
-  `https://image.tmdb.org` and `https://iptv-org.github.io`, `script-src 'self'`.
-- The refresh cookie is `HttpOnly; Secure; SameSite=Lax`, path `/api/auth` — no
-  extra config, but the SPA and API must share the origin.
-
-## Connector
-
-The LAN connector (`connector/`) is distributed separately — users install it on
-their own network (`pipx install tvtimes-connector` or the Docker image) and
-pair it from **Settings → Connectors**. Nothing about it runs server-side beyond
-the `/api/connector/*` endpoints.
+`docker compose pull && docker compose up -d`. The `web` container runs
+`alembic upgrade head` on start before serving; the worker waits for it.
 
 ## Health
 
-- `GET /api/healthz` — liveness (version).
+- `GET /api/healthz` — liveness (returns the version). Used by the compose
+  healthcheck.
 - `GET /api/readyz` — readiness (checks the DB).
+
+## Connector (optional)
+
+`connector/` is a separate agent for HDHomeRun tuners on a network the server
+can't reach. Users run `issinoho/tvtimes-connector` (or `pipx install
+tvtimes-connector`) on that network and pair it from **Settings → Connectors**.
+Nothing of it runs server-side beyond `/api/connector/*`. Tuners the server
+*can* reach need no connector — add a native **HDHomeRun** source instead.
