@@ -24,7 +24,7 @@ docker compose up -d
 ```
 
 Open the origin you set and create the first account. One container serves both
-the API and the web app on port 8000; a second runs the background worker.
+the API and the web app on port 8888; a second runs the background worker.
 Postgres, Redis, and the auto-generated secrets live in named volumes, so
 accounts and sessions survive `docker compose pull && docker compose up -d`.
 

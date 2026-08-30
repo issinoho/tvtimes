@@ -16,7 +16,7 @@ curl -o .env https://raw.githubusercontent.com/issinoho/tvtimes/main/.env.exampl
 Edit `.env`. For a first run on your LAN you only need:
 
 ```sh
-TVTIMES_PUBLIC_ORIGIN=http://192.168.1.10:8000   # the address you'll open in a browser
+TVTIMES_PUBLIC_ORIGIN=http://192.168.1.10:8888   # the address you'll open in a browser
 TVTIMES_WEBAUTHN_RP_ID=localhost                  # keep as localhost for a bare-IP setup
 POSTGRES_PASSWORD=pick-something
 ```
@@ -76,11 +76,11 @@ Caddy:
 
 ```
 tv.example.com {
-    reverse_proxy 127.0.0.1:8000
+    reverse_proxy 127.0.0.1:8888
 }
 ```
 
-Nginx: proxy `/` to `127.0.0.1:8000` with `proxy_set_header X-Forwarded-Proto
+Nginx: proxy `/` to `127.0.0.1:8888` with `proxy_set_header X-Forwarded-Proto
 $scheme;` and `X-Forwarded-For`. The app already trusts forwarded headers.
 
 ## HDHomeRun tuners
