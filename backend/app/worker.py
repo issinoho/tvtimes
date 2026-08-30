@@ -43,9 +43,7 @@ async def shutdown(_ctx: dict[str, Any]) -> None:
     _log.info("worker.shutdown")
 
 
-async def refresh_source(
-    ctx: dict[str, Any], source_id: str, force_epg: bool = False
-) -> None:
+async def refresh_source(ctx: dict[str, Any], source_id: str, force_epg: bool = False) -> None:
     async with get_sessionmaker()() as session:
         source = await session.get(Source, uuid.UUID(source_id))
         if source is None:
