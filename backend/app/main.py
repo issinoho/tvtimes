@@ -22,6 +22,7 @@ from app.logging import configure_logging, get_logger
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
+    settings.assert_production_ready()
     configure_logging(settings.log_level, json=settings.is_prod)
     log = get_logger("app")
     log.info("startup", env=settings.env, rp_id=settings.webauthn_rp_id)

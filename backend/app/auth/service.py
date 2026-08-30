@@ -263,6 +263,10 @@ async def complete_mfa_login(
     if user is None or user.totp is None or user.totp.confirmed_at is None:
         raise TokenInvalid()
 
+    # A lockout raised after the password step still applies here.
+    if user.locked_until is not None and user.locked_until > _now():
+        raise AccountLocked()
+
     secret = decrypt(user.totp.secret_encrypted)
     if totp.verify_code(secret, code):
         await _audit(session, "mfa_ok", user=user, meta=meta, factor="totp")

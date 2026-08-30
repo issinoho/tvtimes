@@ -111,6 +111,27 @@ async def test_passkey_login_rejects_unknown_credential(
     assert resp.status_code == 401
 
 
+async def test_passkey_registration_requires_verified_email(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    from app.db import get_sessionmaker
+    from app.models.user import User
+    from sqlalchemy import update
+
+    # Register + verify + login to obtain an access token, then revoke
+    # verification directly so the request carries an unverified session.
+    await register_and_verify(app_client, captured_emails)
+    token = await login(app_client)
+    async with get_sessionmaker()() as s:
+        await s.execute(
+            update(User).where(User.email == "sam@example.com").values(email_verified_at=None)
+        )
+        await s.commit()
+
+    resp = await app_client.post("/api/account/passkeys/options", headers=auth_header(token))
+    assert resp.status_code == 403
+
+
 async def test_delete_passkey(
     app_client: AsyncClient, captured_emails: list[dict[str, str]]
 ) -> None:

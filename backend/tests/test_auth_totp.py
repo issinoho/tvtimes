@@ -89,6 +89,34 @@ async def test_wrong_totp_code_is_rejected(
     assert bad.status_code == 401
 
 
+async def test_lockout_blocks_the_mfa_step_too(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    await register_and_verify(app_client, captured_emails)
+    token = await login(app_client)
+    await _enrol_totp(app_client, token)
+
+    # Get a valid mfa_token from a good password step...
+    resp = await app_client.post(
+        "/api/auth/login", json={"email": "sam@example.com", "password": DEFAULT_PASSWORD}
+    )
+    mfa_token = resp.json()["mfa_token"]
+
+    # ...then trip the lockout with bad password attempts.
+    for _ in range(5):
+        await app_client.post(
+            "/api/auth/login", json={"email": "sam@example.com", "password": "wrong wrong"}
+        )
+
+    import pyotp as _pyotp
+
+    resp = await app_client.post(
+        "/api/auth/login/mfa",
+        json={"mfa_token": mfa_token, "code": _pyotp.TOTP("A" * 16).now()},
+    )
+    assert resp.status_code == 423
+
+
 async def test_me_reports_totp_enabled(
     app_client: AsyncClient, captured_emails: list[dict[str, str]]
 ) -> None:

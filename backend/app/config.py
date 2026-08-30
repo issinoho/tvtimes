@@ -78,6 +78,20 @@ class Settings(BaseSettings):
     def fetch_allowlist_entries(self) -> list[str]:
         return [e.strip() for e in self.fetch_allowlist.split(",") if e.strip()]
 
+    def assert_production_ready(self) -> None:
+        """Fail fast at startup if a prod deployment is missing real secrets."""
+        if self.env != "prod":
+            return
+        problems: list[str] = []
+        if not self.jwt_private_key_pem.strip():
+            problems.append("TVTIMES_JWT_PRIVATE_KEY_PEM is required in prod")
+        if self.encryption_key.startswith("dev-insecure-key"):
+            problems.append("TVTIMES_ENCRYPTION_KEY still holds the insecure default")
+        if not self.public_origin.startswith("https://"):
+            problems.append("TVTIMES_PUBLIC_ORIGIN must be https:// in prod")
+        if problems:
+            raise RuntimeError("insecure production config: " + "; ".join(problems))
+
 
 @functools.lru_cache
 def get_settings() -> Settings:

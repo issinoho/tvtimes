@@ -67,7 +67,7 @@ async def set_timezone(body: TimezoneIn, user: VerifiedUser, session: SessionDep
 @router.post("/passkeys/options", response_model=OptionsOut)
 @limiter.limit(WEBAUTHN_LIMIT)
 async def passkey_register_options(
-    request: Request, user: CurrentUser, session: SessionDep
+    request: Request, user: VerifiedUser, session: SessionDep
 ) -> OptionsOut:
     options = await service.webauthn_register_begin(session, user)
     return OptionsOut(options=options)
@@ -78,7 +78,7 @@ async def passkey_register_options(
 async def passkey_register_verify(
     request: Request,
     body: WebAuthnRegisterCompleteIn,
-    user: CurrentUser,
+    user: VerifiedUser,
     session: SessionDep,
     meta: ClientMetaDep,
 ) -> PasskeyOut:
