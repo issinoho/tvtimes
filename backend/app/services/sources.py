@@ -12,7 +12,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.crypto import decrypt, encrypt
-from app.ingest import hdhomerun, m3u, stalker, xtream
+from app.ingest import channel_logos, hdhomerun, m3u, stalker, xtream
 from app.ingest.errors import SourceError, SourceRejected, SourceUnreachable
 from app.ingest.models import Channel as ParsedChannel
 from app.ingest.models import Playlist
@@ -216,17 +216,26 @@ async def refresh_source(session: AsyncSession, source: Source) -> bool:
         c.dedupe_key: c
         for c in await session.scalars(select(Channel).where(Channel.source_id == source.id))
     }
+    logo_index = await channel_logos.load_index()
     seen: set[str] = set()
     for order, ch in enumerate(playlist.channels):
         key = _dedupe_key(ch)
         if key in seen:
             continue
         seen.add(key)
+        row = existing.get(key)
+        logo = (
+            ch.tvg_logo
+            or channel_logos.lookup(
+                logo_index, ext_id=ch.tvg_id, name=ch.name, tvg_name=ch.tvg_name
+            )
+            or (row.logo_url if row else None)  # keep a prior backfill if iptv-org is down
+        )
         fields: dict[str, object] = {
             "ext_id": ch.tvg_id,
             "name": ch.name[:400],
             "tvg_name": ch.tvg_name,
-            "logo_url": ch.tvg_logo,
+            "logo_url": logo,
             "group_title": (ch.group_title or None) and ch.group_title[:400],
             "number": ch.number,
             "is_hd": ch.is_hd,
@@ -234,7 +243,6 @@ async def refresh_source(session: AsyncSession, source: Source) -> bool:
             "stream_ref_encrypted": encrypt(ch.stream_ref),
             "last_seen_at": _now(),
         }
-        row = existing.get(key)
         if row is None:
             session.add(
                 Channel(tenant_id=source.tenant_id, source_id=source.id, dedupe_key=key, **fields)

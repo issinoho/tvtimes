@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import os
 import re
-from collections.abc import AsyncIterator
+import time
+from collections.abc import AsyncIterator, Iterator
 
 import pytest
 
@@ -41,6 +42,22 @@ def _no_breach_check(monkeypatch: pytest.MonkeyPatch) -> None:
         return False
 
     monkeypatch.setattr("app.auth.passwords._is_breached", _never_breached)
+
+
+@pytest.fixture(autouse=True)
+def _no_iptv_org_fetch() -> Iterator[None]:
+    """Seed the channel-logo cache so ``load_index`` serves it instead of
+    hitting iptv-org during a ``refresh_source``. Tests that exercise the
+    backfill clear the cache or patch ``load_index`` themselves."""
+    from app.ingest import channel_logos
+
+    saved = channel_logos._index, channel_logos._loaded_at
+    channel_logos._index = {"__test_stub__": ""}
+    channel_logos._loaded_at = time.monotonic()
+    try:
+        yield
+    finally:
+        channel_logos._index, channel_logos._loaded_at = saved
 
 
 @pytest.fixture
