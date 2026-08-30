@@ -1,11 +1,60 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
-import type { GuideChannel, Programme } from '@/features/guide/api';
+import { useSetChannelShift, type GuideChannel, type Programme } from '@/features/guide/api';
 import { GENRE_VAR, genreOf } from '@/features/guide/genre';
 import { fmtDayTime } from '@/features/guide/time';
 import { useHero } from '@/features/guide/hero';
 import { useDialogFocus } from '@/lib/useDialogFocus';
 import styles from '@/features/guide/guide.module.css';
+
+const SHIFT_STEPS = [-3600, -900, 0, 900, 3600] as const;
+const CLAMP = 24 * 3600;
+
+function fmtShift(seconds: number): string {
+  if (seconds === 0) return 'no offset';
+  const sign = seconds > 0 ? '+' : '−';
+  const abs = Math.abs(seconds);
+  const h = Math.floor(abs / 3600);
+  const m = Math.round((abs % 3600) / 60);
+  return `${sign}${h ? `${h}h` : ''}${m ? `${m}m` : ''}`;
+}
+
+function ChannelShiftControl({ channel }: { channel: GuideChannel }) {
+  const [shift, setShift] = useState(channel.clock_shift_seconds);
+  const mutation = useSetChannelShift();
+  useEffect(() => setShift(channel.clock_shift_seconds), [channel.id, channel.clock_shift_seconds]);
+
+  const apply = (seconds: number) => {
+    const next = Math.max(-CLAMP, Math.min(CLAMP, seconds));
+    setShift(next);
+    mutation.mutate({ channelId: channel.id, seconds: next });
+  };
+
+  return (
+    <div className={styles.shift}>
+      <p className={styles.kv}>
+        Listing offset for {channel.name}: <strong>{fmtShift(shift)}</strong>
+      </p>
+      <div className={styles.shiftBtns}>
+        {SHIFT_STEPS.map((step) => (
+          <button
+            key={step}
+            type="button"
+            className={styles.btn}
+            disabled={mutation.isPending}
+            onClick={() => apply(step === 0 ? 0 : shift + step)}
+          >
+            {step === 0 ? 'Reset' : fmtShift(step)}
+          </button>
+        ))}
+      </div>
+      <p className={styles.kvDim}>
+        Added to every programme time on this channel — e.g. +3h to match a US-West feed to an
+        East-coast guide. The grid updates as you adjust.
+      </p>
+    </div>
+  );
+}
 
 interface Props {
   channel: GuideChannel;
@@ -116,6 +165,8 @@ export function ProgrammeSheet({ channel, programme, onClose }: Props) {
         ) : (
           <p className={styles.kv}>No description in this guide.</p>
         )}
+
+        <ChannelShiftControl channel={channel} />
 
         {hero?.enriching ? (
           <p className={styles.kv} style={{ marginTop: '1rem' }}>

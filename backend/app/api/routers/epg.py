@@ -14,6 +14,8 @@ from app.models.source import Channel
 from app.queue import enqueue_epg_refresh
 from app.schemas.auth import MessageOut
 from app.schemas.epg import (
+    ChannelPatchIn,
+    ChannelShiftOut,
     EpgSourceIn,
     EpgSourceOut,
     GuideChannelOut,
@@ -22,6 +24,7 @@ from app.schemas.epg import (
     ScheduleOut,
 )
 from app.services import epg as svc
+from app.services import sources as src_svc
 
 router = APIRouter(tags=["epg"])
 
@@ -108,6 +111,21 @@ async def delete_epg_source(
     return MessageOut(message="EPG source removed.")
 
 
+@router.patch("/channels/{channel_id}", response_model=ChannelShiftOut)
+async def patch_channel(
+    channel_id: uuid.UUID, body: ChannelPatchIn, user: VerifiedUser, session: SessionDep
+) -> ChannelShiftOut:
+    try:
+        channel = await src_svc.get_channel(session, user.tenant_id, channel_id)
+    except src_svc.SourceNotFound as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Unknown channel") from exc
+    await src_svc.set_channel_clock_shift(
+        session, channel, clock_shift_seconds=body.clock_shift_seconds
+    )
+    await session.flush()
+    return ChannelShiftOut(id=channel.id, clock_shift_seconds=channel.clock_shift_seconds)
+
+
 @router.get("/channels/{channel_id}/schedule", response_model=ScheduleOut)
 async def channel_schedule(
     channel_id: uuid.UUID,
@@ -168,6 +186,7 @@ async def guide(
                 group_title=r.channel.group_title,
                 is_hd=r.channel.is_hd,
                 timezone=r.timezone,
+                clock_shift_seconds=r.channel.clock_shift_seconds,
                 programmes=[_programme_out(*t) for t in r.programmes],
             )
             for r in rows

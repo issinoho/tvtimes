@@ -161,6 +161,21 @@ async def delete_source(session: AsyncSession, source: Source) -> None:
     await session.delete(source)
 
 
+async def get_channel(
+    session: AsyncSession, tenant_id: uuid.UUID, channel_id: uuid.UUID
+) -> Channel:
+    channel = await session.get(Channel, channel_id)
+    if channel is None or channel.tenant_id != tenant_id:
+        raise SourceNotFound
+    return channel
+
+
+async def set_channel_clock_shift(
+    session: AsyncSession, channel: Channel, *, clock_shift_seconds: int
+) -> None:
+    channel.clock_shift_seconds = clock_shift_seconds
+
+
 # --- refresh ---------------------------------------------------------------
 
 

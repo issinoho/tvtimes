@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api, unwrap } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
@@ -20,5 +20,26 @@ export function useGuide(params: GuideParams) {
     queryFn: async () => unwrap(await api.GET('/api/guide', { params: { query: params } })),
     staleTime: 60_000,
     placeholderData: (prev) => prev,
+  });
+}
+
+/**
+ * Set a channel's per-channel clock offset (added to every one of its
+ * programme times). Used to line up e.g. a US-West feed with an East-coast EPG.
+ */
+export function useSetChannelShift() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ channelId, seconds }: { channelId: string; seconds: number }) =>
+      unwrap(
+        await api.PATCH('/api/channels/{channel_id}', {
+          params: { path: { channel_id: channelId } },
+          body: { clock_shift_seconds: seconds },
+        }),
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['guide'] });
+      void qc.invalidateQueries({ queryKey: ['channel'] });
+    },
   });
 }
