@@ -17,7 +17,11 @@ from app.config import get_settings
 REFRESH_COOKIE = "tvtimes_refresh"
 CSRF_COOKIE = "tvtimes_csrf"
 CSRF_HEADER = "x-csrf-token"
-_COOKIE_PATH = "/api/auth"
+# The refresh token is only ever read server-side, so keep it narrowly scoped.
+_REFRESH_PATH = "/api/auth"
+# The CSRF token is a non-secret double-submit value the SPA must read from
+# JavaScript on any route, so it has to be visible at the site root.
+_CSRF_PATH = "/"
 
 
 def _secure() -> bool:
@@ -27,19 +31,35 @@ def _secure() -> bool:
 def set_session_cookies(response: Response, *, refresh_token: str, max_age_seconds: int) -> str:
     csrf = secrets.token_urlsafe(24)
     common: dict[str, object] = {
-        "path": _COOKIE_PATH,
         "secure": _secure(),
         "samesite": "lax",
         "max_age": max_age_seconds,
     }
-    response.set_cookie(REFRESH_COOKIE, refresh_token, httponly=True, **common)  # type: ignore[arg-type]
-    response.set_cookie(CSRF_COOKIE, csrf, httponly=False, **common)  # type: ignore[arg-type]
+    response.set_cookie(
+        REFRESH_COOKIE,
+        refresh_token,
+        httponly=True,
+        path=_REFRESH_PATH,
+        **common,  # type: ignore[arg-type]
+    )
+    # Drop any pre-existing CSRF cookie left at the old auth-scoped path so the
+    # browser doesn't send two same-named cookies to /api/auth/* (which would
+    # make the double-submit check flaky until the stale one expired).
+    response.delete_cookie(CSRF_COOKIE, path=_REFRESH_PATH)
+    response.set_cookie(
+        CSRF_COOKIE,
+        csrf,
+        httponly=False,
+        path=_CSRF_PATH,
+        **common,  # type: ignore[arg-type]
+    )
     return csrf
 
 
 def clear_session_cookies(response: Response) -> None:
-    for name in (REFRESH_COOKIE, CSRF_COOKIE):
-        response.delete_cookie(name, path=_COOKIE_PATH)
+    response.delete_cookie(REFRESH_COOKIE, path=_REFRESH_PATH)
+    response.delete_cookie(CSRF_COOKIE, path=_CSRF_PATH)
+    response.delete_cookie(CSRF_COOKIE, path=_REFRESH_PATH)  # legacy scope
 
 
 def read_refresh_cookie(request: Request) -> str:
