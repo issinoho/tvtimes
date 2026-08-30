@@ -11,12 +11,22 @@ import {
   type PublicKeyCredentialRequestOptionsJSON,
 } from '@simplewebauthn/browser';
 
-export function browserSupportsPasskeys(): boolean {
+function hasWebAuthnApi(): boolean {
   return (
     typeof window !== 'undefined' &&
     typeof window.PublicKeyCredential !== 'undefined' &&
     typeof navigator.credentials !== 'undefined'
   );
+}
+
+/** The WebAuthn API exists but the page isn't a secure context (plain HTTP on a
+ * LAN IP) — the ceremony would throw. `localhost` and HTTPS are fine. */
+export function passkeysNeedSecureContext(): boolean {
+  return hasWebAuthnApi() && typeof window !== 'undefined' && window.isSecureContext === false;
+}
+
+export function browserSupportsPasskeys(): boolean {
+  return hasWebAuthnApi() && (typeof window === 'undefined' || window.isSecureContext !== false);
 }
 
 export async function createPasskey(optionsJson: string): Promise<unknown> {

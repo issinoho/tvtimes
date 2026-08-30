@@ -121,8 +121,8 @@
   border: 1px solid transparent;
 }
 .callout.error {
-  color: #ffd7d7;
-  background: color-mix(in srgb, var(--genre-news) 22%, transparent);
+  color: var(--callout-error-fg);
+  background: color-mix(in srgb, var(--genre-news) 16%, transparent);
   border-color: color-mix(in srgb, var(--genre-news) 45%, transparent);
 }
 .callout.info {
@@ -131,8 +131,8 @@
   border-color: color-mix(in srgb, var(--brand-violet) 40%, transparent);
 }
 .callout.success {
-  color: #d7ffe9;
-  background: color-mix(in srgb, var(--genre-doc) 20%, transparent);
+  color: var(--callout-success-fg);
+  background: color-mix(in srgb, var(--genre-doc) 16%, transparent);
   border-color: color-mix(in srgb, var(--genre-doc) 42%, transparent);
 }
 
