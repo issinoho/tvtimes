@@ -29,7 +29,7 @@ async def close_pool() -> None:
         _pool = None
 
 
-async def _enqueue(job: str, *args: str) -> None:
+async def _enqueue(job: str, *args: object) -> None:
     """Best effort: a queue outage must not fail the API call that triggered it
     (the periodic sweep will pick the work up)."""
     try:
@@ -39,8 +39,10 @@ async def _enqueue(job: str, *args: str) -> None:
         _log.warning("queue.enqueue_failed", job=job, error=str(exc))
 
 
-async def enqueue_source_refresh(source_id: uuid.UUID) -> None:
-    await _enqueue("refresh_source", str(source_id))
+async def enqueue_source_refresh(source_id: uuid.UUID, *, force_epg: bool = False) -> None:
+    """``force_epg`` re-parses the EPG even if the feed is unchanged — used for
+    the manual "Refresh" button so a user can always rebuild stale programmes."""
+    await _enqueue("refresh_source", str(source_id), force_epg)
 
 
 async def enqueue_epg_refresh(epg_source_id: uuid.UUID) -> None:
