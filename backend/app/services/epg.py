@@ -129,12 +129,16 @@ async def _channel_index(session: AsyncSession, tenant_id: uuid.UUID) -> dict[st
     for ch in rows:
         keys: list[str] = []
         if ch.ext_id:
-            keys.append(ch.ext_id)
-            keys.append(FEED_SUFFIX_RE.sub("", ch.ext_id))
+            # tvg-id / XMLTV id casing is wildly inconsistent between feeds
+            # (``TCM.us`` vs ``tcm.us``) — match case-insensitively.
+            keys.append(ch.ext_id.lower())
+            keys.append(FEED_SUFFIX_RE.sub("", ch.ext_id).lower())
         keys.append(normalize_name(ch.name))
         if ch.tvg_name:
             keys.append(normalize_name(ch.tvg_name))
         for key in keys:
+            if not key:
+                continue
             bucket = index.setdefault(key, [])
             if ch.id not in bucket:
                 bucket.append(ch.id)
@@ -144,9 +148,10 @@ async def _channel_index(session: AsyncSession, tenant_id: uuid.UUID) -> dict[st
 def _resolve_channels(
     xmltv_id: str, guide: ParsedGuide, index: dict[str, list[uuid.UUID]]
 ) -> list[uuid.UUID]:
-    if xmltv_id in index:
-        return index[xmltv_id]
-    stripped = FEED_SUFFIX_RE.sub("", xmltv_id)
+    lowered = xmltv_id.lower()
+    if lowered in index:
+        return index[lowered]
+    stripped = FEED_SUFFIX_RE.sub("", xmltv_id).lower()
     if stripped in index:
         return index[stripped]
     channel = guide.channels.get(xmltv_id)

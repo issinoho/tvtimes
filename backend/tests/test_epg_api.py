@@ -194,14 +194,17 @@ async def test_source_refresh_keeps_channel_ids_and_programmes(
 async def test_programmes_fan_out_to_channels_sharing_a_tvg_id(
     app_client: AsyncClient, captured_emails: list[dict[str, str]], monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Two channels with the same tvg-id (mixed case vs the XMLTV's lower case)
+    both get the schedule."""
     await register_and_verify(app_client, captured_emails)
     headers = auth_header(await login(app_client))
 
     async def fake_ingest(_kind: object, _config: object) -> Playlist:
+        # Playlist stores mixed-case tvg-ids; the XMLTV below uses lower-case.
         return Playlist(
             channels=[
-                ParsedChannel(name="TCM US East", stream_ref="http://s/e", tvg_id="tcm.us"),
-                ParsedChannel(name="TCM US West", stream_ref="http://s/w", tvg_id="tcm.us"),
+                ParsedChannel(name="TCM US East", stream_ref="http://s/e", tvg_id="TCM.us"),
+                ParsedChannel(name="TCM US West", stream_ref="http://s/w", tvg_id="TCM.us"),
             ],
             epg_url="http://epg.example.com/guide.xml",
         )
