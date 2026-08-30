@@ -1,0 +1,33 @@
+<svg width="880" height="200" viewBox="0 0 880 200" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="tvtimes">
+  <defs>
+    <linearGradient id="mark" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1B0A3D"/>
+      <stop offset="0.45" stop-color="#6D28D9"/>
+      <stop offset="1" stop-color="#DB2777"/>
+    </linearGradient>
+    <radialGradient id="wash" cx="0.28" cy="0.15" r="0.9">
+      <stop offset="0" stop-color="#6D28D9" stop-opacity="0.55"/>
+      <stop offset="0.5" stop-color="#DB2777" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#0B0713" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="panel"><rect x="0" y="0" width="880" height="200" rx="28"/></clipPath>
+  </defs>
+
+  <g clip-path="url(#panel)">
+    <rect x="0" y="0" width="880" height="200" fill="#0B0713"/>
+    <rect x="0" y="0" width="880" height="200" fill="url(#wash)"/>
+    <rect x="0.5" y="0.5" width="879" height="199" rx="27.5" fill="none" stroke="#F4EEFF" stroke-opacity="0.10"/>
+  </g>
+
+  <!-- mark -->
+  <g transform="translate(56 62)">
+    <rect x="0" y="0" width="76" height="60" rx="16" fill="url(#mark)"/>
+    <rect x="0" y="0" width="76" height="60" rx="16" fill="none" stroke="#F4EEFF" stroke-opacity="0.14"/>
+    <rect x="14" y="29" width="48" height="2.5" rx="1.25" fill="#F4EEFF" fill-opacity="0.35"/>
+    <path d="M30 16 L54 30 L30 44 Z" fill="#F4EEFF" fill-opacity="0.92"/>
+  </g>
+
+  <!-- wordmark -->
+  <text x="164" y="104" font-family="'Space Grotesk','Segoe UI',ui-sans-serif,system-ui,-apple-system,sans-serif" font-size="58" font-weight="600" letter-spacing="-1" fill="#F4EEFF">tvtimes</text>
+  <text x="166" y="138" font-family="'Segoe UI',ui-sans-serif,system-ui,-apple-system,sans-serif" font-size="20" font-weight="400" letter-spacing="0.2" fill="#F4EEFF" fill-opacity="0.62">self-hosted TV schedule guide</text>
+</svg>
