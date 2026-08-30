@@ -40,6 +40,7 @@ _DEVICE_TYPE_TUNER = 0x00000001
 _WILDCARD = 0xFFFFFFFF
 
 _HDHR_XMLTV = "https://api.hdhomerun.com/api/xmltv?DeviceAuth={auth}"
+_HDHR_GUIDE = "https://api.hdhomerun.com/api/guide.php?DeviceAuth={auth}"
 _DISCOVER_TIMEOUT = 8.0
 _LINEUP_TIMEOUT = 20.0
 
@@ -158,9 +159,29 @@ def _to_int(value: object) -> int | None:
     return None
 
 
+async def _fetch_channel_images(client: httpx.AsyncClient, device_auth: str) -> dict[str, str]:
+    """GuideNumber -> logo URL from the SiliconDust cloud guide. Best effort:
+    logos are cosmetic and this endpoint needs guide data on the account."""
+    try:
+        r = await client.get(_HDHR_GUIDE.format(auth=device_auth), timeout=_LINEUP_TIMEOUT)
+        r.raise_for_status()
+        data = r.json()
+    except (httpx.HTTPError, ValueError):
+        return {}
+    images: dict[str, str] = {}
+    for entry in data if isinstance(data, list) else []:
+        if not isinstance(entry, dict):
+            continue
+        number = str(entry.get("GuideNumber") or "").strip()
+        image = entry.get("ImageURL")
+        if number and isinstance(image, str) and image:
+            images[number] = image
+    return images
+
+
 async def _fetch_device(
     client: httpx.AsyncClient, base_url: str
-) -> tuple[list[Channel], str | None]:
+) -> tuple[list[Channel], str | None, str | None]:
     base_url = base_url.rstrip("/")
     await _assert_lan_url(base_url)
     try:
@@ -211,8 +232,9 @@ async def _fetch_device(
         )
 
     auth = discover.get("DeviceAuth")
-    epg_url = _HDHR_XMLTV.format(auth=auth) if auth else None
-    return channels, epg_url
+    auth_str = str(auth) if auth else None
+    epg_url = _HDHR_XMLTV.format(auth=auth_str) if auth_str else None
+    return channels, epg_url, auth_str
 
 
 async def load_hdhomerun_playlist(config: dict[str, object]) -> Playlist:
@@ -229,13 +251,18 @@ async def load_hdhomerun_playlist(config: dict[str, object]) -> Playlist:
     seen_streams: set[str] = set()
     async with httpx.AsyncClient(follow_redirects=True) as client:
         for i, base in enumerate(base_urls):
-            channels, epg_url = await _fetch_device(client, base)
+            channels, epg_url, device_auth = await _fetch_device(client, base)
             if i == 0 and epg_url:
                 playlist.epg_url = epg_url
+            images = (
+                await _fetch_channel_images(client, device_auth) if device_auth and channels else {}
+            )
             for ch in channels:
                 if ch.stream_ref in seen_streams:
                     continue
                 seen_streams.add(ch.stream_ref)
+                if ch.tvg_id and ch.tvg_id in images:
+                    ch.tvg_logo = images[ch.tvg_id]
                 playlist.channels.append(ch)
 
     if not playlist.channels:

@@ -22,21 +22,43 @@ _LINEUP = [
     {"GuideNumber": "3.1", "GuideName": "ITV1", "URL": "http://192.168.1.50/auto/v3.1"},
     {"GuideNumber": "4.1", "GuideName": "ignored, no url"},
 ]
+_GUIDE = [
+    {"GuideNumber": "2.1", "GuideName": "BBC One", "ImageURL": "https://cdn.hdhr/bbc1.png"},
+    {"GuideNumber": "9.9", "GuideName": "Not in lineup", "ImageURL": "https://cdn.hdhr/x.png"},
+]
+
+
+def _mock_guide(*, json: object = None, status: int = 200) -> None:
+    respx.get(url__startswith="https://api.hdhomerun.com/api/guide.php").mock(
+        return_value=Response(status, json=json if json is not None else _GUIDE)
+    )
 
 
 @respx.mock
 async def test_load_playlist_happy_path() -> None:
     respx.get("http://192.168.1.50/discover.json").mock(return_value=Response(200, json=_DISCOVER))
     respx.get("http://192.168.1.50/lineup.json").mock(return_value=Response(200, json=_LINEUP))
+    _mock_guide()
 
     playlist = await hdhomerun.load_hdhomerun_playlist({"device_url": "http://192.168.1.50"})
 
     assert playlist.epg_url == "https://api.hdhomerun.com/api/xmltv?DeviceAuth=s3cr3tauth"
-    assert [(c.name, c.stream_ref, c.tvg_id) for c in playlist.channels] == [
-        ("BBC One HD", "http://192.168.1.50/auto/v2.1", "2.1"),
-        ("ITV1", "http://192.168.1.50/auto/v3.1", "3.1"),
+    assert [(c.name, c.stream_ref, c.tvg_id, c.tvg_logo) for c in playlist.channels] == [
+        ("BBC One HD", "http://192.168.1.50/auto/v2.1", "2.1", "https://cdn.hdhr/bbc1.png"),
+        ("ITV1", "http://192.168.1.50/auto/v3.1", "3.1", None),
     ]
     assert playlist.channels[0].number == 2
+
+
+@respx.mock
+async def test_guide_fetch_failure_leaves_channels_without_logos() -> None:
+    respx.get("http://192.168.1.50/discover.json").mock(return_value=Response(200, json=_DISCOVER))
+    respx.get("http://192.168.1.50/lineup.json").mock(return_value=Response(200, json=_LINEUP))
+    _mock_guide(status=403)
+
+    playlist = await hdhomerun.load_hdhomerun_playlist({"device_url": "http://192.168.1.50"})
+    assert len(playlist.channels) == 2
+    assert all(c.tvg_logo is None for c in playlist.channels)
 
 
 @respx.mock
@@ -44,6 +66,7 @@ async def test_relative_lineup_url_is_resolved_against_device() -> None:
     disc = {**_DISCOVER, "LineupURL": "lineup.json"}
     respx.get("http://192.168.1.50/discover.json").mock(return_value=Response(200, json=disc))
     respx.get("http://192.168.1.50/lineup.json").mock(return_value=Response(200, json=_LINEUP))
+    _mock_guide()
 
     playlist = await hdhomerun.load_hdhomerun_playlist({"device_url": "http://192.168.1.50"})
     assert len(playlist.channels) == 2
@@ -53,6 +76,7 @@ async def test_relative_lineup_url_is_resolved_against_device() -> None:
 async def test_empty_lineup_is_invalid() -> None:
     respx.get("http://192.168.1.50/discover.json").mock(return_value=Response(200, json=_DISCOVER))
     respx.get("http://192.168.1.50/lineup.json").mock(return_value=Response(200, json=[]))
+    _mock_guide()
 
     with pytest.raises(SourceInvalid):
         await hdhomerun.load_hdhomerun_playlist({"device_url": "http://192.168.1.50"})
