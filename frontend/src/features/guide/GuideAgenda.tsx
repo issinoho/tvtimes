@@ -24,6 +24,7 @@ export function GuideAgenda({ channels, onOpen }: Props) {
             type="button"
             className={styles.chip}
             data-active={i === active}
+            aria-pressed={i === active}
             onClick={() => setActive(i)}
           >
             {c.number ? `${c.number} · ` : ''}

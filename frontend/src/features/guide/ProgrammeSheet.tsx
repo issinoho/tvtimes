@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import type { GuideChannel, Programme } from '@/features/guide/api';
 import { GENRE_VAR, genreOf } from '@/features/guide/genre';
 import { useHero } from '@/features/guide/hero';
+import { useDialogFocus } from '@/lib/useDialogFocus';
 import styles from '@/features/guide/guide.module.css';
 
 interface Props {
@@ -13,6 +14,7 @@ interface Props {
 
 export function ProgrammeSheet({ channel, programme, onClose }: Props) {
   const { data: hero } = useHero(programme.id);
+  const sheetRef = useDialogFocus<HTMLElement>();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -40,10 +42,13 @@ export function ProgrammeSheet({ channel, programme, onClose }: Props) {
     <>
       <div className={styles.sheetBackdrop} onClick={onClose} />
       <aside
+        ref={sheetRef}
         className={styles.sheet}
         style={{ ['--genre' as string]: GENRE_VAR[genre] }}
         role="dialog"
+        aria-modal="true"
         aria-label={programme.title}
+        tabIndex={-1}
       >
         <button type="button" className={`${styles.btn} ${styles.close}`} onClick={onClose}>
           Close
