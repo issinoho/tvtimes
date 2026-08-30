@@ -1,97 +1,179 @@
-<!-- logo placeholder: frontend/src/assets/brand/logo-lockup.svg -->
+<p align="center">
+  <img src="docs/logo.svg" alt="tvtimes" width="460">
+</p>
 
-# tvtimes
+<p align="center">
+  A modern, self-hosted TV schedule (EPG) for your home lab — colourful
+  set-top-box-style guide, passkeys-first accounts, one Docker Compose stack.
+</p>
 
-A modern, self-hostable TV schedule (EPG) site. Create an account, connect TV
-sources (M3U / Xtream / Stalker / HDHomeRun), and browse a colourful
-set-top-box-style guide enriched with channel logos, release years and a
-cinematic TMDB "hero" panel. Passkeys-first auth, long-lived sessions, works on
-phones and tablets, installable as a PWA.
+<p align="center">
+  <a href="https://hub.docker.com/r/issinoho1969/tvtimes"><img alt="Docker Hub" src="https://img.shields.io/badge/docker-issinoho1969%2Ftvtimes-2496ED?logo=docker&logoColor=white"></a>
+  <img alt="License" src="https://img.shields.io/badge/license-MIT-6D28D9">
+</p>
 
-Build plan: [`docs/plan.md`](docs/plan.md) · Brand: [`docs/brand.md`](docs/brand.md)
-· Self-hosting: [`docs/homelab.md`](docs/homelab.md) · Ops notes: [`docs/deploy.md`](docs/deploy.md)
+---
 
-## Run it (Docker Compose)
+## What it is
+
+Create an account, connect your TV sources, and browse a fast, virtualised
+guide grid enriched with channel logos, release years, genres and a cinematic
+TMDB "hero" panel. Everything runs on your own hardware.
+
+| | |
+|---|---|
+| **Sources** | M3U / M3U8 playlists · Xtream Codes · Stalker portals · **HDHomeRun** (native discovery, or the connector agent for tuners on another network) |
+| **Guide** | virtualised grid + live "now" line on desktop, single-channel agenda on phones; genre colours, date nav, group filter, channel search, full keyboard nav; installable PWA with an offline shell |
+| **Time** | one account timezone (captured from your browser at signup) with a per-source override and a per-channel clock-shift nudge — so an East/West feed pair can share EPG data and still read correctly |
+| **Enrichment** | your own TMDB API key powers backdrops, logos, cast, ratings and synopses for film programmes; channel logos are backfilled from the iptv-org database when a playlist omits them |
+| **Auth** | WebAuthn passkeys first, Argon2id password + HIBP check as a fallback, TOTP 2FA, 60-day rotating refresh sessions with replay detection, audit log |
+
+## Run it
 
 You need Docker with the Compose plugin. Nothing to build — it pulls a
-published image.
+published multi-arch image (`linux/amd64` + `linux/arm64`).
 
 ```sh
+mkdir tvtimes && cd tvtimes
 curl -O https://raw.githubusercontent.com/issinoho/tvtimes/main/docker-compose.yml
 curl -o .env https://raw.githubusercontent.com/issinoho/tvtimes/main/.env.example
-# edit .env: set TVTIMES_PUBLIC_ORIGIN (and TVTIMES_WEBAUTHN_RP_ID for a domain)
+# edit .env — set TVTIMES_PUBLIC_ORIGIN to the URL you'll open (see below)
 docker compose up -d
 ```
 
-Open the origin you set and create the first account. One container serves both
-the API and the web app on port 8888; a second runs the background worker.
-Postgres, Redis, and the auto-generated secrets live in named volumes, so
-accounts and sessions survive `docker compose pull && docker compose up -d`.
+Open the origin you configured (default `http://localhost:8888`) and create the
+first account. With the default `TVTIMES_EMAIL_PROVIDER=console`, the
+verification link is printed to the log:
 
-Full walkthrough — reverse proxy + TLS, HDHomeRun, email, backups, upgrades — in
-[`docs/homelab.md`](docs/homelab.md).
+```sh
+docker compose logs tvtimes | grep -E "email.console|email.undelivered_body"
+```
 
-### Images
+One container serves the API **and** the web app on port 8888; a second runs the
+background worker. Postgres, Redis and the auto-generated secrets live in named
+volumes, so accounts and sessions survive `docker compose pull && docker compose up -d`.
+
+### Essential configuration
+
+| Variable | Notes |
+|---|---|
+| `TVTIMES_PUBLIC_ORIGIN` | The exact URL the browser uses — scheme, host, port, no trailing slash. Passkeys are bound to it. `http://192.168.x.x:8888` is fine on a trusted LAN; use `https://…` behind a reverse proxy. |
+| `TVTIMES_WEBAUTHN_RP_ID` | The registrable domain of that origin (no scheme/port); `localhost` for a bare-IP setup. **Changing it later invalidates every passkey.** |
+| `TVTIMES_HTTP_PORT` | Host port to expose (default `8888`). |
+| `POSTGRES_PASSWORD` | Used by the db container and the app connection string. |
+| `TVTIMES_EMAIL_PROVIDER` | `console` (log only) · `smtp` (+ `TVTIMES_SMTP_*`) · `resend` (+ `TVTIMES_RESEND_API_KEY`). |
+
+Full list with comments: [`.env.example`](.env.example). Secrets
+(`TVTIMES_JWT_PRIVATE_KEY_PEM`, `TVTIMES_ENCRYPTION_KEY`) are generated into the
+`secrets` volume on first run — **back that volume up**; if it's lost, stored
+credentials and sessions can't be decrypted.
+
+### Behind a reverse proxy (HTTPS)
+
+Passkeys and `Secure` cookies need HTTPS (or `localhost`). Terminate TLS at your
+proxy and forward everything to the container. In `.env`:
+
+```sh
+TVTIMES_PUBLIC_ORIGIN=https://tv.example.com
+TVTIMES_WEBAUTHN_RP_ID=tv.example.com
+```
+
+Caddy:
+
+```
+tv.example.com {
+    reverse_proxy 127.0.0.1:8888
+}
+```
+
+The app already trusts `X-Forwarded-Proto` / `X-Forwarded-For`.
+
+### HDHomeRun
+
+Add a source → **HDHomeRun**:
+
+- **Server on the tuner's network, not in Docker's bridge:** leave the address
+  blank to auto-discover.
+- **tvtimes in Docker (usual case):** the bridge network can't receive
+  discovery broadcasts — enter the tuner's LAN address, e.g. `http://192.168.1.50`.
+- **Tuner on a different network from the server:** run
+  [`issinoho1969/tvtimes-connector`](connector/README.md) there and pair it from
+  **Settings → Connectors**.
+
+SiliconDust guide data (`api.hdhomerun.com`) is adopted automatically when the
+tuner reports a `DeviceAuth`.
+
+### Backups & upgrades
+
+```sh
+# upgrade
+docker compose pull && docker compose up -d          # migrations run on start
+
+# database backup
+docker compose exec db pg_dump -U tvtimes tvtimes | gzip > tvtimes-$(date +%F).sql.gz
+```
+
+Volumes: `tvtimes_pgdata` (accounts, sources, guide), `tvtimes_secrets` (signing
++ encryption keys — **back up**), `tvtimes_redisdata` (queue/cache, safe to lose).
+
+More detail: [`docs/homelab.md`](docs/homelab.md) · ops reference:
+[`docs/deploy.md`](docs/deploy.md).
+
+## Images
 
 | Image | Purpose |
-|-------|---------|
-| `issinoho1969/tvtimes` (`ghcr.io/issinoho/tvtimes`) | all-in-one: API + worker + web app |
-| `issinoho1969/tvtimes-connector` (`ghcr.io/issinoho/tvtimes-connector`) | optional LAN agent for HDHomeRun tuners on a network the server can't reach |
+|---|---|
+| `issinoho1969/tvtimes` · `ghcr.io/issinoho/tvtimes` | all-in-one: API + worker + web app |
+| `issinoho1969/tvtimes-connector` · `ghcr.io/issinoho/tvtimes-connector` | optional LAN agent for off-network HDHomeRun tuners |
 
-Native HDHomeRun support is built in — add an **HDHomeRun** source and either
-let it auto-discover or enter the tuner's LAN address (needed when tvtimes runs
-on Docker's default bridge network, which can't receive discovery broadcasts).
-The connector is only for tuners on a different network from the server.
-
-## Status
-
-| Phase | Scope | State |
-|------:|-------|-------|
-| 1 | Monorepo scaffold, CI, dev stack | done |
-| 2 | Auth (passkeys-first, TOTP, rotating sessions) | done |
-| 3 | Cloud sources (M3U / Xtream / Stalker) | done |
-| 4 | EPG ingest (XMLTV) + timezones | done |
-| 5 | Guide UI | done |
-| 6 | TMDB enrichment + hero overlay | done |
-| 7 | LAN connector (HDHomeRun) | done |
-| 8 | Polish (theme toggle, a11y, docs) | done |
-| — | Homelab packaging + native HDHomeRun | done |
-
-## Layout
+## Architecture
 
 ```
-backend/     FastAPI + SQLAlchemy 2.0 (async) + Alembic + arq worker
-frontend/    React 18 + Vite + TypeScript SPA (PWA)
-connector/   Optional LAN agent for off-network HDHomeRun tuners
-docker/      Container entrypoint
-docs/        Plan, brand, self-hosting, and ops docs
+backend/     FastAPI · SQLAlchemy 2.0 (async) · Alembic · arq worker · Postgres 16 · Redis 7
+frontend/    React 18 · Vite · TypeScript · TanStack Query · @tanstack/react-virtual · PWA
+connector/   Standalone Python agent (outbound HTTPS only) for off-network tuners
+docker/      Container entrypoint (secret bootstrap · migrations · api|worker dispatch)
+docs/        homelab · deploy · brand
 ```
+
+The API serves the built SPA from the **same origin** (`/api/*` to the backend,
+everything else to the app with a client-routing fallback), so there is no CORS
+and the refresh cookie is first-party.
 
 ## Local development
-
-Requires Docker and [uv](https://docs.astral.sh/uv/) + Node 22+.
 
 ```sh
 docker compose -f docker-compose.dev.yml up --build
 ```
 
-- API + docs: http://localhost:8000/docs
-- SPA (Vite dev server, HMR): http://localhost:5173
+- API + interactive docs: <http://localhost:8000/docs>
+- SPA dev server (HMR): <http://localhost:5173>
 
-Backend only (SQLite fallback, no worker):
+Backend only (SQLite, no worker):
 
 ```sh
 cd backend && uv sync && uv run uvicorn app.main:app --reload
 ```
 
-## Tests
+Working conventions and the non-obvious invariants are in
+[`CLAUDE.md`](CLAUDE.md).
+
+### Tests & checks
 
 ```sh
-cd backend && uv run pytest
-cd frontend && npm test
+cd backend  && uv run ruff check . && uv run ruff format --check . && uv run mypy . && uv run pytest -q
+cd frontend && npm run lint && npm run typecheck && npm test && npm run build
 ```
+
+## Releases
+
+| Tag | Publishes |
+|---|---|
+| `v*` | `issinoho1969/tvtimes` + GHCR mirror, multi-arch |
+| `connector-v*` | connector image + the wheel/sdist on the GitHub Release |
 
 ## Licence
 
-Source parsing and EPG logic is ported and adapted from the
-[`tvdinner`](https://github.com/issinoho/tvdinner) CLI (MIT).
+MIT. Source parsing and EPG logic is adapted from the
+[`tvdinner`](https://github.com/issinoho/tvdinner) CLI (MIT). Brand mark built
+from openly-licensed base glyphs — see [`docs/brand.md`](docs/brand.md).
