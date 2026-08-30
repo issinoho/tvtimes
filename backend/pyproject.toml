@@ -60,7 +60,7 @@ ignore = ["B008"]  # FastAPI Depends() in defaults
 
 [tool.ruff.lint.per-file-ignores]
 "alembic/env.py" = ["E402"]
-"alembic/versions/*" = ["E501", "F401", "RUF100"]  # generated
+"alembic/versions/*" = ["E501", "F401", "I001", "RUF100"]  # generated
 "tests/*" = ["E402"]
 
 [tool.pytest.ini_options]

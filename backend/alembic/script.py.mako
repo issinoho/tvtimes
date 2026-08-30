@@ -9,10 +9,9 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+import app.db  # noqa: F401  custom column types (app.db.TZDateTime)
 import sqlalchemy as sa
 from alembic import op
-
-import app.db  # noqa: F401  custom column types (app.db.TZDateTime)
 ${imports if imports else ""}
 
 revision: str = ${repr(up_revision)}
