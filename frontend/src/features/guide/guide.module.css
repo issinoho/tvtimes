@@ -209,11 +209,23 @@
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 2px;
+  width: 3px;
+  margin-left: -1px;
   background: var(--now-line);
   z-index: 5;
   pointer-events: none;
-  box-shadow: 0 0 8px 1px color-mix(in srgb, var(--now-line) 60%, transparent);
+  box-shadow: 0 0 10px 2px color-mix(in srgb, var(--now-line) 70%, transparent);
+}
+.nowLine::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 12px;
+  height: 12px;
+  transform: translate(-50%, -40%) rotate(45deg);
+  background: var(--now-line);
+  border-radius: 2px;
 }
 
 .empty {

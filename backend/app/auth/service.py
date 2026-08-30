@@ -6,6 +6,7 @@ from __future__ import annotations
 import hashlib
 import secrets
 import uuid
+import zoneinfo
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -98,12 +99,23 @@ async def _audit(
 # --- registration & verification --------------------------------------------
 
 
+def _clean_timezone(name: str | None) -> str:
+    if not name:
+        return "UTC"
+    try:
+        zoneinfo.ZoneInfo(name)
+    except (zoneinfo.ZoneInfoNotFoundError, ValueError):
+        return "UTC"
+    return name
+
+
 async def register(
     session: AsyncSession,
     *,
     email: str,
     display_name: str,
     password: str | None,
+    timezone: str | None = None,
     meta: ClientMeta | None = None,
 ) -> None:
     """Always returns without revealing whether the address was already in use.
@@ -128,7 +140,7 @@ async def register(
         except passwords.PasswordError as exc:
             raise PolicyViolation(str(exc)) from exc
 
-    tenant = Tenant(name=display_name.strip() or email, default_timezone="UTC")
+    tenant = Tenant(name=display_name.strip() or email, default_timezone=_clean_timezone(timezone))
     user = User(
         tenant=tenant,
         email=email,

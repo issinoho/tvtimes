@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { GuideChannel, Programme } from '@/features/guide/api';
 import { GENRE_VAR, genreOf } from '@/features/guide/genre';
-import { hourTicks, ROW_H, trackWidth, WINDOW_MINUTES, xOf } from '@/features/guide/time';
+import { fmtTime, hourTicks, ROW_H, trackWidth, WINDOW_MINUTES, xOf } from '@/features/guide/time';
 import { useNow } from '@/features/guide/useNow';
 import styles from '@/features/guide/guide.module.css';
 
@@ -48,14 +48,15 @@ export function GuideGrid({ channels, windowStart, onOpen }: Props) {
     }
   }, []);
 
-  // Jump to "now" on first mount.
+  // Centre on "now" — on first mount and whenever the window is re-anchored
+  // (the "Now" button, day nav). Reads the clock directly so the 30s `now`
+  // tick doesn't yank the scroll position.
   useEffect(() => {
     const body = bodyRef.current;
     if (!body) return;
-    const x = xOf(windowStart, now);
+    const x = xOf(windowStart, new Date());
     if (x > 0 && x < width) body.scrollLeft = Math.max(0, x - body.clientWidth / 3);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [windowStart, width]);
 
   const nowX = xOf(windowStart, now);
   const showNow = nowX >= 0 && nowX <= width;
@@ -193,11 +194,7 @@ export function GuideGrid({ channels, windowStart, onOpen }: Props) {
                   const w = right - left;
                   if (w < 2) return null;
                   const live = now >= new Date(p.start) && now < new Date(p.stop);
-                  const at = new Date(p.start).toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: false,
-                  });
+                  const at = fmtTime(p.start, ch.timezone);
                   return (
                     <button
                       key={p.id}

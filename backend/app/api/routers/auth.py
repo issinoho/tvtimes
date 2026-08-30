@@ -63,6 +63,7 @@ async def register(
         email=body.email,
         display_name=body.display_name,
         password=body.password,
+        timezone=body.timezone,
         meta=meta,
     )
     return MessageOut(message=_GENERIC_REGISTER)

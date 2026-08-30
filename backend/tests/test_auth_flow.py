@@ -26,6 +26,28 @@ async def test_register_is_generic_and_sends_verification(
     assert captured_emails[0]["to"] == "new@example.com"
 
 
+async def test_register_stores_browser_timezone(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    await register_and_verify(
+        app_client, captured_emails, email="tz@example.com", timezone="Europe/London"
+    )
+    headers = auth_header(await login(app_client, email="tz@example.com"))
+    me = await app_client.get("/api/account/me", headers=headers)
+    assert me.json()["default_timezone"] == "Europe/London"
+
+
+async def test_register_falls_back_to_utc_for_unknown_timezone(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    await register_and_verify(
+        app_client, captured_emails, email="badtz@example.com", timezone="Mars/Olympus_Mons"
+    )
+    headers = auth_header(await login(app_client, email="badtz@example.com"))
+    me = await app_client.get("/api/account/me", headers=headers)
+    assert me.json()["default_timezone"] == "UTC"
+
+
 async def test_duplicate_register_does_not_leak_existence(
     app_client: AsyncClient, captured_emails: list[dict[str, str]]
 ) -> None:

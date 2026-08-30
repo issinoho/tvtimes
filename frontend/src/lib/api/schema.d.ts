@@ -1191,6 +1191,8 @@ export interface components {
             display_name: string;
             /** Password */
             password?: string | null;
+            /** Timezone */
+            timezone?: string | null;
         };
         /** ResetIn */
         ResetIn: {
