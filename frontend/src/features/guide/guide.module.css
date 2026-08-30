@@ -200,7 +200,13 @@
 .cell[data-now='true'] {
   background: color-mix(in srgb, var(--genre, var(--genre-default)) 14%, var(--bg-overlay));
 }
+.cellInner {
+  display: inline-block;
+  max-width: 100%;
+  will-change: transform;
+}
 .cellTitle {
+  display: block;
   font-size: 0.8rem;
   font-weight: 600;
   line-height: 1.15;
@@ -209,6 +215,7 @@
   text-overflow: ellipsis;
 }
 .cellMeta {
+  display: block;
   font-size: 0.7rem;
   color: var(--text-dim);
   white-space: nowrap;

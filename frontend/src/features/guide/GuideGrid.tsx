@@ -39,6 +39,31 @@ export function GuideGrid({ channels, windowStart, onOpen }: Props) {
     initialRect: { width: 1200, height: 800 },
   });
 
+  // Keep each programme's label visible while the guide is scrolled through a
+  // wide cell: slide the label right by however far the cell's start is past
+  // the left edge, capped so it never overruns the cell.
+  const pinLabels = useCallback(() => {
+    const body = bodyRef.current;
+    if (!body) return;
+    const sl = body.scrollLeft;
+    // Read all geometry first, then write, to avoid layout thrash.
+    const plan: { inner: HTMLElement; shift: number }[] = [];
+    for (const cell of body.querySelectorAll<HTMLElement>('[data-cell]')) {
+      const inner = cell.firstElementChild as HTMLElement | null;
+      if (!inner) continue;
+      plan.push({
+        inner,
+        shift: Math.min(
+          Math.max(0, sl - cell.offsetLeft),
+          Math.max(0, cell.offsetWidth - inner.offsetWidth - 6),
+        ),
+      });
+    }
+    for (const { inner, shift } of plan) {
+      inner.style.transform = shift ? `translateX(${shift}px)` : '';
+    }
+  }, []);
+
   const syncScroll = useCallback(() => {
     const body = bodyRef.current;
     if (!body) return;
@@ -46,7 +71,8 @@ export function GuideGrid({ channels, windowStart, onOpen }: Props) {
     if (axisRef.current) {
       axisRef.current.style.transform = `translateX(${-body.scrollLeft}px)`;
     }
-  }, []);
+    pinLabels();
+  }, [pinLabels]);
 
   // Centre on "now" — on first mount and whenever the window is re-anchored
   // (the "Now" button, day nav). Reads the clock directly so the 30s `now`
@@ -56,7 +82,11 @@ export function GuideGrid({ channels, windowStart, onOpen }: Props) {
     if (!body) return;
     const x = xOf(windowStart, new Date());
     if (x > 0 && x < width) body.scrollLeft = Math.max(0, x - body.clientWidth / 3);
-  }, [windowStart, width]);
+    pinLabels();
+  }, [windowStart, width, pinLabels]);
+
+  // Re-pin after the virtualiser (re)renders rows.
+  useEffect(pinLabels);
 
   const nowX = xOf(windowStart, now);
   const showNow = nowX >= 0 && nowX <= width;
@@ -206,6 +236,7 @@ export function GuideGrid({ channels, windowStart, onOpen }: Props) {
                         width: w,
                         ['--genre' as string]: GENRE_VAR[genreOf(p.categories, p.is_movie)],
                       }}
+                      data-cell
                       data-now={live}
                       data-focused={focus?.row === vr.index && focus?.col === col}
                       aria-selected={focus?.row === vr.index && focus?.col === col}
@@ -213,11 +244,13 @@ export function GuideGrid({ channels, windowStart, onOpen }: Props) {
                       aria-label={`${ch.name}, ${at}, ${p.title}${live ? ', on now' : ''}`}
                       title={p.title}
                     >
-                      <div className={styles.cellTitle}>{p.title}</div>
-                      <div className={styles.cellMeta}>
-                        {at}
-                        {p.is_movie && p.year ? ` · ${p.year}` : ''}
-                      </div>
+                      <span className={styles.cellInner}>
+                        <span className={styles.cellTitle}>{p.title}</span>
+                        <span className={styles.cellMeta}>
+                          {at}
+                          {p.is_movie && p.year ? ` · ${p.year}` : ''}
+                        </span>
+                      </span>
                     </button>
                   );
                 })}
