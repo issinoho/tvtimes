@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
 
 import { AuthProvider } from '@/lib/auth/AuthProvider';
+import { UpdatePrompt } from '@/lib/pwa/UpdatePrompt';
 import { AppRoutes } from '@/routes/AppRoutes';
 
 const queryClient = new QueryClient({
@@ -14,6 +15,7 @@ export function App() {
       <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <AuthProvider>
           <AppRoutes />
+          <UpdatePrompt />
         </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>
