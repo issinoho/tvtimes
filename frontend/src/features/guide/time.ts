@@ -33,9 +33,30 @@ export function hourTicks(from: Date, timezone: string): { x: number; label: str
   return ticks;
 }
 
-export function formatRange(startIso: string, stopIso: string): string {
-  const opt: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', hour12: false };
-  const s = new Date(startIso).toLocaleTimeString([], opt);
-  const e = new Date(stopIso).toLocaleTimeString([], opt);
-  return `${s} – ${e}`;
+/**
+ * Wall-clock time of an instant, rendered in `timezone` (the channel's display
+ * zone) so cards, the axis and the now-line all agree. Without a zone it falls
+ * back to the viewer's local time.
+ */
+export function fmtTime(iso: string | Date, timezone?: string): string {
+  return new Date(iso).toLocaleTimeString('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    ...(timezone ? { timeZone: timezone } : {}),
+  });
+}
+
+export function fmtDayTime(iso: string | Date, timezone?: string): string {
+  return new Date(iso).toLocaleString('en-GB', {
+    weekday: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    ...(timezone ? { timeZone: timezone } : {}),
+  });
+}
+
+export function formatRange(startIso: string, stopIso: string, timezone?: string): string {
+  return `${fmtTime(startIso, timezone)} – ${fmtTime(stopIso, timezone)}`;
 }

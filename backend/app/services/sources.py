@@ -176,7 +176,12 @@ async def _ingest(kind: SourceKind, config: dict[str, object]) -> Playlist:
 
 
 def _dedupe_key(ch: ParsedChannel) -> str:
-    return (ch.tvg_id or ch.name.strip().lower() or "channel")[:400]
+    """Identity for collapsing repeated playlist entries. Keyed on tvg-id *and*
+    name so East/West or SD/HD variants that share a tvg-id are kept as
+    separate channels (EPG matching still keys on the shared tvg-id); only a
+    genuine duplicate line — same id and same name — is dropped."""
+    parts = [(ch.tvg_id or "").strip().lower(), ch.name.strip().lower()]
+    return ("|".join(p for p in parts if p) or "channel")[:400]
 
 
 async def refresh_source(session: AsyncSession, source: Source) -> None:

@@ -99,10 +99,13 @@ async def register_and_verify(
     email: str = "sam@example.com",
     password: str | None = DEFAULT_PASSWORD,
     display_name: str = "Sam",
+    timezone: str | None = None,
 ) -> None:
     body: dict[str, object] = {"email": email, "display_name": display_name}
     if password is not None:
         body["password"] = password
+    if timezone is not None:
+        body["timezone"] = timezone
     resp = await client.post("/api/auth/register", json=body)
     assert resp.status_code == 202, resp.text
     verify_mail = next(m for m in outbox if m["to"] == email and "confirm" in m["subject"])

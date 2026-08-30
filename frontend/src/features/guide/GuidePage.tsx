@@ -44,10 +44,11 @@ export function GuidePage() {
   }, [allChannels, search]);
 
   const shift = (ms: number) => setWindowStart((d) => new Date(d.getTime() + ms));
-  const dayLabel = windowStart.toLocaleDateString([], {
+  const dayLabel = windowStart.toLocaleDateString('en-GB', {
     weekday: 'short',
     day: 'numeric',
     month: 'short',
+    ...(allChannels[0]?.timezone ? { timeZone: allChannels[0].timezone } : {}),
   });
 
   return (

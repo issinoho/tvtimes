@@ -19,7 +19,12 @@ export function SignUpPage() {
     try {
       unwrap(
         await api.POST('/api/auth/register', {
-          body: { email, display_name: displayName, password },
+          body: {
+            email,
+            display_name: displayName,
+            password,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          },
         }),
       );
       setSent(true);

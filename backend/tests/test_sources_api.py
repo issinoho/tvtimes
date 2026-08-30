@@ -122,6 +122,29 @@ async def test_xtream_config_summary_hides_password(
     assert "panel.example.com" in resp.json()["config_summary"]
 
 
+async def test_same_tvg_id_different_names_are_kept_separate(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    headers = await _auth(app_client, captured_emails, "sam@example.com")
+    source = (await app_client.post("/api/sources", json=M3U_BODY, headers=headers)).json()
+
+    async def fake_ingest(_kind: object, _config: object) -> Playlist:
+        return Playlist(
+            channels=[
+                ParsedChannel(name="TCM US East", stream_ref="http://s/e", tvg_id="TCM.us"),
+                ParsedChannel(name="TCM US West", stream_ref="http://s/w", tvg_id="TCM.us"),
+                ParsedChannel(name="TCM US East", stream_ref="http://s/dup", tvg_id="TCM.us"),
+            ],
+        )
+
+    monkeypatch.setattr("app.services.sources._ingest", fake_ingest)
+    await _run_refresh(source["id"])
+
+    body = (await app_client.get(f"/api/sources/{source['id']}/channels", headers=headers)).json()
+    assert body["total"] == 2
+    assert {c["name"] for c in body["items"]} == {"TCM US East", "TCM US West"}
+
+
 async def test_create_hdhomerun_source(
     app_client: AsyncClient, captured_emails: list[dict[str, str]], monkeypatch: pytest.MonkeyPatch
 ) -> None:

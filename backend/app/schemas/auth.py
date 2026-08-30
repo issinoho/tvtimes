@@ -17,6 +17,9 @@ class RegisterIn(BaseModel):
     email: EmailStr
     display_name: str = Field(min_length=1, max_length=120)
     password: str | None = Field(default=None, min_length=10, max_length=200)
+    # IANA zone from the browser; becomes the account default. Falls back to UTC
+    # if absent or unknown to this server's tz database.
+    timezone: str | None = Field(default=None, max_length=64)
 
 
 class MessageOut(BaseModel):

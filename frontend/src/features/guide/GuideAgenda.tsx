@@ -2,6 +2,7 @@ import { useState } from 'react';
 
 import type { GuideChannel, Programme } from '@/features/guide/api';
 import { GENRE_VAR, genreOf } from '@/features/guide/genre';
+import { fmtTime } from '@/features/guide/time';
 import { useNow } from '@/features/guide/useNow';
 import styles from '@/features/guide/guide.module.css';
 
@@ -50,13 +51,7 @@ export function GuideAgenda({ channels, onOpen }: Props) {
                 style={{ ['--genre' as string]: GENRE_VAR[genreOf(p.categories, p.is_movie)] }}
                 onClick={() => onOpen(channel, p)}
               >
-                <span className={styles.agendaTime}>
-                  {new Date(p.start).toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: false,
-                  })}
-                </span>
+                <span className={styles.agendaTime}>{fmtTime(p.start, channel.timezone)}</span>
                 <span>
                   <strong style={{ fontWeight: 600 }}>{p.title}</strong>
                   {p.sub_title ? (

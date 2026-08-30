@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 
 import type { GuideChannel, Programme } from '@/features/guide/api';
 import { GENRE_VAR, genreOf } from '@/features/guide/genre';
+import { fmtDayTime } from '@/features/guide/time';
 import { useHero } from '@/features/guide/hero';
 import { useDialogFocus } from '@/lib/useDialogFocus';
 import styles from '@/features/guide/guide.module.css';
@@ -29,8 +30,7 @@ export function ProgrammeSheet({ channel, programme, onClose }: Props) {
   const pct = live
     ? Math.round(((now - start.getTime()) / (stop.getTime() - start.getTime())) * 100)
     : 0;
-  const fmt = (d: Date) =>
-    d.toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
+  const fmt = (d: Date) => fmtDayTime(d, channel.timezone);
 
   const e = hero?.enrichment ?? null;
   const genre = genreOf(programme.categories, programme.is_movie);
