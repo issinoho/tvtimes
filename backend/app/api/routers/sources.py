@@ -113,7 +113,7 @@ async def refresh_source(
     source_id: uuid.UUID, user: VerifiedUser, session: SessionDep
 ) -> MessageOut:
     source = await _load(session, user, source_id)
-    await enqueue_source_refresh(source.id)
+    await enqueue_source_refresh(source.id, force_epg=True)
     return MessageOut(message="Refresh queued.")
 
 

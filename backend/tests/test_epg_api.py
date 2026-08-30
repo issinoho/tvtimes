@@ -296,6 +296,39 @@ async def test_conditional_get_304_keeps_programmes(
     assert seen["etag"] == '"v1"'  # the stored validator was sent back
 
 
+async def test_reset_cache_forces_a_full_reparse_even_on_304(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The manual "Refresh" button passes force_epg=True, which clears the
+    conditional-GET validators so stale programmes are always rebuilt."""
+    _headers, source_id = await _seed_source_with_channels(app_client, captured_emails, monkeypatch)
+
+    async def fetch(url: str, **kw: object) -> BytesResult:
+        # Always a 200 with a validator; the point is whether we still *send*
+        # If-None-Match after a reset.
+        assert kw.get("etag") is None, "reset_cache should have cleared the stored etag"
+        return BytesResult(200, _xml(), etag='"v1"', last_modified=None)
+
+    monkeypatch.setattr("app.services.epg.fetch_bytes", fetch)
+    assert await _run_epg_refresh() == 1
+
+    from app.db import get_sessionmaker
+    from app.models.source import Source
+    from app.services import epg as epg_svc
+    from app.services import sources as src_svc
+
+    async with get_sessionmaker()() as session:
+        source = await session.get(Source, uuid.UUID(source_id))
+        assert source is not None
+        changed = await src_svc.refresh_source(session, source)
+        assert changed is False  # nothing about the channels changed
+        await epg_svc.ensure_epg_source_for(session, source, reset_cache=changed or True)
+        await session.commit()
+
+    # The next EPG refresh must re-fetch with no validator (assertion in fetch()).
+    assert await _run_epg_refresh() == 1
+
+
 async def test_create_standalone_epg_source_rejects_ssrf(
     app_client: AsyncClient, captured_emails: list[dict[str, str]]
 ) -> None:

@@ -43,7 +43,7 @@ async def shutdown(_ctx: dict[str, Any]) -> None:
     _log.info("worker.shutdown")
 
 
-async def refresh_source(ctx: dict[str, Any], source_id: str) -> None:
+async def refresh_source(ctx: dict[str, Any], source_id: str, force_epg: bool = False) -> None:
     async with get_sessionmaker()() as session:
         source = await session.get(Source, uuid.UUID(source_id))
         if source is None:
@@ -51,7 +51,7 @@ async def refresh_source(ctx: dict[str, Any], source_id: str) -> None:
             return
         channels_changed = await src_svc.refresh_source(session, source)
         epg_source = await epg_svc.ensure_epg_source_for(
-            session, source, reset_cache=channels_changed
+            session, source, reset_cache=channels_changed or force_epg
         )
         await session.commit()
     if epg_source is not None:
