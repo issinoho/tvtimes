@@ -504,6 +504,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/guide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Guide */
+        get: operations["guide_api_guide_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -570,6 +587,43 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+        };
+        /** GuideChannelOut */
+        GuideChannelOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Number */
+            number: number | null;
+            /** Logo Url */
+            logo_url: string | null;
+            /** Group Title */
+            group_title: string | null;
+            /** Is Hd */
+            is_hd: boolean;
+            /** Timezone */
+            timezone: string;
+            /** Programmes */
+            programmes: components["schemas"]["ProgrammeOut"][];
+        };
+        /** GuideOut */
+        GuideOut: {
+            /**
+             * From
+             * Format: date-time
+             */
+            from: string;
+            /**
+             * To
+             * Format: date-time
+             */
+            to: string;
+            /** Channels */
+            channels: components["schemas"]["GuideChannelOut"][];
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -2131,6 +2185,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ScheduleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    guide_api_guide_get: {
+        parameters: {
+            query?: {
+                from?: string | null;
+                to?: string | null;
+                source_id?: string | null;
+                group?: string | null;
+                channels?: string[] | null;
+                limit?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuideOut"];
                 };
             };
             /** @description Validation Error */
