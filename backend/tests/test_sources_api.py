@@ -131,9 +131,15 @@ async def test_same_tvg_id_different_names_are_kept_separate(
     async def fake_ingest(_kind: object, _config: object) -> Playlist:
         return Playlist(
             channels=[
+                # Same tvg-id, different names -> kept.
                 ParsedChannel(name="TCM US East", stream_ref="http://s/e", tvg_id="TCM.us"),
                 ParsedChannel(name="TCM US West", stream_ref="http://s/w", tvg_id="TCM.us"),
-                ParsedChannel(name="TCM US East", stream_ref="http://s/dup", tvg_id="TCM.us"),
+                # Same tvg-id AND name but a different stream -> still kept
+                # (a playlist that labels both feeds just "TCM").
+                ParsedChannel(name="TCM", stream_ref="http://s/east", tvg_id="TCM.us"),
+                ParsedChannel(name="TCM", stream_ref="http://s/west", tvg_id="TCM.us"),
+                # Byte-for-byte duplicate line -> collapsed.
+                ParsedChannel(name="TCM US East", stream_ref="http://s/e", tvg_id="TCM.us"),
             ],
         )
 
@@ -141,8 +147,8 @@ async def test_same_tvg_id_different_names_are_kept_separate(
     await _run_refresh(source["id"])
 
     body = (await app_client.get(f"/api/sources/{source['id']}/channels", headers=headers)).json()
-    assert body["total"] == 2
-    assert {c["name"] for c in body["items"]} == {"TCM US East", "TCM US West"}
+    assert body["total"] == 4
+    assert sorted(c["name"] for c in body["items"]) == ["TCM", "TCM", "TCM US East", "TCM US West"]
 
 
 async def test_create_hdhomerun_source(

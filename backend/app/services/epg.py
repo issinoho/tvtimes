@@ -60,8 +60,16 @@ async def create_epg_source(session: AsyncSession, *, tenant_id: uuid.UUID, url:
     return row
 
 
-async def ensure_epg_source_for(session: AsyncSession, source: Source) -> EpgSource | None:
-    """Keep an ``epg_source`` row in step with a Source's discovered EPG URL."""
+async def ensure_epg_source_for(
+    session: AsyncSession, source: Source, *, reset_cache: bool = False
+) -> EpgSource | None:
+    """Keep an ``epg_source`` row in step with a Source's discovered EPG URL.
+
+    ``reset_cache=True`` clears the conditional-GET state so the next refresh
+    re-downloads and re-parses the feed even if it is byte-identical — needed
+    after the source's channels were rebuilt, since the programmes were
+    matched to the *old* channel ids.
+    """
     url = (source.epg_url or "").strip()
     existing = await session.scalar(select(EpgSource).where(EpgSource.source_id == source.id))
     if not url:
@@ -81,6 +89,8 @@ async def ensure_epg_source_for(session: AsyncSession, source: Source) -> EpgSou
         existing.url = url
         existing.etag = existing.last_modified = None
         existing.last_status = EpgStatus.pending
+    elif reset_cache:
+        existing.etag = existing.last_modified = None
     return existing
 
 
@@ -109,10 +119,12 @@ async def delete_epg_source(session: AsyncSession, row: EpgSource) -> None:
 # --- refresh ------------------------------------------------------------------
 
 
-async def _channel_index(session: AsyncSession, tenant_id: uuid.UUID) -> dict[str, uuid.UUID]:
-    """Map XMLTV channel keys -> our channel.id. Keys: raw tvg-id, the
-    ``@feed``-stripped tvg-id, and normalised display / tvg names."""
-    index: dict[str, uuid.UUID] = {}
+async def _channel_index(session: AsyncSession, tenant_id: uuid.UUID) -> dict[str, list[uuid.UUID]]:
+    """Map XMLTV channel keys -> our channel ids. Keys: raw tvg-id, the
+    ``@feed``-stripped tvg-id, and normalised display / tvg names. A key can
+    fan out to several channels (e.g. an East and West feed that share a
+    tvg-id) — each then gets its own copy of the programmes."""
+    index: dict[str, list[uuid.UUID]] = {}
     rows = await session.scalars(select(Channel).where(Channel.tenant_id == tenant_id))
     for ch in rows:
         keys: list[str] = []
@@ -123,13 +135,15 @@ async def _channel_index(session: AsyncSession, tenant_id: uuid.UUID) -> dict[st
         if ch.tvg_name:
             keys.append(normalize_name(ch.tvg_name))
         for key in keys:
-            index.setdefault(key, ch.id)
+            bucket = index.setdefault(key, [])
+            if ch.id not in bucket:
+                bucket.append(ch.id)
     return index
 
 
-def _resolve_channel(
-    xmltv_id: str, guide: ParsedGuide, index: dict[str, uuid.UUID]
-) -> uuid.UUID | None:
+def _resolve_channels(
+    xmltv_id: str, guide: ParsedGuide, index: dict[str, list[uuid.UUID]]
+) -> list[uuid.UUID]:
     if xmltv_id in index:
         return index[xmltv_id]
     stripped = FEED_SUFFIX_RE.sub("", xmltv_id)
@@ -139,9 +153,9 @@ def _resolve_channel(
     if channel is not None:
         for name in channel.display_names:
             hit = index.get(normalize_name(name))
-            if hit is not None:
+            if hit:
                 return hit
-    return None
+    return []
 
 
 async def refresh_epg_source(session: AsyncSession, epg_source: EpgSource) -> None:
@@ -191,28 +205,26 @@ async def refresh_epg_source(session: AsyncSession, epg_source: EpgSource) -> No
     for prog in guide.programmes:
         if not (lo <= prog.start <= hi):
             continue
-        channel_id = _resolve_channel(prog.channel_id, guide, index)
-        if channel_id is None:
-            continue
-        session.add(
-            Programme(
-                tenant_id=epg_source.tenant_id,
-                channel_id=channel_id,
-                epg_source_id=epg_source.id,
-                start_utc=prog.start,
-                stop_utc=prog.stop,
-                title=prog.title[:500] or "(untitled)",
-                sub_title=(prog.sub_title or None) and prog.sub_title[:500],
-                description=prog.description,
-                categories=prog.categories,
-                episode_num=(prog.episode_num or None) and prog.episode_num[:64],
-                year=prog.year,
-                icon_url=prog.icon_url,
-                director=prog.director,
-                is_movie=is_movie(prog.categories, group_by_channel.get(channel_id)),
+        for channel_id in _resolve_channels(prog.channel_id, guide, index):
+            session.add(
+                Programme(
+                    tenant_id=epg_source.tenant_id,
+                    channel_id=channel_id,
+                    epg_source_id=epg_source.id,
+                    start_utc=prog.start,
+                    stop_utc=prog.stop,
+                    title=prog.title[:500] or "(untitled)",
+                    sub_title=(prog.sub_title or None) and prog.sub_title[:500],
+                    description=prog.description,
+                    categories=prog.categories,
+                    episode_num=(prog.episode_num or None) and prog.episode_num[:64],
+                    year=prog.year,
+                    icon_url=prog.icon_url,
+                    director=prog.director,
+                    is_movie=is_movie(prog.categories, group_by_channel.get(channel_id)),
+                )
             )
-        )
-        count += 1
+            count += 1
 
     epg_source.programme_count = count
     epg_source.etag = result.etag

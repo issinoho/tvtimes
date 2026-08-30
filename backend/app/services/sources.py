@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import uuid
 from collections.abc import Sequence
@@ -176,17 +177,26 @@ async def _ingest(kind: SourceKind, config: dict[str, object]) -> Playlist:
 
 
 def _dedupe_key(ch: ParsedChannel) -> str:
-    """Identity for collapsing repeated playlist entries. Keyed on tvg-id *and*
-    name so East/West or SD/HD variants that share a tvg-id are kept as
-    separate channels (EPG matching still keys on the shared tvg-id); only a
-    genuine duplicate line — same id and same name — is dropped."""
-    parts = [(ch.tvg_id or "").strip().lower(), ch.name.strip().lower()]
-    return ("|".join(p for p in parts if p) or "channel")[:400]
+    """Identity for collapsing repeated playlist lines. Two entries collapse
+    only when their tvg-id, name *and* stream target all match, so East/West or
+    SD/HD variants — which often share a tvg-id and sometimes even a name — are
+    all kept as separate channels. EPG matching still keys on the shared
+    tvg-id / name, so both variants still get programmes."""
+    digest = hashlib.sha1((ch.stream_ref or "").encode("utf-8"), usedforsecurity=False)
+    parts = [(ch.tvg_id or "").strip().lower(), ch.name.strip().lower(), digest.hexdigest()[:12]]
+    return "|".join(p for p in parts if p)[:400] or "channel"
 
 
-async def refresh_source(session: AsyncSession, source: Source) -> None:
-    """Fetch the source and replace its channel set. Never raises: failures
-    land in ``last_status`` / ``last_error``."""
+async def refresh_source(session: AsyncSession, source: Source) -> bool:
+    """Fetch the source and reconcile its channel set **in place** — channels
+    are matched to existing rows by ``dedupe_key``, so an unchanged channel
+    keeps its id (and its linked programmes survive). Never raises: failures
+    land in ``last_status`` / ``last_error``.
+
+    Returns ``True`` when the set of channels changed (a key was added or
+    removed); the caller should then force a full EPG rebuild, because the
+    new/renumbered channels have no programmes yet.
+    """
     try:
         playlist = await _ingest(source.kind, decrypt_config(source))
     except SourceError as exc:
@@ -194,45 +204,65 @@ async def refresh_source(session: AsyncSession, source: Source) -> None:
         source.last_error = exc.message
         source.last_refreshed_at = _now()
         _log.warning("source.refresh_failed", source_id=str(source.id), error=exc.message)
-        return
+        return False
     except Exception:
         source.last_status = SourceStatus.error
         source.last_error = "An unexpected error occurred while reading this source."
         source.last_refreshed_at = _now()
         _log.exception("source.refresh_crashed", source_id=str(source.id))
-        return
+        return False
 
-    await session.execute(delete(Channel).where(Channel.source_id == source.id))
+    existing = {
+        c.dedupe_key: c
+        for c in await session.scalars(select(Channel).where(Channel.source_id == source.id))
+    }
     seen: set[str] = set()
     for order, ch in enumerate(playlist.channels):
         key = _dedupe_key(ch)
         if key in seen:
             continue
         seen.add(key)
-        session.add(
-            Channel(
-                tenant_id=source.tenant_id,
-                source_id=source.id,
-                dedupe_key=key,
-                ext_id=ch.tvg_id,
-                name=ch.name[:400],
-                tvg_name=ch.tvg_name,
-                logo_url=ch.tvg_logo,
-                group_title=(ch.group_title or None) and ch.group_title[:400],
-                number=ch.number,
-                is_hd=ch.is_hd,
-                sort_order=order,
-                stream_ref_encrypted=encrypt(ch.stream_ref),
-                last_seen_at=_now(),
+        fields: dict[str, object] = {
+            "ext_id": ch.tvg_id,
+            "name": ch.name[:400],
+            "tvg_name": ch.tvg_name,
+            "logo_url": ch.tvg_logo,
+            "group_title": (ch.group_title or None) and ch.group_title[:400],
+            "number": ch.number,
+            "is_hd": ch.is_hd,
+            "sort_order": order,
+            "stream_ref_encrypted": encrypt(ch.stream_ref),
+            "last_seen_at": _now(),
+        }
+        row = existing.get(key)
+        if row is None:
+            session.add(
+                Channel(tenant_id=source.tenant_id, source_id=source.id, dedupe_key=key, **fields)
             )
+        else:
+            for name, value in fields.items():
+                setattr(row, name, value)
+
+    stale = set(existing) - seen
+    if stale:
+        await session.execute(
+            delete(Channel).where(Channel.source_id == source.id, Channel.dedupe_key.in_(stale))
         )
+    changed = bool(stale) or bool(seen - set(existing))
 
     source.channel_count = len(seen)
     source.epg_url = playlist.epg_url
     source.last_status = SourceStatus.ok
     source.last_error = "; ".join(playlist.warnings) if playlist.warnings else None
     source.last_refreshed_at = _now()
-    _log.info("source.refreshed", source_id=str(source.id), channels=source.channel_count)
+    _log.info(
+        "source.refreshed",
+        source_id=str(source.id),
+        channels=len(seen),
+        added=len(seen - set(existing)),
+        removed=len(stale),
+    )
+    return changed
 
 
 async def list_channels(
