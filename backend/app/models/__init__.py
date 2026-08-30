@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from app.db import Base
 from app.models.audit import AuditLog
+from app.models.connector import Connector, ConnectorStatus
 from app.models.credentials import PasswordCredential, TotpSecret, WebAuthnCredential
 from app.models.epg import EpgSource, EpgStatus, Programme
 from app.models.session import AuthSession
@@ -33,6 +34,8 @@ __all__ = [
     "AuthSession",
     "Base",
     "Channel",
+    "Connector",
+    "ConnectorStatus",
     "EmailToken",
     "EmailTokenPurpose",
     "EpgSource",
