@@ -3,7 +3,7 @@ import { useState } from 'react';
 
 import { api, ApiError, unwrap } from '@/lib/api/client';
 import { registerPasskey } from '@/lib/auth/passkeys';
-import { browserSupportsPasskeys } from '@/lib/auth/webauthn';
+import { browserSupportsPasskeys, passkeysNeedSecureContext } from '@/lib/auth/webauthn';
 import styles from '@/features/settings/settings.module.css';
 
 const fmtDate = (iso: string) => new Date(iso).toLocaleDateString();
@@ -96,7 +96,12 @@ export function PasskeysSection() {
           {busy ? 'Waiting…' : 'Add a passkey'}
         </button>
       </div>
-      {!browserSupportsPasskeys() ? (
+      {passkeysNeedSecureContext() ? (
+        <p className={styles.hint}>
+          Passkeys need a secure connection — open tvtimes over HTTPS (or http://localhost) to add
+          one.
+        </p>
+      ) : !browserSupportsPasskeys() ? (
         <p className={styles.hint}>This browser can't create passkeys.</p>
       ) : null}
       {error ? <p className={styles.error}>{error}</p> : null}

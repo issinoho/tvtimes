@@ -5,7 +5,7 @@ import { AuthShell, Button, Callout, FootNote, Heading } from '@/components/ui';
 import { useAuth } from '@/lib/auth/AuthProvider';
 import { SKIP_PASSKEY_KEY } from '@/lib/auth/constants';
 import { registerPasskey } from '@/lib/auth/passkeys';
-import { browserSupportsPasskeys } from '@/lib/auth/webauthn';
+import { browserSupportsPasskeys, passkeysNeedSecureContext } from '@/lib/auth/webauthn';
 
 export function OnboardingPasskeyPage() {
   const { refreshMe } = useAuth();
@@ -45,6 +45,12 @@ export function OnboardingPasskeyPage() {
         <Button onClick={add} busy={busy}>
           Create a passkey
         </Button>
+      ) : passkeysNeedSecureContext() ? (
+        <Callout kind="info">
+          Passkeys need a secure connection — open tvtimes over HTTPS (or
+          <code> http://localhost</code>) to use them. Your password still works; you can add a
+          passkey later from Settings.
+        </Callout>
       ) : (
         <Callout kind="info">
           This browser can't create passkeys. You can add one later from another device.
