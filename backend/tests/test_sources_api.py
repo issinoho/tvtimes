@@ -151,6 +151,63 @@ async def test_same_tvg_id_different_names_are_kept_separate(
     assert sorted(c["name"] for c in body["items"]) == ["TCM", "TCM", "TCM US East", "TCM US West"]
 
 
+async def test_missing_logo_is_backfilled_from_iptv_org(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    headers = await _auth(app_client, captured_emails, "sam@example.com")
+    source = (await app_client.post("/api/sources", json=M3U_BODY, headers=headers)).json()
+
+    async def fake_index(**_kw: object) -> dict[str, str]:
+        return {"bbc one": "https://logos/bbc1.png"}
+
+    async def fake_ingest(_kind: object, _config: object) -> Playlist:
+        return Playlist(
+            channels=[
+                ParsedChannel(name="BBC One", stream_ref="http://s/1"),  # no tvg-logo
+                ParsedChannel(name="Some Local Channel", stream_ref="http://s/2"),
+            ],
+        )
+
+    monkeypatch.setattr("app.services.sources.channel_logos.load_index", fake_index)
+    monkeypatch.setattr("app.services.sources._ingest", fake_ingest)
+    await _run_refresh(source["id"])
+
+    items = (await app_client.get(f"/api/sources/{source['id']}/channels", headers=headers)).json()[
+        "items"
+    ]
+    by_name = {c["name"]: c for c in items}
+    assert by_name["BBC One"]["logo_url"] == "https://logos/bbc1.png"
+    assert by_name["Some Local Channel"]["logo_url"] is None
+
+
+async def test_playlist_logo_wins_over_backfill(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    headers = await _auth(app_client, captured_emails, "sam@example.com")
+    source = (await app_client.post("/api/sources", json=M3U_BODY, headers=headers)).json()
+
+    async def fake_index(**_kw: object) -> dict[str, str]:
+        return {"bbc one": "https://logos/generic.png"}
+
+    async def fake_ingest(_kind: object, _config: object) -> Playlist:
+        return Playlist(
+            channels=[
+                ParsedChannel(
+                    name="BBC One", stream_ref="http://s/1", tvg_logo="https://feed/mine.png"
+                )
+            ],
+        )
+
+    monkeypatch.setattr("app.services.sources.channel_logos.load_index", fake_index)
+    monkeypatch.setattr("app.services.sources._ingest", fake_ingest)
+    await _run_refresh(source["id"])
+
+    items = (await app_client.get(f"/api/sources/{source['id']}/channels", headers=headers)).json()[
+        "items"
+    ]
+    assert items[0]["logo_url"] == "https://feed/mine.png"
+
+
 async def test_create_hdhomerun_source(
     app_client: AsyncClient, captured_emails: list[dict[str, str]], monkeypatch: pytest.MonkeyPatch
 ) -> None:
