@@ -16,9 +16,9 @@ Early development. See [`docs/plan.md`](docs/plan.md) for the build plan and
 
 | Phase | Scope | State |
 |------:|-------|-------|
-| 1 | Monorepo scaffold, CI, dev stack | in progress |
-| 2 | Auth (passkeys-first, TOTP, rotating sessions) | — |
-| 3 | Cloud sources (M3U / Xtream / Stalker) | — |
+| 1 | Monorepo scaffold, CI, dev stack | done |
+| 2 | Auth (passkeys-first, TOTP, rotating sessions) | in review ([#1](https://github.com/issinoho/tvtimes/pull/1)) |
+| 3 | Cloud sources (M3U / Xtream / Stalker) | next |
 | 4 | EPG ingest (XMLTV) + timezones | — |
 | 5 | Guide UI | — |
 | 6 | TMDB enrichment + hero overlay | — |
