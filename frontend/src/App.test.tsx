@@ -69,14 +69,17 @@ test('an unauthenticated visitor lands on the sign-in screen', async () => {
   await waitFor(() => expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument());
 });
 
-test('a refreshable session with a passkey shows the home screen', async () => {
+test('a refreshable session with a passkey lands on the guide', async () => {
   mockApi({
     '/api/auth/refresh': () =>
       json({ access_token: 'a.b.c', token_type: 'bearer', expires_at: '' }),
     '/api/account/me': () => json(ME),
+    '/api/sources': () => json([]),
+    '/api/guide': () => json({ from: '', to: '', channels: [] }),
   });
   renderAt('/');
-  await waitFor(() => expect(screen.getByText(/the guide is next/i)).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByText(/Connect a source/i)).toBeInTheDocument());
+  expect(screen.getByRole('button', { name: 'Now' })).toBeInTheDocument();
 });
 
 test('a session with no passkey is pushed into onboarding', async () => {

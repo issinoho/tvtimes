@@ -55,7 +55,7 @@ async def set_timezone(body: TimezoneIn, user: VerifiedUser, session: SessionDep
     try:
         zoneinfo.ZoneInfo(body.timezone)
     except (zoneinfo.ZoneInfoNotFoundError, ValueError) as exc:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Unknown timezone") from exc
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Unknown timezone") from exc
     await session.refresh(user, ["tenant"])
     user.tenant.default_timezone = body.timezone
     return MessageOut(message="Timezone updated.")
