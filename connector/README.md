@@ -21,7 +21,7 @@ or run it in Docker:
 ```sh
 docker run --network host -v tvtimes-connector:/config \
   -e TVTIMES_CONNECTOR_CONFIG=/config/config.json \
-  issinoho/tvtimes-connector run          # or ghcr.io/issinoho/tvtimes-connector
+  issinoho1969/tvtimes-connector run          # or ghcr.io/issinoho/tvtimes-connector
 ```
 
 (`--network host` lets it see HDHomeRun devices on your LAN.)
