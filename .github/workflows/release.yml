@@ -4,7 +4,7 @@ name: Release image
 #   git tag v1.2.0 && git push origin v1.2.0
 #
 # Pushes multi-arch (amd64 + arm64) to Docker Hub and GHCR:
-#   issinoho/tvtimes:1.2.0  issinoho/tvtimes:1.2  issinoho/tvtimes:latest
+#   issinoho1969/tvtimes:1.2.0  issinoho1969/tvtimes:1.2  issinoho1969/tvtimes:latest
 #   ghcr.io/issinoho/tvtimes:<same tags>
 #
 # Requires repo secrets DOCKERHUB_USERNAME and DOCKERHUB_TOKEN (a Docker Hub
@@ -45,7 +45,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            issinoho/tvtimes
+            issinoho1969/tvtimes
             ghcr.io/issinoho/tvtimes
           tags: |
             type=semver,pattern={{version}}

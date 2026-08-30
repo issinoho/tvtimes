@@ -4,7 +4,7 @@
 # app in one container. `docker compose` runs it twice — once as the web/API
 # process, once (command: worker) as the background worker.
 #
-#   docker build -t issinoho/tvtimes .
+#   docker build -t issinoho1969/tvtimes .
 #
 # Published multi-arch by .github/workflows/release.yml on a `v*` tag.
 

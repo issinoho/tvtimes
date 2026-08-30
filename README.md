@@ -35,8 +35,8 @@ Full walkthrough — reverse proxy + TLS, HDHomeRun, email, backups, upgrades �
 
 | Image | Purpose |
 |-------|---------|
-| `issinoho/tvtimes` (`ghcr.io/issinoho/tvtimes`) | all-in-one: API + worker + web app |
-| `issinoho/tvtimes-connector` (`ghcr.io/issinoho/tvtimes-connector`) | optional LAN agent for HDHomeRun tuners on a network the server can't reach |
+| `issinoho1969/tvtimes` (`ghcr.io/issinoho/tvtimes`) | all-in-one: API + worker + web app |
+| `issinoho1969/tvtimes-connector` (`ghcr.io/issinoho/tvtimes-connector`) | optional LAN agent for HDHomeRun tuners on a network the server can't reach |
 
 Native HDHomeRun support is built in — add an **HDHomeRun** source and either
 let it auto-discover or enter the tuner's LAN address (needed when tvtimes runs

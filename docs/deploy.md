@@ -3,7 +3,7 @@
 This is the reference for what the app expects from its environment. For a
 step-by-step self-hosting walkthrough see [`homelab.md`](homelab.md).
 
-The all-in-one image (`issinoho/tvtimes`) contains the API, the arq worker and
+The all-in-one image (`issinoho1969/tvtimes`) contains the API, the arq worker and
 the built web app. The API serves the SPA from the same origin (`/api/*` to the
 backend, everything else to the SPA with a client-routing fallback), so there is
 no CORS and the refresh cookie is first-party.
@@ -75,7 +75,7 @@ Full list with defaults: [`.env.example`](../.env.example).
 ## Connector (optional)
 
 `connector/` is a separate agent for HDHomeRun tuners on a network the server
-can't reach. Users run `issinoho/tvtimes-connector` (or `pipx install
+can't reach. Users run `issinoho1969/tvtimes-connector` (or `pipx install
 tvtimes-connector`) on that network and pair it from **Settings → Connectors**.
 Nothing of it runs server-side beyond `/api/connector/*`. Tuners the server
 *can* reach need no connector — add a native **HDHomeRun** source instead.

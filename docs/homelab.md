@@ -43,7 +43,7 @@ docker compose up -d
 ```
 
 Migrations run automatically on start. Pin a version in `.env`
-(`TVTIMES_IMAGE=issinoho/tvtimes:v1.2.0`) if you'd rather upgrade deliberately.
+(`TVTIMES_IMAGE=issinoho1969/tvtimes:v1.2.0`) if you'd rather upgrade deliberately.
 
 ## Data & backups
 
@@ -93,7 +93,7 @@ Add a source, choose **HDHomeRun**:
   can't receive discovery broadcasts — enter the tuner's address, e.g.
   `http://192.168.1.50`. Find it at <https://my.hdhomerun.com> or your router.
 - **Tuner on a different network from the server:** run the connector there
-  (`docker run --network host issinoho/tvtimes-connector run --pair <code>
+  (`docker run --network host issinoho1969/tvtimes-connector run --pair <code>
   --server https://tv.example.com`) and pair it from **Settings → Connectors**.
 
 The SiliconDust guide data (`api.hdhomerun.com`) is picked up automatically when

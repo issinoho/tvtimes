@@ -4,7 +4,7 @@ name: Release connector
 #   git tag connector-v1.2.0 && git push origin connector-v1.2.0
 #
 # Publishes:
-#   - issinoho/tvtimes-connector + ghcr.io/issinoho/tvtimes-connector (multi-arch)
+#   - issinoho1969/tvtimes-connector + ghcr.io/issinoho/tvtimes-connector (multi-arch)
 #   - the built wheel + sdist, attached to the GitHub Release
 #
 # Requires repo secrets DOCKERHUB_USERNAME and DOCKERHUB_TOKEN.
@@ -43,7 +43,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            issinoho/tvtimes-connector
+            issinoho1969/tvtimes-connector
             ghcr.io/issinoho/tvtimes-connector
           tags: |
             type=match,pattern=connector-v(.*),group=1

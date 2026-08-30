@@ -13,7 +13,7 @@
 name: tvtimes
 
 x-app: &app
-  image: ${TVTIMES_IMAGE:-issinoho/tvtimes:latest}
+  image: ${TVTIMES_IMAGE:-issinoho1969/tvtimes:latest}
   restart: unless-stopped
   environment:
     TVTIMES_ENV: prod
