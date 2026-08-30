@@ -3,8 +3,11 @@
 Run with: ``arq app.worker.WorkerSettings``
 
 Jobs:
-  - ``refresh_source(source_id)`` — fetch + parse + replace a source's channels
-  - ``sweep_sources`` (cron, every 15 min) — enqueue refreshes that are due
+  - ``refresh_source(source_id)`` — fetch + parse + replace a source's channels,
+    then (re)discover its EPG source and queue that too
+  - ``refresh_epg_source(epg_source_id)`` — conditional GET + parse XMLTV +
+    replace programmes
+  - ``sweep`` (cron, every 15 min) — enqueue refreshes that are due
 """
 
 from __future__ import annotations
@@ -18,8 +21,10 @@ from arq.connections import RedisSettings
 from app.config import get_settings
 from app.db import dispose_engine, get_sessionmaker
 from app.logging import configure_logging, get_logger
+from app.models.epg import EpgSource
 from app.models.source import Source
-from app.services import sources as svc
+from app.services import epg as epg_svc
+from app.services import sources as src_svc
 
 _log = get_logger("worker")
 
@@ -35,28 +40,44 @@ async def shutdown(_ctx: dict[str, Any]) -> None:
     _log.info("worker.shutdown")
 
 
-async def refresh_source(_ctx: dict[str, Any], source_id: str) -> None:
+async def refresh_source(ctx: dict[str, Any], source_id: str) -> None:
     async with get_sessionmaker()() as session:
         source = await session.get(Source, uuid.UUID(source_id))
         if source is None:
             _log.warning("worker.refresh.missing", source_id=source_id)
             return
-        await svc.refresh_source(session, source)
+        await src_svc.refresh_source(session, source)
+        epg_source = await epg_svc.ensure_epg_source_for(session, source)
+        await session.commit()
+    if epg_source is not None:
+        await ctx["redis"].enqueue_job("refresh_epg_source", str(epg_source.id))
+
+
+async def refresh_epg_source(_ctx: dict[str, Any], epg_source_id: str) -> None:
+    async with get_sessionmaker()() as session:
+        row = await session.get(EpgSource, uuid.UUID(epg_source_id))
+        if row is None:
+            _log.warning("worker.epg.missing", epg_source_id=epg_source_id)
+            return
+        await epg_svc.refresh_epg_source(session, row)
         await session.commit()
 
 
-async def sweep_sources(ctx: dict[str, Any]) -> None:
+async def sweep(ctx: dict[str, Any]) -> None:
     async with get_sessionmaker()() as session:
-        due = await svc.due_for_refresh(session)
-    for source_id in due:
-        await ctx["redis"].enqueue_job("refresh_source", str(source_id))
-    if due:
-        _log.info("worker.sweep", enqueued=len(due))
+        due_sources = await src_svc.due_for_refresh(session)
+        due_epg = await epg_svc.due_epg_sources(session)
+    for sid in due_sources:
+        await ctx["redis"].enqueue_job("refresh_source", str(sid))
+    for eid in due_epg:
+        await ctx["redis"].enqueue_job("refresh_epg_source", str(eid))
+    if due_sources or due_epg:
+        _log.info("worker.sweep", sources=len(due_sources), epg=len(due_epg))
 
 
 class WorkerSettings:
-    functions: ClassVar[list[Any]] = [refresh_source]
-    cron_jobs: ClassVar[list[Any]] = [cron(sweep_sources, minute=set(range(0, 60, 15)))]
+    functions: ClassVar[list[Any]] = [refresh_source, refresh_epg_source]
+    cron_jobs: ClassVar[list[Any]] = [cron(sweep, minute=set(range(0, 60, 15)))]
     on_startup = startup
     on_shutdown = shutdown
     redis_settings = RedisSettings.from_dsn(get_settings().redis_url)

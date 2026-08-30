@@ -435,6 +435,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/epg-sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Epg Sources */
+        get: operations["list_epg_sources_api_epg_sources_get"];
+        put?: never;
+        /** Create Epg Source */
+        post: operations["create_epg_source_api_epg_sources_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/epg-sources/{epg_source_id}/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Refresh Epg Source */
+        post: operations["refresh_epg_source_api_epg_sources__epg_source_id__refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/epg-sources/{epg_source_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Epg Source */
+        delete: operations["delete_epg_source_api_epg_sources__epg_source_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/channels/{channel_id}/schedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Channel Schedule */
+        get: operations["channel_schedule_api_channels__channel_id__schedule_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -469,6 +538,38 @@ export interface components {
             limit: number;
             /** Offset */
             offset: number;
+        };
+        /** EpgSourceIn */
+        EpgSourceIn: {
+            /** Url */
+            url: string;
+        };
+        /** EpgSourceOut */
+        EpgSourceOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Url */
+            url: string;
+            /** Source Id */
+            source_id: string | null;
+            /** Last Status */
+            last_status: string;
+            /** Last Error */
+            last_error: string | null;
+            /** Programme Count */
+            programme_count: number;
+            /** Last Fetched At */
+            last_fetched_at: string | null;
+            /** Refresh Interval Minutes */
+            refresh_interval_minutes: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -580,6 +681,42 @@ export interface components {
             /** Backed Up */
             backed_up: boolean;
         };
+        /** ProgrammeOut */
+        ProgrammeOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Start
+             * Format: date-time
+             */
+            start: string;
+            /**
+             * Stop
+             * Format: date-time
+             */
+            stop: string;
+            /** Title */
+            title: string;
+            /** Sub Title */
+            sub_title: string | null;
+            /** Description */
+            description: string | null;
+            /** Categories */
+            categories: string[];
+            /** Episode Num */
+            episode_num: string | null;
+            /** Year */
+            year: string | null;
+            /** Icon Url */
+            icon_url: string | null;
+            /** Director */
+            director: string | null;
+            /** Is Movie */
+            is_movie: boolean;
+        };
         /** Readiness */
         Readiness: {
             /**
@@ -621,6 +758,20 @@ export interface components {
              * Format: email
              */
             email: string;
+        };
+        /** ScheduleOut */
+        ScheduleOut: {
+            /**
+             * Channel Id
+             * Format: uuid
+             */
+            channel_id: string;
+            /** Channel Name */
+            channel_name: string;
+            /** Timezone */
+            timezone: string;
+            /** Programmes */
+            programmes: components["schemas"]["ProgrammeOut"][];
         };
         /** SessionOut */
         SessionOut: {
@@ -1812,6 +1963,174 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ChannelPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_epg_sources_api_epg_sources_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EpgSourceOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_epg_source_api_epg_sources_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EpgSourceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EpgSourceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_epg_source_api_epg_sources__epg_source_id__refresh_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                epg_source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_epg_source_api_epg_sources__epg_source_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                epg_source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    channel_schedule_api_channels__channel_id__schedule_get: {
+        parameters: {
+            query?: {
+                from?: string | null;
+                to?: string | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                channel_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduleOut"];
                 };
             };
             /** @description Validation Error */

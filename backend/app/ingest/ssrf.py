@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import ipaddress
 import socket
+from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urljoin, urlsplit
 
@@ -112,6 +113,81 @@ async def fetch_text(
                     f"Could not fetch {redact_resource_url(current)}: {exc.__class__.__name__}."
                 ) from exc
     raise SourceUnreachable("Too many redirects.")
+
+
+@dataclass(slots=True)
+class BytesResult:
+    status: int  # 200 or 304
+    body: bytes  # empty on 304; gzip bodies are already decompressed
+    etag: str | None
+    last_modified: str | None
+
+
+async def fetch_bytes(
+    url: str,
+    *,
+    etag: str | None = None,
+    last_modified: str | None = None,
+    max_bytes: int | None = None,
+    timeout: float | None = None,
+    allowlist: list[str] | None = None,
+) -> BytesResult:
+    """Conditional GET for large blobs (XMLTV). A gzip body is transparently
+    decompressed. ``304`` is returned as-is so the caller can keep what it has."""
+    from app.ingest.xmltv import maybe_decompress
+
+    settings = get_settings()
+    max_bytes = max_bytes or settings.fetch_max_bytes
+    timeout = timeout or settings.fetch_timeout_seconds
+    allowlist = allowlist if allowlist is not None else settings.fetch_allowlist_entries
+
+    headers: dict[str, str] = {"Accept-Encoding": "gzip"}
+    if etag:
+        headers["If-None-Match"] = etag
+    if last_modified:
+        headers["If-Modified-Since"] = last_modified
+
+    current = url
+    async with httpx.AsyncClient(follow_redirects=False, timeout=timeout) as client:
+        for _ in range(_MAX_REDIRECTS + 1):
+            await assert_allowed_url(current, allowlist=allowlist)
+            try:
+                async with client.stream("GET", current, headers=headers) as response:
+                    if response.is_redirect:
+                        location = response.headers.get("location")
+                        if not location:
+                            raise SourceUnreachable("Redirect with no Location header.")
+                        current = urljoin(current, location)
+                        continue
+                    if response.status_code == 304:
+                        return BytesResult(304, b"", etag, last_modified)
+                    if response.status_code >= 400:
+                        raise SourceUnreachable(
+                            f"{redact_resource_url(current)} returned HTTP {response.status_code}."
+                        )
+                    body = await _read_bytes_capped(response, max_bytes)
+                    return BytesResult(
+                        200,
+                        maybe_decompress(body),
+                        response.headers.get("etag"),
+                        response.headers.get("last-modified"),
+                    )
+            except httpx.HTTPError as exc:
+                raise SourceUnreachable(
+                    f"Could not fetch {redact_resource_url(current)}: {exc.__class__.__name__}."
+                ) from exc
+    raise SourceUnreachable("Too many redirects.")
+
+
+async def _read_bytes_capped(response: httpx.Response, max_bytes: int) -> bytes:
+    chunks: list[bytes] = []
+    total = 0
+    async for chunk in response.aiter_bytes(65536):
+        total += len(chunk)
+        if total > max_bytes:
+            raise SourceRejected("The source response is larger than the allowed limit.")
+        chunks.append(chunk)
+    return b"".join(chunks)
 
 
 async def _read_capped(response: httpx.Response, max_bytes: int, m3u_sniff: bool) -> str:
