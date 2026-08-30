@@ -1,0 +1,83 @@
+/**
+ * tvtimes design tokens — "twilight aurora".
+ * See docs/brand.md. Dark is the default; light overrides follow.
+ */
+
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg: #0b0713;
+  --bg-raised: #150c24;
+  --bg-overlay: #1e1233;
+
+  --brand-indigo: #1b0a3d;
+  --brand-violet: #6d28d9;
+  --brand-pink: #db2777;
+  --brand-amber: #f59e0b;
+
+  --text: #f4eeff;
+  --text-dim: #a99fc4;
+  --line: #2c2140;
+
+  --focus: var(--brand-pink);
+  --now-line: var(--brand-pink);
+
+  --grad-brand: linear-gradient(120deg, #1b0a3d 0%, #6d28d9 45%, #db2777 100%);
+  --wash:
+    radial-gradient(1200px 800px at 15% -10%, rgba(109, 40, 217, 0.35), transparent 60%),
+    radial-gradient(1000px 700px at 110% 10%, rgba(219, 39, 119, 0.28), transparent 55%);
+
+  --genre-film: #7c3aed;
+  --genre-sport: #0ea5e9;
+  --genre-news: #ef4444;
+  --genre-kids: #f59e0b;
+  --genre-doc: #10b981;
+  --genre-ent: #ec4899;
+  --genre-drama: #8b5cf6;
+  --genre-music: #f43f5e;
+  --genre-default: #4b5563;
+
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow-hero: 0 24px 80px -12px rgba(0, 0, 0, 0.7);
+  --font-sans:
+    'Space Grotesk', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --bg: #f7f4fb;
+  --bg-raised: #ffffff;
+  --bg-overlay: #ffffff;
+
+  --brand-violet: #6d28d9;
+  --brand-pink: #c81e63;
+  --brand-amber: #b4740a;
+
+  --text: #1b1230;
+  --text-dim: #5b5175;
+  --line: #e4dcf0;
+
+  --wash:
+    radial-gradient(1200px 800px at 15% -10%, rgba(109, 40, 217, 0.14), transparent 60%),
+    radial-gradient(1000px 700px at 110% 10%, rgba(200, 30, 99, 0.12), transparent 55%);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    color-scheme: light;
+    --bg: #f7f4fb;
+    --bg-raised: #ffffff;
+    --bg-overlay: #ffffff;
+    --brand-pink: #c81e63;
+    --brand-amber: #b4740a;
+    --text: #1b1230;
+    --text-dim: #5b5175;
+    --line: #e4dcf0;
+    --wash:
+      radial-gradient(1200px 800px at 15% -10%, rgba(109, 40, 217, 0.14), transparent 60%),
+      radial-gradient(1000px 700px at 110% 10%, rgba(200, 30, 99, 0.12), transparent 55%);
+  }
+}

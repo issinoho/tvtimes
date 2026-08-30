@@ -1,0 +1,4 @@
+dist
+coverage
+src/lib/api/schema.d.ts
+package-lock.json
