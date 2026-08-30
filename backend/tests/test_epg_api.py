@@ -259,6 +259,44 @@ async def test_programmes_fan_out_to_channels_sharing_a_tvg_id(
     assert {r["name"] for r in rows} == {"TCM US East", "TCM US West"}
     for r in rows:
         assert [p["title"] for p in r["programmes"]] == ["Casablanca"]
+        assert r["clock_shift_seconds"] == 0
+
+    west = next(r for r in rows if r["name"] == "TCM US West")
+    east = next(r for r in rows if r["name"] == "TCM US East")
+
+    # Shift only the West feed by +2h.
+    patched = await app_client.patch(
+        f"/api/channels/{west['id']}", json={"clock_shift_seconds": 7200}, headers=headers
+    )
+    assert patched.status_code == 200, patched.text
+    assert patched.json() == {"id": west["id"], "clock_shift_seconds": 7200}
+
+    guide2 = await app_client.get(
+        "/api/guide",
+        params={
+            "from": (_BASE - timedelta(hours=1)).isoformat(),
+            "to": (_BASE + timedelta(hours=6)).isoformat(),
+            "source_id": source_id,
+        },
+        headers=headers,
+    )
+    rows2 = {r["name"]: r for r in guide2.json()["channels"]}
+    assert rows2["TCM US East"]["programmes"][0]["start"] == east["programmes"][0]["start"]
+    east_start = datetime.fromisoformat(east["programmes"][0]["start"])
+    west_start = datetime.fromisoformat(rows2["TCM US West"]["programmes"][0]["start"])
+    assert (west_start - east_start) == timedelta(hours=2)
+    assert rows2["TCM US West"]["clock_shift_seconds"] == 7200
+
+
+async def test_patch_unknown_channel_is_404(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    await register_and_verify(app_client, captured_emails)
+    headers = auth_header(await login(app_client))
+    resp = await app_client.patch(
+        f"/api/channels/{uuid.uuid4()}", json={"clock_shift_seconds": 0}, headers=headers
+    )
+    assert resp.status_code == 404
 
 
 async def test_guide_rejects_over_wide_window(

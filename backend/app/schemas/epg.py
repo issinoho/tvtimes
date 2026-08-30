@@ -54,7 +54,19 @@ class GuideChannelOut(BaseModel):
     group_title: str | None
     is_hd: bool
     timezone: str
+    clock_shift_seconds: int
     programmes: list[ProgrammeOut]
+
+
+class ChannelPatchIn(BaseModel):
+    # Added to every programme time for this channel - e.g. +10800 to line a
+    # US-West feed up with an East-coast EPG. Clamped to +/- 24h.
+    clock_shift_seconds: int = Field(ge=-86_400, le=86_400)
+
+
+class ChannelShiftOut(BaseModel):
+    id: uuid.UUID
+    clock_shift_seconds: int
 
 
 class GuideOut(BaseModel):

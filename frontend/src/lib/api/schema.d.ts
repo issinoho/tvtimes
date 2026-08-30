@@ -505,6 +505,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/channels/{channel_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Patch Channel */
+        patch: operations["patch_channel_api_channels__channel_id__patch"];
+        trace?: never;
+    };
     "/api/channels/{channel_id}/schedule": {
         parameters: {
             query?: never;
@@ -704,6 +721,21 @@ export interface components {
             /** Offset */
             offset: number;
         };
+        /** ChannelPatchIn */
+        ChannelPatchIn: {
+            /** Clock Shift Seconds */
+            clock_shift_seconds: number;
+        };
+        /** ChannelShiftOut */
+        ChannelShiftOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Clock Shift Seconds */
+            clock_shift_seconds: number;
+        };
         /** ConnectorCreateIn */
         ConnectorCreateIn: {
             /**
@@ -856,6 +888,8 @@ export interface components {
             is_hd: boolean;
             /** Timezone */
             timezone: string;
+            /** Clock Shift Seconds */
+            clock_shift_seconds: number;
             /** Programmes */
             programmes: components["schemas"]["ProgrammeOut"][];
         };
@@ -2616,6 +2650,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_channel_api_channels__channel_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                channel_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChannelPatchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelShiftOut"];
                 };
             };
             /** @description Validation Error */
