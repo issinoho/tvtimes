@@ -44,6 +44,18 @@ def _no_breach_check(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture
+async def db_schema() -> AsyncIterator[None]:
+    """A created-and-torn-down schema for tests that hit the DB without the app."""
+    engine = get_engine()
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    try:
+        yield
+    finally:
+        await dispose_engine()
+
+
+@pytest.fixture
 async def app_client() -> AsyncIterator[AsyncClient]:
     app = create_app()
     engine = get_engine()

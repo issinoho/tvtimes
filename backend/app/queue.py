@@ -29,11 +29,19 @@ async def close_pool() -> None:
         _pool = None
 
 
-async def enqueue_source_refresh(source_id: uuid.UUID) -> None:
+async def _enqueue(job: str, *args: str) -> None:
     """Best effort: a queue outage must not fail the API call that triggered it
-    (the periodic sweep will pick the source up)."""
+    (the periodic sweep will pick the work up)."""
     try:
         pool = await get_pool()
-        await pool.enqueue_job("refresh_source", str(source_id))
+        await pool.enqueue_job(job, *args)
     except Exception as exc:
-        _log.warning("queue.enqueue_failed", job="refresh_source", error=str(exc))
+        _log.warning("queue.enqueue_failed", job=job, error=str(exc))
+
+
+async def enqueue_source_refresh(source_id: uuid.UUID) -> None:
+    await _enqueue("refresh_source", str(source_id))
+
+
+async def enqueue_epg_refresh(epg_source_id: uuid.UUID) -> None:
+    await _enqueue("refresh_epg_source", str(epg_source_id))

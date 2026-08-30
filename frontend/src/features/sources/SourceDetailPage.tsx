@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
+import { EpgPanel } from '@/features/sources/EpgPanel';
 import { StatusPill } from '@/features/sources/StatusPill';
 import {
   useChannels,
@@ -53,6 +54,8 @@ export function SourceDetailPage() {
       {source.last_status === 'error' && source.last_error ? (
         <p className={styles.err}>{source.last_error}</p>
       ) : null}
+
+      <EpgPanel sourceId={sourceId} />
 
       <div className={styles.toolbar}>
         <button
