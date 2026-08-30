@@ -16,6 +16,7 @@ from app.db import Base
 from app.models.audit import AuditLog
 from app.models.credentials import PasswordCredential, TotpSecret, WebAuthnCredential
 from app.models.session import AuthSession
+from app.models.source import Channel, Source, SourceKind, SourceStatus
 from app.models.tenant import Tenant
 from app.models.token import (
     EmailToken,
@@ -29,9 +30,13 @@ __all__ = [
     "AuditLog",
     "AuthSession",
     "Base",
+    "Channel",
     "EmailToken",
     "EmailTokenPurpose",
     "PasswordCredential",
+    "Source",
+    "SourceKind",
+    "SourceStatus",
     "Tenant",
     "TotpSecret",
     "User",

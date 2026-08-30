@@ -364,10 +364,112 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Sources */
+        get: operations["list_sources_api_sources_get"];
+        put?: never;
+        /** Create Source */
+        post: operations["create_source_api_sources_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sources/{source_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Source */
+        get: operations["get_source_api_sources__source_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Source */
+        delete: operations["delete_source_api_sources__source_id__delete"];
+        options?: never;
+        head?: never;
+        /** Patch Source */
+        patch: operations["patch_source_api_sources__source_id__patch"];
+        trace?: never;
+    };
+    "/api/sources/{source_id}/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Refresh Source */
+        post: operations["refresh_source_api_sources__source_id__refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sources/{source_id}/channels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Channels */
+        get: operations["list_channels_api_sources__source_id__channels_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** ChannelOut */
+        ChannelOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Ext Id */
+            ext_id: string | null;
+            /** Logo Url */
+            logo_url: string | null;
+            /** Group Title */
+            group_title: string | null;
+            /** Number */
+            number: number | null;
+            /** Is Hd */
+            is_hd: boolean;
+        };
+        /** ChannelPage */
+        ChannelPage: {
+            /** Items */
+            items: components["schemas"]["ChannelOut"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -392,6 +494,30 @@ export interface components {
             email: string;
             /** Password */
             password: string;
+        };
+        /** M3uSourceIn */
+        M3uSourceIn: {
+            /** Display Name */
+            display_name: string;
+            /** Timezone Override */
+            timezone_override?: string | null;
+            /**
+             * Clock Shift Seconds
+             * @default 0
+             */
+            clock_shift_seconds: number;
+            /**
+             * Refresh Interval Minutes
+             * @default 360
+             */
+            refresh_interval_minutes: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "m3u";
+            /** Url */
+            url: string;
         };
         /** MeOut */
         MeOut: {
@@ -523,6 +649,94 @@ export interface components {
              */
             current: boolean;
         };
+        /** SourceOut */
+        SourceOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Display Name */
+            display_name: string;
+            /** Enabled */
+            enabled: boolean;
+            /**
+             * Config Summary
+             * @default
+             */
+            config_summary: string;
+            /** Timezone Override */
+            timezone_override: string | null;
+            /** Clock Shift Seconds */
+            clock_shift_seconds: number;
+            /** Refresh Interval Minutes */
+            refresh_interval_minutes: number;
+            /** Last Status */
+            last_status: string;
+            /** Last Error */
+            last_error: string | null;
+            /** Channel Count */
+            channel_count: number;
+            /** Epg Url */
+            epg_url: string | null;
+            /** Last Refreshed At */
+            last_refreshed_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** SourcePatchIn */
+        SourcePatchIn: {
+            /** Display Name */
+            display_name?: string | null;
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Timezone Override */
+            timezone_override?: string | null;
+            /** Clock Shift Seconds */
+            clock_shift_seconds?: number | null;
+            /** Refresh Interval Minutes */
+            refresh_interval_minutes?: number | null;
+        };
+        /** StalkerSourceIn */
+        StalkerSourceIn: {
+            /** Display Name */
+            display_name: string;
+            /** Timezone Override */
+            timezone_override?: string | null;
+            /**
+             * Clock Shift Seconds
+             * @default 0
+             */
+            clock_shift_seconds: number;
+            /**
+             * Refresh Interval Minutes
+             * @default 360
+             */
+            refresh_interval_minutes: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "stalker";
+            /** Portal Url */
+            portal_url: string;
+            /** Mac */
+            mac: string;
+            /** Serial */
+            serial?: string | null;
+            /** Device Id */
+            device_id?: string | null;
+            /**
+             * Stb Type
+             * @default MAG250
+             */
+            stb_type: string;
+        };
         /** TimezoneIn */
         TimezoneIn: {
             /** Timezone */
@@ -596,6 +810,39 @@ export interface components {
              * @default Passkey
              */
             nickname: string;
+        };
+        /** XtreamSourceIn */
+        XtreamSourceIn: {
+            /** Display Name */
+            display_name: string;
+            /** Timezone Override */
+            timezone_override?: string | null;
+            /**
+             * Clock Shift Seconds
+             * @default 0
+             */
+            clock_shift_seconds: number;
+            /**
+             * Refresh Interval Minutes
+             * @default 360
+             */
+            refresh_interval_minutes: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "xtream";
+            /** Server Url */
+            server_url: string;
+            /** Username */
+            username: string;
+            /** Password */
+            password: string;
+            /**
+             * Output
+             * @default ts
+             */
+            output: string;
         };
     };
     responses: never;
@@ -1325,6 +1572,246 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sources_api_sources_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_source_api_sources_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["M3uSourceIn"] | components["schemas"]["XtreamSourceIn"] | components["schemas"]["StalkerSourceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_source_api_sources__source_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_source_api_sources__source_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_source_api_sources__source_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SourcePatchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_source_api_sources__source_id__refresh_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_channels_api_sources__source_id__channels_get: {
+        parameters: {
+            query?: {
+                group?: string | null;
+                search?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelPage"];
                 };
             };
             /** @description Validation Error */

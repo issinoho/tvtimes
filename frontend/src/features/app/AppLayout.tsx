@@ -21,6 +21,9 @@ export function AppLayout() {
           <NavLink to="/" end className={styles.navLink}>
             {({ isActive }) => <span data-active={isActive}>Guide</span>}
           </NavLink>
+          <NavLink to="/sources" className={styles.navLink}>
+            {({ isActive }) => <span data-active={isActive}>Sources</span>}
+          </NavLink>
           <NavLink to="/settings" className={styles.navLink}>
             {({ isActive }) => <span data-active={isActive}>Settings</span>}
           </NavLink>
