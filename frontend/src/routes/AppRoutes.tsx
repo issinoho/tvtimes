@@ -12,6 +12,7 @@ import { SearchPage } from '@/features/search/SearchPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
 import { SourceDetailPage } from '@/features/sources/SourceDetailPage';
 import { SourcesPage } from '@/features/sources/SourcesPage';
+import { WatchlistPage } from '@/features/watchlist/WatchlistPage';
 import { RequireAuth } from '@/routes/RequireAuth';
 
 export function AppRoutes() {
@@ -42,6 +43,7 @@ export function AppRoutes() {
       >
         <Route index element={<GuidePage />} />
         <Route path="search" element={<SearchPage />} />
+        <Route path="watchlist" element={<WatchlistPage />} />
         <Route path="sources" element={<SourcesPage />} />
         <Route path="sources/:sourceId" element={<SourceDetailPage />} />
         <Route path="settings" element={<SettingsPage />} />

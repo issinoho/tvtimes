@@ -151,6 +151,12 @@ TVTIMES_SMTP_PASSWORD=...
 
 or `TVTIMES_EMAIL_PROVIDER=resend` with `TVTIMES_RESEND_API_KEY`.
 
+Email also carries **watchlist reminders** — open a programme from the guide or
+search and pick *Remind me* (that airing) or *Watch this title* (every future
+airing). The worker emails you ~15 minutes before, to your verified account
+address. With `console` the reminder is only written to the worker log, so set a
+real provider if you want them to actually arrive.
+
 ## Troubleshooting
 
 - **"insecure production config" on start** — you set your own
