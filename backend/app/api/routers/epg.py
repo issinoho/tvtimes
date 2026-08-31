@@ -6,7 +6,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, Response, status
 
 from app.auth.deps import SessionDep, VerifiedUser
 from app.models.epg import EpgSource, Programme
@@ -24,6 +24,7 @@ from app.schemas.epg import (
     ScheduleOut,
 )
 from app.services import epg as svc
+from app.services import logos as logo_svc
 from app.services import sources as src_svc
 
 router = APIRouter(tags=["epg"])
@@ -126,6 +127,25 @@ async def patch_channel(
     return ChannelShiftOut(id=channel.id, clock_shift_seconds=channel.clock_shift_seconds)
 
 
+@router.get("/channels/{channel_id}/logo", include_in_schema=False)
+async def channel_logo(channel_id: uuid.UUID, session: SessionDep) -> Response:
+    """Proxy a channel's logo through this origin so an ``http://`` LAN logo URL
+    still loads on an HTTPS deployment. Unauthenticated on purpose — it's just an
+    icon, keyed by an unguessable UUID, and ``<img>`` can't send a bearer token."""
+    channel = await session.get(Channel, channel_id)
+    if channel is None or not channel.logo_url:
+        raise HTTPException(status.HTTP_404_NOT_FOUND)
+    got = await logo_svc.fetch_logo(channel.logo_url)
+    if got is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND)
+    body, content_type = got
+    return Response(
+        body,
+        media_type=content_type,
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
 @router.get("/channels/{channel_id}/schedule", response_model=ScheduleOut)
 async def channel_schedule(
     channel_id: uuid.UUID,
@@ -159,7 +179,7 @@ async def guide(
     source_id: Annotated[uuid.UUID | None, Query()] = None,
     group: Annotated[str | None, Query(max_length=400)] = None,
     channels: Annotated[list[uuid.UUID] | None, Query()] = None,
-    limit: Annotated[int, Query(ge=1, le=400)] = 300,
+    limit: Annotated[int, Query(ge=1, le=3000)] = 800,
 ) -> GuideOut:
     start, end = _clamp_range(
         frm, to, default_span=timedelta(hours=6), max_span=timedelta(hours=36)

@@ -186,7 +186,16 @@ export function GuideGrid({ channels, windowStart, onOpen }: Props) {
               >
                 <span className={styles.chanNum}>{ch.number ?? ''}</span>
                 {ch.logo_url ? (
-                  <img className={styles.chanLogo} src={ch.logo_url} alt="" loading="lazy" />
+                  <img
+                    className={styles.chanLogo}
+                    /* proxied through our origin: http:// LAN logos must load on an https page */
+                    src={`/api/channels/${ch.id}/logo`}
+                    alt=""
+                    loading="lazy"
+                    onError={(e) => {
+                      e.currentTarget.style.visibility = 'hidden';
+                    }}
+                  />
                 ) : (
                   <span className={styles.chanLogoEmpty} aria-hidden />
                 )}
