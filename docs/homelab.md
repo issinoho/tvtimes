@@ -39,11 +39,14 @@ in the log above — click it from there.
 
 ```sh
 docker compose pull
-docker compose up -d
+docker compose up -d --force-recreate
 ```
 
-Migrations run automatically on start. Pin a version in `.env`
-(`TVTIMES_IMAGE=issinoho1969/tvtimes:v1.2.0`) if you'd rather upgrade deliberately.
+Migrations run automatically on start. `--force-recreate` ensures the running
+containers move onto the freshly pulled image (a bare `up -d` sometimes reports
+"Running" and does nothing). A browser tab that's already open shows a "new
+version available — Reload" prompt. Pin a version in `.env`
+(`TVTIMES_IMAGE=issinoho1969/tvtimes:v1.2.0`) to upgrade deliberately.
 
 ## Data & backups
 
