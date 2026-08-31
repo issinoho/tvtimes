@@ -33,11 +33,112 @@ TMDB "hero" panel. Everything runs on your own hardware.
 You need Docker with the Compose plugin. Nothing to build — it pulls a
 published multi-arch image (`linux/amd64` + `linux/arm64`).
 
+Make a directory, drop in the two files below, then `docker compose up -d`.
+
+**`.env`** — the only line you must set is `TVTIMES_PUBLIC_ORIGIN`:
+
 ```sh
-mkdir tvtimes && cd tvtimes
+TVTIMES_PUBLIC_ORIGIN=http://localhost:8888   # the exact URL you'll open
+TVTIMES_WEBAUTHN_RP_ID=localhost              # the origin's domain; keep as localhost for a bare-IP setup
+POSTGRES_PASSWORD=change-me
+# TVTIMES_EMAIL_PROVIDER=smtp                 # optional; default logs the verification link
+```
+
+<details>
+<summary><b><code>docker-compose.yml</code></b> — copy verbatim</summary>
+
+```yaml
+name: tvtimes
+
+x-app: &app
+  image: ${TVTIMES_IMAGE:-issinoho1969/tvtimes:latest}
+  restart: unless-stopped
+  environment:
+    TVTIMES_ENV: prod
+    TVTIMES_DATABASE_URL: postgresql+asyncpg://tvtimes:${POSTGRES_PASSWORD:-tvtimes}@db:5432/tvtimes
+    TVTIMES_REDIS_URL: redis://redis:6379/0
+    TVTIMES_RATELIMIT_STORAGE_URI: redis://redis:6379/1
+    TVTIMES_PUBLIC_ORIGIN: ${TVTIMES_PUBLIC_ORIGIN:?set TVTIMES_PUBLIC_ORIGIN in .env}
+    TVTIMES_WEBAUTHN_RP_ID: ${TVTIMES_WEBAUTHN_RP_ID:-localhost}
+    TVTIMES_WEBAUTHN_RP_NAME: ${TVTIMES_WEBAUTHN_RP_NAME:-tvtimes}
+    TVTIMES_EMAIL_PROVIDER: ${TVTIMES_EMAIL_PROVIDER:-console}
+    TVTIMES_EMAIL_FROM: ${TVTIMES_EMAIL_FROM:-tvtimes <no-reply@localhost>}
+    TVTIMES_SMTP_HOST: ${TVTIMES_SMTP_HOST:-}
+    TVTIMES_SMTP_PORT: ${TVTIMES_SMTP_PORT:-587}
+    TVTIMES_SMTP_USERNAME: ${TVTIMES_SMTP_USERNAME:-}
+    TVTIMES_SMTP_PASSWORD: ${TVTIMES_SMTP_PASSWORD:-}
+    TVTIMES_RESEND_API_KEY: ${TVTIMES_RESEND_API_KEY:-}
+  volumes:
+    - secrets:/data
+  depends_on:
+    db: { condition: service_healthy }
+    redis: { condition: service_healthy }
+
+services:
+  tvtimes:
+    <<: *app
+    command: ["web"]
+    ports:
+      - "${TVTIMES_HTTP_PORT:-8888}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/healthz', timeout=3).status==200 else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  worker:
+    <<: *app
+    command: ["worker"]
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      tvtimes: { condition: service_started }
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tvtimes
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tvtimes}
+      POSTGRES_DB: tvtimes
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tvtimes"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
+  redisdata:
+  secrets:
+```
+
+</details>
+
+Prefer to fetch them?
+
+```sh
 curl -O https://raw.githubusercontent.com/issinoho/tvtimes/main/docker-compose.yml
 curl -o .env https://raw.githubusercontent.com/issinoho/tvtimes/main/.env.example
-# edit .env — set TVTIMES_PUBLIC_ORIGIN to the URL you'll open (see below)
+```
+
+Then:
+
+```sh
 docker compose up -d
 ```
 
