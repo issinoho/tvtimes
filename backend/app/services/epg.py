@@ -13,6 +13,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.ingest.errors import SourceError, SourceUnreachable
 from app.ingest.ssrf import assert_allowed_url, fetch_bytes
 from app.ingest.xmltv import (
@@ -46,9 +47,10 @@ def _now() -> datetime:
 
 async def create_epg_source(session: AsyncSession, *, tenant_id: uuid.UUID, url: str) -> EpgSource:
     url = url.strip()
-    # A transient DNS failure is left for the refresh to report.
+    # A transient DNS failure is left for the refresh to report. A LAN URL the
+    # operator has allow-listed (TVTIMES_FETCH_ALLOWLIST) is permitted.
     with contextlib.suppress(SourceUnreachable):
-        await assert_allowed_url(url)
+        await assert_allowed_url(url, allowlist=get_settings().fetch_allowlist_entries)
     existing = await session.scalar(
         select(EpgSource).where(EpgSource.tenant_id == tenant_id, EpgSource.url == url)
     )

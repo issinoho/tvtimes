@@ -434,6 +434,25 @@ async def test_create_standalone_epg_source_rejects_ssrf(
     assert resp.json()["code"] == "source_error"
 
 
+async def test_standalone_epg_source_allows_an_allowlisted_lan_url(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.config import get_settings
+
+    await register_and_verify(app_client, captured_emails)
+    headers = auth_header(await login(app_client))
+    url = "http://192.168.0.218:5523/feeds/pluto-us/epg.xml"
+
+    blocked = await app_client.post("/api/epg-sources", json={"url": url}, headers=headers)
+    assert blocked.status_code == 422
+
+    monkeypatch.setenv("TVTIMES_FETCH_ALLOWLIST", "192.168.0.0/24")
+    get_settings.cache_clear()
+    ok = await app_client.post("/api/epg-sources", json={"url": url}, headers=headers)
+    assert ok.status_code == 201, ok.text
+    assert ok.json()["source_id"] is None
+
+
 async def test_cannot_delete_source_managed_epg(
     app_client: AsyncClient, captured_emails: list[dict[str, str]], monkeypatch: pytest.MonkeyPatch
 ) -> None:
