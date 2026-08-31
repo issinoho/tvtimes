@@ -89,7 +89,9 @@ async def _paced() -> None:
         _last_call = loop.time()
 
 
-def _cache_key(title: str, year: str | None) -> tuple[str, str]:
+def cache_key(title: str, year: str | None) -> tuple[str, str]:
+    """The (query_key, query_year) a programme maps to in ``tmdb_enrichment``.
+    Shared with ``services.epg`` so the guide highlights join on the same key."""
     return normalize_name(title)[:300], (year or "")
 
 
@@ -118,7 +120,7 @@ async def enrich_one(
 ) -> TmdbEnrichment | None:
     """Return a fresh cache row for ``title``, fetching from TMDB on a miss.
     Returns None only on a hard request failure (never cached)."""
-    key, year_key = _cache_key(title, year)
+    key, year_key = cache_key(title, year)
     row = await _lookup(session, media_type, key, year_key)
     if row is not None and not force and _now() - row.fetched_at < CACHE_TTL:
         return row
@@ -183,7 +185,7 @@ async def enrich_epg_window(session: AsyncSession, tenant_id: uuid.UUID, token: 
     async with httpx.AsyncClient() as http:
         for p in rows:
             media = MediaType.movie if p.is_movie else MediaType.tv
-            key, year_key = _cache_key(p.title, p.year)
+            key, year_key = cache_key(p.title, p.year)
             sig = (media.value, key, year_key)
             if not key or sig in seen:
                 continue
@@ -229,7 +231,7 @@ async def hero_for(
 
     token = await token_for(session, tenant_id)
     media = MediaType.movie if programme.is_movie else MediaType.tv
-    key, year_key = _cache_key(programme.title, programme.year)
+    key, year_key = cache_key(programme.title, programme.year)
     row = await _lookup(session, media, key, year_key)
     fresh = row is not None and _now() - row.fetched_at < CACHE_TTL
     return Hero(
