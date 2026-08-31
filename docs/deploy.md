@@ -13,7 +13,7 @@ no CORS and the refresh cookie is first-party.
 | | command | notes |
 |---|---|---|
 | Web/API | `entrypoint web` | runs `alembic upgrade head`, then `uvicorn` with `--proxy-headers`. Stateless; scale horizontally behind a load balancer. |
-| Worker | `entrypoint worker` | `arq app.worker.WorkerSettings`. One is enough — refreshes sources/EPG, warms the TMDB cache. |
+| Worker | `entrypoint worker` | `arq app.worker.WorkerSettings`. One is enough — refreshes sources/EPG, warms the TMDB cache, sends watchlist reminder emails (`reminders` cron, every 5 min). |
 | Postgres 16 | — | the only stateful store |
 | Redis 7 | — | arq queue + rate-limit storage |
 
@@ -58,8 +58,19 @@ Full list with defaults: [`.env.example`](../.env.example).
   limiter and audit log read the client IP).
 - Proxy **all** paths to the container — the SPA and API are one origin.
 - Recommended headers: HSTS; CSP with `connect-src 'self'`, `script-src 'self'`,
-  `img-src 'self' data: https://image.tmdb.org https://iptv-org.github.io`.
+  `img-src 'self' data: https://image.tmdb.org`. Channel logos are proxied
+  through this origin (`/api/channels/{id}/logo`), so only TMDB art is
+  cross-origin; the iptv-org logo CDN is fetched server-side only.
 - The refresh cookie is `HttpOnly; Secure; SameSite=Lax`, path `/api/auth`.
+
+## Export feeds
+
+If a tenant enables **Settings → Export feeds**, three unauthenticated,
+token-gated routes open up — `GET /api/exports/playlist.m3u`, `.../epg.xml`, and
+`.../stream/{channel_id}` (a 302 to the resolved upstream). Auth is a
+per-tenant token as `?token=`, matched against its sha256; there is nothing to
+configure server-side. They are rate-limited (30/min) and safe to expose
+through the same proxy as the rest of the app.
 
 ## Upgrades
 

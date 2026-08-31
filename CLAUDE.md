@@ -89,6 +89,23 @@ CI pins **newer** ruff/mypy than an old local pin may resolve — if `ruff forma
 - **Email is fail-open.** `auth/email.send_email` catches provider errors, logs
   `email.delivery_failed` + `email.undelivered_body` (so the link is
   recoverable), and returns — a broken mailer must not 500 registration.
+- **Watchlist items are snapshots.** A `watchlist_item` of kind `programme`
+  stores `channel_id` + start + title, deliberately **not** an FK to
+  `programme` (an EPG refresh deletes and recreates those rows). Kind `title`
+  matches every future airing whose normalised title is equal.
+  `watchlist_notification` is a send-once ledger so a title watch never
+  double-emails; the `reminders` arq cron (every 5 min) skips unverified users
+  and goes through the same fail-open mailer, ~15 min before air.
+- **Export token.** Per-tenant, `Tenant.export_token_hash` is the **sha256** of
+  the token (the raw value is shown once, never stored). It gates the
+  unauthenticated `/api/exports/*` endpoints via `?token=` — a tuner client
+  can't send an `Authorization` header. Rotating just replaces the hash. The
+  M3U/XMLTV writers call `epg.resolve_display_tz` so the export and the grid
+  agree on zone + per-channel clock shift.
+- **`tmdb.cache_key`** (was `_cache_key`, now public) is the one mapping from a
+  programme to its `tmdb_enrichment` row: `(normalize_name(title)[:300], year
+  or "")`. `services/epg` highlights and `services/tmdb` must both use it or the
+  rating join silently misses.
 - **`SourceKind` enum** is `native_enum=False` (VARCHAR) — adding a value needs
   no migration.
 

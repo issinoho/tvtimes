@@ -102,6 +102,22 @@ Add a source, choose **HDHomeRun**:
 The SiliconDust guide data (`api.hdhomerun.com`) is picked up automatically when
 the tuner reports a DeviceAuth.
 
+## A source with channels but no guide
+
+Most M3U playlists advertise their XMLTV feed (`x-tvg-url`) and tvtimes adopts it
+automatically. Some (a few Pluto proxies) don't, leaving the source with an empty
+guide. Open the source's **EPG** panel and paste an XMLTV URL (`.xml` or
+`.xml.gz`) into **Attach XMLTV** — it's matched tenant-wide across all channels,
+and you can remove it again from the same panel. A LAN URL you've added to
+`TVTIMES_FETCH_ALLOWLIST` is accepted here too.
+
+## Finding something to watch
+
+The **Search** page matches programme titles across every channel for the next
+two weeks, in the guide's channel order. From a result — or any programme's info
+panel — pick **Remind me** for that single airing or **Watch this title** to be
+mailed before every future showing (see Email, below).
+
 ## Use tvtimes as your playlist / EPG provider
 
 tvtimes can hand your whole line-up to another player — Jellyfin, Plex, Emby,
