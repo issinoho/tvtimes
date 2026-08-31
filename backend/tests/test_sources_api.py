@@ -102,6 +102,30 @@ async def test_create_rejects_ssrf_url(
     assert resp.json()["code"] == "source_error"
 
 
+async def test_create_allows_a_lan_url_on_the_fetch_allowlist(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.config import get_settings
+
+    headers = await _auth(app_client, captured_emails, "sam@example.com")
+
+    rejected = await app_client.post(
+        "/api/sources",
+        json={**M3U_BODY, "url": "http://192.168.0.218:5523/feeds/pluto-us/m3u"},
+        headers=headers,
+    )
+    assert rejected.status_code == 422  # blocked by default
+
+    monkeypatch.setenv("TVTIMES_FETCH_ALLOWLIST", "192.168.0.0/24")
+    get_settings.cache_clear()
+    allowed = await app_client.post(
+        "/api/sources",
+        json={**M3U_BODY, "url": "http://192.168.0.218:5523/feeds/pluto-us/m3u"},
+        headers=headers,
+    )
+    assert allowed.status_code == 201, allowed.text
+
+
 async def test_xtream_config_summary_hides_password(
     app_client: AsyncClient, captured_emails: list[dict[str, str]]
 ) -> None:
