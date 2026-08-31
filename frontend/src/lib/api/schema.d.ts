@@ -595,6 +595,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/guide/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search Guide */
+        get: operations["search_guide_api_guide_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/guide/programme/{programme_id}/hero": {
         parameters: {
             query?: never;
@@ -1306,6 +1323,54 @@ export interface components {
             timezone: string;
             /** Programmes */
             programmes: components["schemas"]["ProgrammeOut"][];
+        };
+        /**
+         * SearchChannelOut
+         * @description The channel context for a search hit — GuideChannelOut without the
+         *     per-row programme list.
+         */
+        SearchChannelOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Number */
+            number: number | null;
+            /** Logo Url */
+            logo_url: string | null;
+            /** Group Title */
+            group_title: string | null;
+            /** Is Hd */
+            is_hd: boolean;
+            /** Timezone */
+            timezone: string;
+            /** Clock Shift Seconds */
+            clock_shift_seconds: number;
+        };
+        /** SearchHitOut */
+        SearchHitOut: {
+            channel: components["schemas"]["SearchChannelOut"];
+            programme: components["schemas"]["ProgrammeOut"];
+        };
+        /** SearchOut */
+        SearchOut: {
+            /** Query */
+            query: string;
+            /**
+             * From
+             * Format: date-time
+             */
+            from: string;
+            /**
+             * To
+             * Format: date-time
+             */
+            to: string;
+            /** Results */
+            results: components["schemas"]["SearchHitOut"][];
         };
         /** SessionOut */
         SessionOut: {
@@ -2915,6 +2980,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GuideOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_guide_api_guide_search_get: {
+        parameters: {
+            query: {
+                q: string;
+                movies_only?: boolean;
+                from?: string | null;
+                to?: string | null;
+                limit?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchOut"];
                 };
             };
             /** @description Validation Error */

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { useSetChannelShift, type GuideChannel, type Programme } from '@/features/guide/api';
+import { useSetChannelShift, type SearchChannel, type Programme } from '@/features/guide/api';
 import { GENRE_VAR, genreOf } from '@/features/guide/genre';
 import { fmtDayTime } from '@/features/guide/time';
 import { useHero } from '@/features/guide/hero';
@@ -19,7 +19,7 @@ function fmtShift(seconds: number): string {
   return `${sign}${h ? `${h}h` : ''}${m ? `${m}m` : ''}`;
 }
 
-function ChannelShiftControl({ channel }: { channel: GuideChannel }) {
+function ChannelShiftControl({ channel }: { channel: SearchChannel }) {
   const [shift, setShift] = useState(channel.clock_shift_seconds);
   const mutation = useSetChannelShift();
   useEffect(() => setShift(channel.clock_shift_seconds), [channel.id, channel.clock_shift_seconds]);
@@ -57,7 +57,7 @@ function ChannelShiftControl({ channel }: { channel: GuideChannel }) {
 }
 
 interface Props {
-  channel: GuideChannel;
+  channel: SearchChannel;
   programme: Programme;
   onClose: () => void;
 }
