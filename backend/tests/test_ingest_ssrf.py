@@ -56,3 +56,23 @@ async def test_allowlist_bypasses_resolution(monkeypatch: pytest.MonkeyPatch) ->
 
     monkeypatch.setattr(ssrf, "_resolve", boom)
     await ssrf.assert_allowed_url("http://internal.test/x", allowlist=["internal.test"])
+
+
+async def test_allowlist_accepts_a_lan_ip_and_cidr() -> None:
+    await ssrf.assert_allowed_url(
+        "http://192.168.0.218:5523/feeds/x.m3u", allowlist=["192.168.0.218"]
+    )
+    await ssrf.assert_allowed_url(
+        "http://192.168.0.50/epg.xml", allowlist=["10.0.0.0/8", "192.168.0.0/24"]
+    )
+
+
+async def test_allowlisted_cidr_still_rejects_addresses_outside_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_resolve(_host: str) -> list[str]:
+        return ["192.168.9.9"]  # not in 192.168.0.0/24
+
+    monkeypatch.setattr(ssrf, "_resolve", fake_resolve)
+    with pytest.raises(SourceRejected):
+        await ssrf.assert_allowed_url("http://nas.lan/x", allowlist=["192.168.0.0/24"])
