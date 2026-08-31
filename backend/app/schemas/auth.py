@@ -120,3 +120,4 @@ class MeOut(BaseModel):
     totp_enabled: bool
     passkey_count: int
     tmdb_connected: bool = False
+    export_token_set_at: datetime | None = None

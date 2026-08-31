@@ -9,3 +9,9 @@ class TimezoneIn(BaseModel):
 
 class TmdbTokenIn(BaseModel):
     token: str = Field(min_length=20, max_length=1024)
+
+
+class ExportTokenOut(BaseModel):
+    token: str
+    playlist_url: str
+    epg_url: str

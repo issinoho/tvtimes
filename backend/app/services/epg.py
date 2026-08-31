@@ -342,6 +342,14 @@ def _resolve_tz(name: str) -> tuple[zoneinfo.ZoneInfo, str]:
         return zoneinfo.ZoneInfo("UTC"), "UTC"
 
 
+def resolve_display_tz(source: Source | None, default_tz: str) -> tuple[zoneinfo.ZoneInfo, str]:
+    """The zone a channel's programmes render in: per-source override, else the
+    tenant default, else UTC. Shared by the guide grid and the XMLTV export so
+    both agree on the wall-clock times."""
+    override = source.timezone_override if source and source.timezone_override else None
+    return _resolve_tz(override or default_tz)
+
+
 async def guide(
     session: AsyncSession,
     tenant_id: uuid.UUID,
@@ -400,8 +408,7 @@ async def guide(
     rows: list[GuideRow] = []
     for channel in channels:
         source = sources.get(channel.source_id)
-        override = source.timezone_override if source else None
-        tz, tz_name = _resolve_tz(override or default_tz)
+        tz, tz_name = resolve_display_tz(source, default_tz)
         shift = timedelta(seconds=_shift_seconds(channel, source))
         rows.append(
             GuideRow(

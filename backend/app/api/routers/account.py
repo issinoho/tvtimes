@@ -18,8 +18,9 @@ from app.auth.deps import (
     VerifiedUser,
 )
 from app.auth.ratelimit import WEBAUTHN_LIMIT, limiter
+from app.config import get_settings
 from app.models.credentials import WebAuthnCredential
-from app.schemas.account import TimezoneIn, TmdbTokenIn
+from app.schemas.account import ExportTokenOut, TimezoneIn, TmdbTokenIn
 from app.schemas.auth import (
     MeOut,
     MessageOut,
@@ -31,6 +32,7 @@ from app.schemas.auth import (
     TotpConfirmIn,
     WebAuthnRegisterCompleteIn,
 )
+from app.services import exports as exports_svc
 from app.services import tmdb as tmdb_svc
 
 router = APIRouter(prefix="/account", tags=["account"])
@@ -54,6 +56,7 @@ async def me(user: CurrentUser, session: SessionDep) -> MeOut:
         totp_enabled=user.totp is not None and user.totp.confirmed_at is not None,
         passkey_count=passkeys or 0,
         tmdb_connected=bool(user.tenant.tmdb_token_encrypted),
+        export_token_set_at=user.tenant.export_token_set_at,
     )
 
 
@@ -72,6 +75,27 @@ async def set_tmdb_token(body: TmdbTokenIn, user: VerifiedUser, session: Session
 async def clear_tmdb_token(user: VerifiedUser, session: SessionDep) -> MessageOut:
     await tmdb_svc.clear_token(session, user.tenant_id)
     return MessageOut(message="TMDB disconnected.")
+
+
+@router.post("/export-token", response_model=ExportTokenOut)
+async def create_export_token(user: VerifiedUser, session: SessionDep) -> ExportTokenOut:
+    """Mint (or rotate) the tenant's M3U / XMLTV export token. The raw value is
+    returned once here and never again — rotate to get a new one."""
+    await session.refresh(user, ["tenant"])
+    raw = await exports_svc.generate_token(session, user.tenant)
+    base = get_settings().public_origin.rstrip("/")
+    return ExportTokenOut(
+        token=raw,
+        playlist_url=f"{base}/api/exports/playlist.m3u?token={raw}",
+        epg_url=f"{base}/api/exports/epg.xml?token={raw}",
+    )
+
+
+@router.delete("/export-token", response_model=MessageOut)
+async def delete_export_token(user: VerifiedUser, session: SessionDep) -> MessageOut:
+    await session.refresh(user, ["tenant"])
+    await exports_svc.revoke_token(session, user.tenant)
+    return MessageOut(message="Export feeds disabled.")
 
 
 @router.put("/timezone", response_model=MessageOut)

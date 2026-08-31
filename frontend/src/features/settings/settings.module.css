@@ -124,6 +124,27 @@
   color: var(--text-dim);
 }
 
+.feedRow {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+.feedRow .secret {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.feedLabel {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  flex: 0 0 auto;
+}
+
 .codes {
   columns: 2;
   gap: 1rem;

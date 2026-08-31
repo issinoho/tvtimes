@@ -102,6 +102,40 @@ Add a source, choose **HDHomeRun**:
 The SiliconDust guide data (`api.hdhomerun.com`) is picked up automatically when
 the tuner reports a DeviceAuth.
 
+## Use tvtimes as your playlist / EPG provider
+
+tvtimes can hand your whole line-up to another player — Jellyfin, Plex, Emby,
+TiviMate, Threadfin — as one merged **M3U playlist** and **XMLTV guide**. Every
+enabled source is combined and de-duplicated, and programme times are written
+already corrected for each channel's timezone and clock offset, so the
+downstream guide needs no further fixing.
+
+1. **Settings → Export feeds → Generate feed links.**
+2. Copy the two URLs. They carry a secret token and are shown **once** — rotate
+   any time to get fresh links (the old ones stop working), or Disable to switch
+   the feeds off entirely.
+
+```
+https://tv.example.com/api/exports/playlist.m3u?token=…
+https://tv.example.com/api/exports/epg.xml?token=…
+```
+
+In **Jellyfin** → *Live TV* → add an **M3U Tuner** with the playlist URL, then an
+**XMLTV** guide source with the EPG URL. Plex (*Live TV & DVR* → "have an XMLTV
+guide") and TiviMate (add playlist → *Xtream/M3U* → external EPG) work the same
+way.
+
+Notes:
+
+- Anyone with a link can read your line-up and stream through it — treat the
+  URLs as passwords. Rotating invalidates the previous token.
+- Channels are keyed by their tvtimes id, so an East/West pair that shares a
+  tvg-id upstream still links to the right guide data downstream.
+- Playback is proxied per channel through `/api/exports/stream/<id>` — the URL
+  302-redirects to the real stream (Xtream credentials stay on the server and
+  never appear in the file). **Stalker portal** channels appear in the guide but
+  don't play through the export yet.
+
 ## Email (optional but recommended)
 
 `console` is fine for a single account. For real delivery set in `.env`:

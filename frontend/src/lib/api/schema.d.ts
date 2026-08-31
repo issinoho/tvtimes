@@ -243,6 +243,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/account/export-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Export Token
+         * @description Mint (or rotate) the tenant's M3U / XMLTV export token. The raw value is
+         *     returned once here and never again — rotate to get a new one.
+         */
+        post: operations["create_export_token_api_account_export_token_post"];
+        /** Delete Export Token */
+        delete: operations["delete_export_token_api_account_export_token_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/account/timezone": {
         parameters: {
             query?: never;
@@ -886,6 +908,15 @@ export interface components {
              */
             created_at: string;
         };
+        /** ExportTokenOut */
+        ExportTokenOut: {
+            /** Token */
+            token: string;
+            /** Playlist Url */
+            playlist_url: string;
+            /** Epg Url */
+            epg_url: string;
+        };
         /** GuideChannelOut */
         GuideChannelOut: {
             /**
@@ -1126,6 +1157,8 @@ export interface components {
              * @default false
              */
             tmdb_connected: boolean;
+            /** Export Token Set At */
+            export_token_set_at?: string | null;
         };
         /** MessageOut */
         MessageOut: {
@@ -1928,6 +1961,68 @@ export interface operations {
         };
     };
     clear_tmdb_token_api_account_tmdb_token_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_export_token_api_account_export_token_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportTokenOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_export_token_api_account_export_token_delete: {
         parameters: {
             query?: never;
             header?: {

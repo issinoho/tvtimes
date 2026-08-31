@@ -1,0 +1,335 @@
+"""M3U / XMLTV export feeds and per-channel stream resolution."""
+
+from __future__ import annotations
+
+import json
+import uuid
+import xml.etree.ElementTree as ET
+from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo
+
+import pytest
+from app.auth.crypto import encrypt
+from app.db import get_sessionmaker
+from app.models.epg import EpgSource, Programme
+from app.models.source import Channel, Source, SourceKind, SourceStatus
+from app.models.tenant import Tenant
+from app.services import exports as svc
+from httpx import AsyncClient
+
+from tests.conftest import auth_header, login, register_and_verify
+
+XTREAM_CONFIG = {
+    "server_url": "http://provider.example:8080",
+    "username": "user1",
+    "password": "pass1",
+    "output": "ts",
+}
+
+# A programme inside the export window (now-1d … now+14d), at a fixed wall time.
+PROG_START = (datetime.now(UTC) + timedelta(days=1)).replace(
+    hour=19, minute=0, second=0, microsecond=0
+)
+
+
+async def _seed() -> dict[str, uuid.UUID]:
+    """A tenant with an m3u source (2 channels, one on a disabled source),
+    an xtream source (1 channel) and a stalker source (1 channel), plus one
+    programme on the first m3u channel."""
+    async with get_sessionmaker()() as session:
+        tenant = Tenant(name="T", default_timezone="Europe/London")
+        session.add(tenant)
+        await session.flush()
+
+        m3u = Source(
+            tenant_id=tenant.id,
+            kind=SourceKind.m3u,
+            display_name="Playlist",
+            config_encrypted="x",
+            timezone_override="America/New_York",
+            last_status=SourceStatus.ok,
+            sort_rank=0,
+        )
+        xtream = Source(
+            tenant_id=tenant.id,
+            kind=SourceKind.xtream,
+            display_name="Xtream",
+            config_encrypted=encrypt(json.dumps(XTREAM_CONFIG)),
+            last_status=SourceStatus.ok,
+            sort_rank=1,
+        )
+        stalker = Source(
+            tenant_id=tenant.id,
+            kind=SourceKind.stalker,
+            display_name="Portal",
+            config_encrypted="x",
+            last_status=SourceStatus.ok,
+            sort_rank=2,
+        )
+        disabled = Source(
+            tenant_id=tenant.id,
+            kind=SourceKind.m3u,
+            display_name="Off",
+            config_encrypted="x",
+            last_status=SourceStatus.ok,
+            enabled=False,
+            sort_rank=3,
+        )
+        session.add_all([m3u, xtream, stalker, disabled])
+        await session.flush()
+
+        ch_m3u = Channel(
+            tenant_id=tenant.id,
+            source_id=m3u.id,
+            dedupe_key="m1",
+            ext_id="bbc.uk",
+            name="BBC One",
+            tvg_name="BBC One HD",
+            logo_url="http://logos.example/bbc.png",
+            group_title="Entertainment",
+            number=1,
+            stream_ref_encrypted=encrypt("http://provider.example/bbc.ts"),
+            clock_shift_seconds=3600,
+        )
+        ch_xtream = Channel(
+            tenant_id=tenant.id,
+            source_id=xtream.id,
+            dedupe_key="x1",
+            name="Sky Sports",
+            stream_ref_encrypted=encrypt("55555"),
+        )
+        ch_stalker = Channel(
+            tenant_id=tenant.id,
+            source_id=stalker.id,
+            dedupe_key="s1",
+            name="Portal Chan",
+            stream_ref_encrypted=encrypt("ffff0000"),
+        )
+        ch_off = Channel(
+            tenant_id=tenant.id,
+            source_id=disabled.id,
+            dedupe_key="d1",
+            name="Hidden",
+            stream_ref_encrypted=encrypt("http://x/hidden.ts"),
+        )
+        epg = EpgSource(tenant_id=tenant.id, source_id=m3u.id, url="http://x")
+        session.add_all([ch_m3u, ch_xtream, ch_stalker, ch_off, epg])
+        await session.flush()
+
+        session.add(
+            Programme(
+                tenant_id=tenant.id,
+                channel_id=ch_m3u.id,
+                epg_source_id=epg.id,
+                start_utc=PROG_START,
+                stop_utc=PROG_START + timedelta(hours=1),
+                title="The Nine O'Clock News",
+                categories=["News"],
+            )
+        )
+        await session.commit()
+        return {
+            "tenant": tenant.id,
+            "ch_m3u": ch_m3u.id,
+            "ch_xtream": ch_xtream.id,
+            "ch_stalker": ch_stalker.id,
+            "ch_off": ch_off.id,
+        }
+
+
+# --- service-level -----------------------------------------------------------
+
+
+async def test_token_roundtrip_and_rotation(db_schema: None) -> None:
+    ids = await _seed()
+    async with get_sessionmaker()() as session:
+        tenant = await session.get(Tenant, ids["tenant"])
+        assert tenant is not None
+        first = await svc.generate_token(session, tenant)
+        await session.commit()
+
+    async with get_sessionmaker()() as session:
+        assert (await svc.tenant_for_token(session, first)) is not None
+        assert (await svc.tenant_for_token(session, "nope")) is None
+        assert (await svc.tenant_for_token(session, "")) is None
+        tenant = await session.get(Tenant, ids["tenant"])
+        assert tenant is not None
+        second = await svc.generate_token(session, tenant)
+        await session.commit()
+
+    assert second != first
+    async with get_sessionmaker()() as session:
+        assert (await svc.tenant_for_token(session, first)) is None
+        assert (await svc.tenant_for_token(session, second)) is not None
+
+
+async def test_render_m3u_shape(db_schema: None) -> None:
+    ids = await _seed()
+    async with get_sessionmaker()() as session:
+        tenant = await session.get(Tenant, ids["tenant"])
+        assert tenant is not None
+        body = await svc.render_m3u(session, tenant, base_url="https://tv.example", token="TOK")
+
+    lines = body.splitlines()
+    assert lines[0] == '#EXTM3U url-tvg="https://tv.example/api/exports/epg.xml?token=TOK"'
+    extinfs = [ln for ln in lines if ln.startswith("#EXTINF")]
+    # m3u + xtream + stalker channels, but not the one on the disabled source.
+    assert len(extinfs) == 3
+    assert 'tvg-id="Hidden"' not in body and "Hidden" not in body
+    # channel is keyed by our UUID, not the upstream tvg-id.
+    assert f'tvg-id="{ids["ch_m3u"]}"' in body
+    assert "bbc.uk" not in body
+    assert 'tvg-logo="http://logos.example/bbc.png"' in body
+    assert 'tvg-chno="1"' in body
+    assert 'group-title="Entertainment"' in body
+    assert f"https://tv.example/api/exports/stream/{ids['ch_m3u']}?token=TOK" in body
+
+
+async def test_render_xmltv_applies_timezone_and_shift(db_schema: None) -> None:
+    ids = await _seed()
+    async with get_sessionmaker()() as session:
+        tenant = await session.get(Tenant, ids["tenant"])
+        assert tenant is not None
+        chunks = [c async for c in svc.render_xmltv(session, tenant)]
+    doc = "".join(chunks)
+    root = ET.fromstring(doc)
+
+    assert root.tag == "tv"
+    channel_ids = {c.get("id") for c in root.findall("channel")}
+    assert str(ids["ch_m3u"]) in channel_ids
+    assert str(ids["ch_off"]) not in channel_ids
+
+    progs = root.findall("programme")
+    assert len(progs) == 1
+    p = progs[0]
+    assert p.get("channel") == str(ids["ch_m3u"])
+    # source tz override (America/New_York) + 1h channel clock shift, both applied.
+    expected = (PROG_START + timedelta(hours=1)).astimezone(ZoneInfo("America/New_York"))
+    assert p.get("start") == expected.strftime("%Y%m%d%H%M%S %z")
+    start = p.get("start")
+    assert start is not None and start.endswith((" -0400", " -0500"))  # ET, never +0000
+    assert p.findtext("title") == "The Nine O'Clock News"
+    assert p.findtext("category") == "News"
+
+
+async def test_resolve_stream_per_kind(db_schema: None) -> None:
+    ids = await _seed()
+    async with get_sessionmaker()() as session:
+        ch_m3u = await session.get(Channel, ids["ch_m3u"])
+        ch_xtream = await session.get(Channel, ids["ch_xtream"])
+        ch_stalker = await session.get(Channel, ids["ch_stalker"])
+        assert ch_m3u and ch_xtream and ch_stalker
+        src_m3u = await session.get(Source, ch_m3u.source_id)
+        src_xtream = await session.get(Source, ch_xtream.source_id)
+        src_stalker = await session.get(Source, ch_stalker.source_id)
+
+    assert svc.resolve_stream(ch_m3u, src_m3u) == "http://provider.example/bbc.ts"
+    assert (
+        svc.resolve_stream(ch_xtream, src_xtream)
+        == "http://provider.example:8080/live/user1/pass1/55555.ts"
+    )
+    with pytest.raises(svc.StreamUnavailable):
+        svc.resolve_stream(ch_stalker, src_stalker)
+
+
+# --- API --------------------------------------------------------------------
+
+
+async def test_exports_require_token(app_client: AsyncClient) -> None:
+    for path in ("/api/exports/playlist.m3u", "/api/exports/epg.xml"):
+        resp = await app_client.get(path)
+        assert resp.status_code == 401, resp.text
+        resp = await app_client.get(path, params={"token": "bogus"})
+        assert resp.status_code == 401, resp.text
+
+
+async def test_account_export_token_lifecycle(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    await register_and_verify(app_client, captured_emails)
+    access = await login(app_client)
+    h = auth_header(access)
+
+    me = (await app_client.get("/api/account/me", headers=h)).json()
+    assert me["export_token_set_at"] is None
+
+    created = await app_client.post("/api/account/export-token", headers=h)
+    assert created.status_code == 200, created.text
+    payload = created.json()
+    token = payload["token"]
+    assert payload["playlist_url"].endswith(f"/api/exports/playlist.m3u?token={token}")
+    assert payload["epg_url"].endswith(f"/api/exports/epg.xml?token={token}")
+
+    me = (await app_client.get("/api/account/me", headers=h)).json()
+    assert me["export_token_set_at"] is not None
+
+    # Both feeds are now reachable with that token.
+    feed = await app_client.get("/api/exports/playlist.m3u", params={"token": token})
+    assert feed.status_code == 200, feed.text
+    assert feed.text.startswith("#EXTM3U")
+    assert feed.headers["content-type"].startswith("application/x-mpegurl")
+
+    epg = await app_client.get("/api/exports/epg.xml", params={"token": token})
+    assert epg.status_code == 200, epg.text
+    assert epg.headers["content-type"].startswith("application/xml")
+    root = ET.fromstring(epg.text)
+    assert root.tag == "tv"
+
+    # Rotating invalidates the old token.
+    rotated = (await app_client.post("/api/account/export-token", headers=h)).json()
+    assert rotated["token"] != token
+    assert (
+        await app_client.get("/api/exports/playlist.m3u", params={"token": token})
+    ).status_code == 401
+    assert (
+        await app_client.get("/api/exports/playlist.m3u", params={"token": rotated["token"]})
+    ).status_code == 200
+
+    # Revoking kills it entirely.
+    assert (await app_client.delete("/api/account/export-token", headers=h)).status_code == 200
+    assert (
+        await app_client.get("/api/exports/playlist.m3u", params={"token": rotated["token"]})
+    ).status_code == 401
+    me = (await app_client.get("/api/account/me", headers=h)).json()
+    assert me["export_token_set_at"] is None
+
+
+async def test_stream_redirects(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    await register_and_verify(app_client, captured_emails)
+    access = await login(app_client)
+    h = auth_header(access)
+    token = (await app_client.post("/api/account/export-token", headers=h)).json()["token"]
+
+    # Seed sources/channels directly for the just-created tenant.
+    me = (await app_client.get("/api/account/me", headers=h)).json()
+    tenant_id = uuid.UUID(me["tenant_id"])
+    async with get_sessionmaker()() as session:
+        src = Source(
+            tenant_id=tenant_id,
+            kind=SourceKind.m3u,
+            display_name="P",
+            config_encrypted="x",
+            last_status=SourceStatus.ok,
+        )
+        session.add(src)
+        await session.flush()
+        ch = Channel(
+            tenant_id=tenant_id,
+            source_id=src.id,
+            dedupe_key="c",
+            name="C",
+            stream_ref_encrypted=encrypt("http://upstream.example/c.ts"),
+        )
+        session.add(ch)
+        await session.flush()
+        channel_id = ch.id
+        await session.commit()
+
+    resp = await app_client.get(f"/api/exports/stream/{channel_id}", params={"token": token})
+    assert resp.status_code == 302
+    assert resp.headers["location"] == "http://upstream.example/c.ts"
+
+    missing = await app_client.get(f"/api/exports/stream/{uuid.uuid4()}", params={"token": token})
+    assert missing.status_code == 404
