@@ -131,8 +131,7 @@ async def reorder_sources(
     """Set ``sort_rank`` from the given order. ``ordered_ids`` must be exactly
     the tenant's current source ids."""
     rows = {
-        s.id: s
-        for s in await session.scalars(select(Source).where(Source.tenant_id == tenant_id))
+        s.id: s for s in await session.scalars(select(Source).where(Source.tenant_id == tenant_id))
     }
     if set(ordered_ids) != set(rows) or len(ordered_ids) != len(rows):
         raise SourceNotFound
