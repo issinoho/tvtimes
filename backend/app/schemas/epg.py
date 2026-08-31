@@ -84,6 +84,22 @@ class SearchOut(BaseModel):
     results: list[SearchHitOut]
 
 
+class NowNextRowOut(BaseModel):
+    channel: SearchChannelOut
+    current: ProgrammeOut | None
+    upcoming: ProgrammeOut | None
+
+
+class NowNextOut(BaseModel):
+    now: datetime
+    channels: list[NowNextRowOut]
+
+
+class HighlightsOut(BaseModel):
+    films_soon: list[SearchHitOut]
+    top_rated: list[SearchHitOut]
+
+
 class ChannelPatchIn(BaseModel):
     # Added to every programme time for this channel - e.g. +10800 to line a
     # US-West feed up with an East-coast EPG. Clamped to +/- 24h.

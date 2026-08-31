@@ -20,6 +20,9 @@ from app.schemas.epg import (
     EpgSourceOut,
     GuideChannelOut,
     GuideOut,
+    HighlightsOut,
+    NowNextOut,
+    NowNextRowOut,
     ProgrammeOut,
     ScheduleOut,
     SearchChannelOut,
@@ -31,6 +34,26 @@ from app.services import logos as logo_svc
 from app.services import sources as src_svc
 
 router = APIRouter(tags=["epg"])
+
+
+def _search_channel_out(channel: Channel, timezone: str) -> SearchChannelOut:
+    return SearchChannelOut(
+        id=channel.id,
+        name=channel.name,
+        number=channel.number,
+        logo_url=channel.logo_url,
+        group_title=channel.group_title,
+        is_hd=channel.is_hd,
+        timezone=timezone,
+        clock_shift_seconds=channel.clock_shift_seconds,
+    )
+
+
+def _hit_out(h: svc.SearchHit) -> SearchHitOut:
+    return SearchHitOut(
+        channel=_search_channel_out(h.channel, h.timezone),
+        programme=_programme_out(h.programme, h.local_start, h.local_stop),
+    )
 
 
 def _programme_out(p: Programme, local_start: datetime, local_stop: datetime) -> ProgrammeOut:
@@ -238,24 +261,38 @@ async def search_guide(
         end=end,
         limit=limit,
     )
-    return SearchOut(
-        query=q,
-        from_=start,
-        to=end,
-        results=[
-            SearchHitOut(
-                channel=SearchChannelOut(
-                    id=h.channel.id,
-                    name=h.channel.name,
-                    number=h.channel.number,
-                    logo_url=h.channel.logo_url,
-                    group_title=h.channel.group_title,
-                    is_hd=h.channel.is_hd,
-                    timezone=h.timezone,
-                    clock_shift_seconds=h.channel.clock_shift_seconds,
-                ),
-                programme=_programme_out(h.programme, h.local_start, h.local_stop),
+    return SearchOut(query=q, from_=start, to=end, results=[_hit_out(h) for h in hits])
+
+
+@router.get("/guide/now-next", response_model=NowNextOut)
+async def guide_now_next(
+    user: VerifiedUser,
+    session: SessionDep,
+    source_id: Annotated[uuid.UUID | None, Query()] = None,
+    group: Annotated[str | None, Query(max_length=400)] = None,
+    limit: Annotated[int, Query(ge=1, le=2000)] = 500,
+) -> NowNextOut:
+    now = datetime.now(UTC)
+    rows = await svc.now_next(
+        session, user.tenant_id, source_id=source_id, group=group, limit=limit, now=now
+    )
+    return NowNextOut(
+        now=now,
+        channels=[
+            NowNextRowOut(
+                channel=_search_channel_out(r.channel, r.timezone),
+                current=_programme_out(*r.current) if r.current else None,
+                upcoming=_programme_out(*r.upcoming) if r.upcoming else None,
             )
-            for h in hits
+            for r in rows
         ],
+    )
+
+
+@router.get("/guide/highlights", response_model=HighlightsOut)
+async def guide_highlights(user: VerifiedUser, session: SessionDep) -> HighlightsOut:
+    films_soon, top_rated = await svc.highlights(session, user.tenant_id)
+    return HighlightsOut(
+        films_soon=[_hit_out(h) for h in films_soon],
+        top_rated=[_hit_out(h) for h in top_rated],
     )

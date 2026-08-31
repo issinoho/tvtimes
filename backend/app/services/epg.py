@@ -27,6 +27,8 @@ from app.logging import get_logger
 from app.models.epg import EpgSource, EpgStatus, Programme
 from app.models.source import Channel, Source
 from app.models.tenant import Tenant
+from app.models.tmdb import MediaType, TmdbEnrichment
+from app.services.tmdb import cache_key
 
 _log = get_logger("services.epg")
 
@@ -492,6 +494,185 @@ async def search_programmes(
         )
     hits.sort(key=lambda h: (h.local_start, h.channel.name))
     return hits
+
+
+# --- now/next + highlights -------------------------------------------------
+
+
+def _localize(
+    p: Programme, shift: timedelta, tz: zoneinfo.ZoneInfo
+) -> tuple[Programme, datetime, datetime]:
+    return p, (p.start_utc + shift).astimezone(tz), (p.stop_utc + shift).astimezone(tz)
+
+
+@dataclass(slots=True)
+class NowNext:
+    channel: Channel
+    timezone: str
+    current: tuple[Programme, datetime, datetime] | None
+    upcoming: tuple[Programme, datetime, datetime] | None
+
+
+async def now_next(
+    session: AsyncSession,
+    tenant_id: uuid.UUID,
+    *,
+    source_id: uuid.UUID | None = None,
+    group: str | None = None,
+    limit: int = 500,
+    now: datetime | None = None,
+) -> list[NowNext]:
+    """For every channel, the programme on air now and the one after it — times
+    in the channel's display zone, channels in the guide's order."""
+    now = now or _now()
+    stmt = (
+        select(Channel)
+        .join(Source, Channel.source_id == Source.id)
+        .where(Channel.tenant_id == tenant_id)
+    )
+    if source_id is not None:
+        stmt = stmt.where(Channel.source_id == source_id)
+    if group:
+        stmt = stmt.where(Channel.group_title == group)
+    stmt = stmt.order_by(
+        Source.sort_rank,
+        Channel.number.is_(None),
+        Channel.number,
+        Channel.sort_order,
+        Channel.name,
+    ).limit(limit)
+    channels = list(await session.scalars(stmt))
+    if not channels:
+        return []
+
+    sources = {
+        s.id: s
+        for s in await session.scalars(
+            select(Source).where(Source.id.in_({c.source_id for c in channels}))
+        )
+    }
+    tenant = await session.get(Tenant, tenant_id)
+    default_tz = tenant.default_timezone if tenant else "UTC"
+
+    ids = [c.id for c in channels]
+    rows = await session.scalars(
+        select(Programme)
+        .where(
+            Programme.channel_id.in_(ids),
+            Programme.stop_utc > now,
+            Programme.start_utc < now + timedelta(hours=24),
+        )
+        .order_by(Programme.start_utc)
+    )
+    by_channel: dict[uuid.UUID, list[Programme]] = {cid: [] for cid in ids}
+    for p in rows:
+        by_channel[p.channel_id].append(p)
+
+    out: list[NowNext] = []
+    for channel in channels:
+        source = sources.get(channel.source_id)
+        tz, tz_name = resolve_display_tz(source, default_tz)
+        shift = timedelta(seconds=_shift_seconds(channel, source))
+        current: tuple[Programme, datetime, datetime] | None = None
+        upcoming: tuple[Programme, datetime, datetime] | None = None
+        for p in by_channel[channel.id]:
+            if current is None and p.start_utc <= now < p.stop_utc:
+                current = _localize(p, shift, tz)
+            elif upcoming is None and p.start_utc > now:
+                upcoming = _localize(p, shift, tz)
+            if current is not None and upcoming is not None:
+                break
+        out.append(NowNext(channel=channel, timezone=tz_name, current=current, upcoming=upcoming))
+    return out
+
+
+async def highlights(
+    session: AsyncSession,
+    tenant_id: uuid.UUID,
+    *,
+    now: datetime | None = None,
+    soon_hours: int = 10,
+    week_days: int = 7,
+    top_n: int = 15,
+) -> tuple[list[SearchHit], list[SearchHit]]:
+    """``(films_soon, top_rated)`` — films starting within ``soon_hours``, and
+    the highest TMDB-rated films across the next ``week_days``. Each list holds
+    one entry per film (earliest airing), times in the channel's zone."""
+    now = now or _now()
+    films = list(
+        await session.scalars(
+            select(Programme)
+            .where(
+                Programme.tenant_id == tenant_id,
+                Programme.is_movie.is_(True),
+                Programme.start_utc >= now,
+                Programme.start_utc <= now + timedelta(days=week_days),
+            )
+            .order_by(Programme.start_utc)
+        )
+    )
+    if not films:
+        return [], []
+
+    channels = {
+        c.id: c
+        for c in await session.scalars(
+            select(Channel).where(Channel.id.in_({p.channel_id for p in films}))
+        )
+    }
+    sources = {
+        s.id: s
+        for s in await session.scalars(
+            select(Source).where(Source.id.in_({c.source_id for c in channels.values()}))
+        )
+    }
+    tenant = await session.get(Tenant, tenant_id)
+    default_tz = tenant.default_timezone if tenant else "UTC"
+
+    def hit(p: Programme) -> SearchHit:
+        channel = channels[p.channel_id]
+        source = sources.get(channel.source_id)
+        tz, tz_name = resolve_display_tz(source, default_tz)
+        _p, ls, le = _localize(p, timedelta(seconds=_shift_seconds(channel, source)), tz)
+        return SearchHit(
+            programme=p, channel=channel, local_start=ls, local_stop=le, timezone=tz_name
+        )
+
+    soon_end = now + timedelta(hours=soon_hours)
+    seen_soon: set[tuple[str, str]] = set()
+    films_soon: list[SearchHit] = []
+    for p in films:
+        if p.start_utc > soon_end:
+            break
+        k = cache_key(p.title, p.year)
+        if k in seen_soon:
+            continue
+        seen_soon.add(k)
+        films_soon.append(hit(p))
+
+    film_keys = {cache_key(p.title, p.year) for p in films}
+    rated = {
+        (e.query_key, e.query_year): e.rating
+        for e in await session.scalars(
+            select(TmdbEnrichment).where(
+                TmdbEnrichment.media_type == MediaType.movie,
+                TmdbEnrichment.query_key.in_({key for key, _year in film_keys}),
+                TmdbEnrichment.rating.is_not(None),
+            )
+        )
+    }
+    scored: list[tuple[float, Programme]] = []
+    seen_rated: set[tuple[str, str]] = set()
+    for p in films:
+        k = cache_key(p.title, p.year)
+        rating = rated.get(k)
+        if rating is None or k in seen_rated:
+            continue
+        seen_rated.add(k)
+        scored.append((rating, p))
+    scored.sort(key=lambda t: t[0], reverse=True)
+    top_rated = [hit(p) for _r, p in scored[:top_n]]
+    return films_soon, top_rated
 
 
 async def programme_counts(session: AsyncSession, epg_source_id: uuid.UUID) -> int:
