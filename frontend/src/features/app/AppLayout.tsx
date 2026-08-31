@@ -36,6 +36,9 @@ export function AppLayout() {
           <NavLink to="/search" className={styles.navLink}>
             {({ isActive }) => <span data-active={isActive}>Search</span>}
           </NavLink>
+          <NavLink to="/watchlist" className={styles.navLink}>
+            {({ isActive }) => <span data-active={isActive}>Watchlist</span>}
+          </NavLink>
           <NavLink to="/sources" className={styles.navLink}>
             {({ isActive }) => <span data-active={isActive}>Sources</span>}
           </NavLink>

@@ -15,21 +15,28 @@ Jobs:
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 from typing import Any, ClassVar
 
 from arq import cron
 from arq.connections import RedisSettings
 
+from app.auth.email import send_email
 from app.config import get_settings
 from app.db import dispose_engine, get_sessionmaker
 from app.logging import configure_logging, get_logger
 from app.models.epg import EpgSource
-from app.models.source import Source
+from app.models.source import Channel, Source
 from app.services import epg as epg_svc
 from app.services import sources as src_svc
 from app.services import tmdb as tmdb_svc
+from app.services import watchlist as watchlist_svc
 
 _log = get_logger("worker")
+
+
+def _now() -> datetime:
+    return datetime.now(UTC)
 
 
 async def startup(_ctx: dict[str, Any]) -> None:
@@ -97,6 +104,38 @@ async def sweep(ctx: dict[str, Any]) -> None:
         _log.info("worker.sweep", sources=len(due_sources), epg=len(due_epg))
 
 
+async def reminders(ctx: dict[str, Any]) -> None:
+    """Email watchlist reminders whose lead window has opened. Runs every 5 min;
+    the send-once ledger keeps a title watch from double-emailing an airing."""
+    now = _now()
+    sent = 0
+    async with get_sessionmaker()() as session:
+        due = await watchlist_svc.due_reminders(session, now=now)
+        for r in due:
+            channel = await session.get(Channel, r.channel_id)
+            if channel is None:
+                continue
+            local_start, _stop, tz = await epg_svc.local_times(
+                session, channel, r.start_utc, r.stop_utc
+            )
+            when = local_start.strftime("%a %d %b, %H:%M")
+            await send_email(
+                to=r.user.email,
+                subject=f"Reminder: {r.title} on {channel.name}",
+                body_text=(
+                    f"{r.title}\n{channel.name} — {when} ({tz})\n\n"
+                    f"Starting in about {r.item.lead_minutes} minutes.\n"
+                    f"{get_settings().public_origin}\n"
+                ),
+            )
+            await watchlist_svc.mark_sent(session, r.item, key=r.key, now=now)
+            sent += 1
+        await watchlist_svc.prune(session, now=now)
+        await session.commit()
+    if sent:
+        _log.info("worker.reminders", sent=sent)
+
+
 class WorkerSettings:
     functions: ClassVar[list[Any]] = [
         refresh_source,
@@ -104,7 +143,10 @@ class WorkerSettings:
         enrich_epg,
         enrich_programme,
     ]
-    cron_jobs: ClassVar[list[Any]] = [cron(sweep, minute=set(range(0, 60, 15)))]
+    cron_jobs: ClassVar[list[Any]] = [
+        cron(sweep, minute=set(range(0, 60, 15))),
+        cron(reminders, minute=set(range(0, 60, 5))),
+    ]
     on_startup = startup
     on_shutdown = shutdown
     redis_settings = RedisSettings.from_dsn(get_settings().redis_url)

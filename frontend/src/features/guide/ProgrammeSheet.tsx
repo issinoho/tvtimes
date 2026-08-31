@@ -4,6 +4,8 @@ import { useSetChannelShift, type SearchChannel, type Programme } from '@/featur
 import { GENRE_VAR, genreOf } from '@/features/guide/genre';
 import { fmtDayTime } from '@/features/guide/time';
 import { useHero } from '@/features/guide/hero';
+import { useAddWatch, useRemoveWatch, useWatchlist } from '@/features/watchlist/api';
+import { useAuth } from '@/lib/auth/AuthProvider';
 import { useDialogFocus } from '@/lib/useDialogFocus';
 import styles from '@/features/guide/guide.module.css';
 
@@ -60,6 +62,63 @@ interface Props {
   channel: SearchChannel;
   programme: Programme;
   onClose: () => void;
+}
+
+function WatchControls({ channel, programme }: { channel: SearchChannel; programme: Programme }) {
+  const { user } = useAuth();
+  const { data } = useWatchlist();
+  const add = useAddWatch();
+  const remove = useRemoveWatch();
+  const items = data?.items ?? [];
+
+  const startMs = new Date(programme.start).getTime();
+  const airing = items.find(
+    (i) =>
+      i.kind === 'programme' &&
+      i.channel_id === channel.id &&
+      i.start != null &&
+      Math.abs(new Date(i.start).getTime() - startMs) < 60_000,
+  );
+  const title = items.find(
+    (i) => i.kind === 'title' && i.title.toLowerCase() === programme.title.toLowerCase(),
+  );
+  const busy = add.isPending || remove.isPending;
+
+  return (
+    <div>
+      <div className={styles.watchRow}>
+        <button
+          type="button"
+          className={styles.btn}
+          data-on={airing ? 'true' : undefined}
+          disabled={busy}
+          onClick={() =>
+            airing
+              ? remove.mutate(airing.id)
+              : add.mutate({ kind: 'programme', programme_id: programme.id })
+          }
+        >
+          {airing ? '✓ Reminder set' : 'Remind me'}
+        </button>
+        <button
+          type="button"
+          className={styles.btn}
+          data-on={title ? 'true' : undefined}
+          disabled={busy}
+          onClick={() =>
+            title ? remove.mutate(title.id) : add.mutate({ kind: 'title', title: programme.title })
+          }
+        >
+          {title ? '✓ Watching this title' : 'Watch this title'}
+        </button>
+      </div>
+      {user && !user.email_verified ? (
+        <p className={styles.watchHint}>Verify your email to receive reminders.</p>
+      ) : (
+        <p className={styles.watchHint}>Reminders arrive by email ~15 min before air time.</p>
+      )}
+    </div>
+  );
 }
 
 export function ProgrammeSheet({ channel, programme, onClose }: Props) {
@@ -129,6 +188,8 @@ export function ProgrammeSheet({ channel, programme, onClose }: Props) {
             <span style={{ width: `${pct}%` }} />
           </div>
         ) : null}
+
+        <WatchControls channel={channel} programme={programme} />
 
         {e?.rating != null ? (
           <p className={styles.rating}>
