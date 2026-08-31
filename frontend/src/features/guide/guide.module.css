@@ -134,11 +134,12 @@
   flex: none;
   border-radius: 5px;
   padding: 2px;
-  /* A near-white card: most channel logos ship with their own light background
-     baked in (Pluto, many IPTV feeds), and the rest are made to sit on white.
-     A faint violet-tinted white keeps the rail uniform on the dark guide. */
-  background: #f1eef6;
-  box-shadow: inset 0 0 0 1px rgb(20 12 36 / 8%);
+  /* A soft off-white card: most channel logos ship with their own light
+     background baked in (Pluto, many IPTV feeds), and the rest are made to sit
+     on white. Knocked ~10% toward the guide's ground so it reads as a card,
+     not a glaring block. */
+  background: color-mix(in srgb, #ffffff 90%, var(--bg-overlay));
+  box-shadow: inset 0 0 0 1px rgb(20 12 36 / 6%);
 }
 .chanLogoEmpty {
   width: 44px;
