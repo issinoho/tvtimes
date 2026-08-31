@@ -10,7 +10,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
@@ -421,6 +421,77 @@ async def guide(
             )
         )
     return rows
+
+
+@dataclass(slots=True)
+class SearchHit:
+    programme: Programme
+    channel: Channel
+    local_start: datetime
+    local_stop: datetime
+    timezone: str
+
+
+async def search_programmes(
+    session: AsyncSession,
+    tenant_id: uuid.UUID,
+    *,
+    query: str,
+    movies_only: bool = False,
+    start: datetime,
+    end: datetime,
+    limit: int = 100,
+) -> list[SearchHit]:
+    """Programmes whose title / sub-title matches ``query`` (case-insensitive
+    substring) and that air within ``[start, end)``, earliest first — one hit
+    per airing, times resolved into each channel's display zone."""
+    like = f"%{query.strip()}%"
+    stmt = (
+        select(Programme)
+        .join(Channel, Programme.channel_id == Channel.id)
+        .where(
+            Programme.tenant_id == tenant_id,
+            Programme.stop_utc > start,
+            Programme.start_utc < end,
+            or_(Programme.title.ilike(like), Programme.sub_title.ilike(like)),
+        )
+        .order_by(Programme.start_utc)
+        .limit(limit)
+    )
+    if movies_only:
+        stmt = stmt.where(Programme.is_movie.is_(True))
+    programmes = list(await session.scalars(stmt))
+    if not programmes:
+        return []
+
+    channel_ids = {p.channel_id for p in programmes}
+    channels = {
+        c.id: c for c in await session.scalars(select(Channel).where(Channel.id.in_(channel_ids)))
+    }
+    source_ids = {c.source_id for c in channels.values()}
+    sources = {
+        s.id: s for s in await session.scalars(select(Source).where(Source.id.in_(source_ids)))
+    }
+    tenant = await session.get(Tenant, tenant_id)
+    default_tz = tenant.default_timezone if tenant else "UTC"
+
+    hits: list[SearchHit] = []
+    for p in programmes:
+        channel = channels[p.channel_id]
+        source = sources.get(channel.source_id)
+        tz, tz_name = resolve_display_tz(source, default_tz)
+        shift = timedelta(seconds=_shift_seconds(channel, source))
+        hits.append(
+            SearchHit(
+                programme=p,
+                channel=channel,
+                local_start=(p.start_utc + shift).astimezone(tz),
+                local_stop=(p.stop_utc + shift).astimezone(tz),
+                timezone=tz_name,
+            )
+        )
+    hits.sort(key=lambda h: (h.local_start, h.channel.name))
+    return hits
 
 
 async def programme_counts(session: AsyncSession, epg_source_id: uuid.UUID) -> int:

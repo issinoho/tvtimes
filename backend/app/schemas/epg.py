@@ -58,6 +58,32 @@ class GuideChannelOut(BaseModel):
     programmes: list[ProgrammeOut]
 
 
+class SearchChannelOut(BaseModel):
+    """The channel context for a search hit — GuideChannelOut without the
+    per-row programme list."""
+
+    id: uuid.UUID
+    name: str
+    number: int | None
+    logo_url: str | None
+    group_title: str | None
+    is_hd: bool
+    timezone: str
+    clock_shift_seconds: int
+
+
+class SearchHitOut(BaseModel):
+    channel: SearchChannelOut
+    programme: ProgrammeOut
+
+
+class SearchOut(BaseModel):
+    query: str
+    from_: datetime = Field(serialization_alias="from")
+    to: datetime
+    results: list[SearchHitOut]
+
+
 class ChannelPatchIn(BaseModel):
     # Added to every programme time for this channel - e.g. +10800 to line a
     # US-West feed up with an East-coast EPG. Clamped to +/- 24h.

@@ -22,6 +22,9 @@ from app.schemas.epg import (
     GuideOut,
     ProgrammeOut,
     ScheduleOut,
+    SearchChannelOut,
+    SearchHitOut,
+    SearchOut,
 )
 from app.services import epg as svc
 from app.services import logos as logo_svc
@@ -210,5 +213,49 @@ async def guide(
                 programmes=[_programme_out(*t) for t in r.programmes],
             )
             for r in rows
+        ],
+    )
+
+
+@router.get("/guide/search", response_model=SearchOut)
+async def search_guide(
+    user: VerifiedUser,
+    session: SessionDep,
+    q: Annotated[str, Query(min_length=2, max_length=200)],
+    movies_only: Annotated[bool, Query()] = False,
+    frm: Annotated[datetime | None, Query(alias="from")] = None,
+    to: Annotated[datetime | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=300)] = 100,
+) -> SearchOut:
+    # Default to the next week; allow anywhere in the stored window.
+    start, end = _clamp_range(frm, to, default_span=timedelta(days=7), max_span=timedelta(days=16))
+    hits = await svc.search_programmes(
+        session,
+        user.tenant_id,
+        query=q,
+        movies_only=movies_only,
+        start=start,
+        end=end,
+        limit=limit,
+    )
+    return SearchOut(
+        query=q,
+        from_=start,
+        to=end,
+        results=[
+            SearchHitOut(
+                channel=SearchChannelOut(
+                    id=h.channel.id,
+                    name=h.channel.name,
+                    number=h.channel.number,
+                    logo_url=h.channel.logo_url,
+                    group_title=h.channel.group_title,
+                    is_hd=h.channel.is_hd,
+                    timezone=h.timezone,
+                    clock_shift_seconds=h.channel.clock_shift_seconds,
+                ),
+                programme=_programme_out(h.programme, h.local_start, h.local_stop),
+            )
+            for h in hits
         ],
     )

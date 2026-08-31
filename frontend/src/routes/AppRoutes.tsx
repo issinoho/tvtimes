@@ -8,6 +8,7 @@ import { ResetPasswordPage } from '@/features/auth/ResetPasswordPage';
 import { SignUpPage } from '@/features/auth/SignUpPage';
 import { VerifyEmailPage } from '@/features/auth/VerifyEmailPage';
 import { GuidePage } from '@/features/guide/GuidePage';
+import { SearchPage } from '@/features/search/SearchPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
 import { SourceDetailPage } from '@/features/sources/SourceDetailPage';
 import { SourcesPage } from '@/features/sources/SourcesPage';
@@ -40,6 +41,7 @@ export function AppRoutes() {
         }
       >
         <Route index element={<GuidePage />} />
+        <Route path="search" element={<SearchPage />} />
         <Route path="sources" element={<SourcesPage />} />
         <Route path="sources/:sourceId" element={<SourceDetailPage />} />
         <Route path="settings" element={<SettingsPage />} />
