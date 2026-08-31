@@ -29,7 +29,26 @@
   flex-direction: column;
   gap: 0.6rem;
 }
+.row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.4rem;
+}
+.row[data-dragging='true'] {
+  opacity: 0.45;
+}
+.grip {
+  display: flex;
+  align-items: center;
+  padding: 0 0.35rem;
+  color: var(--text-dim);
+  cursor: grab;
+  user-select: none;
+  font-size: 1.1rem;
+  letter-spacing: -2px;
+}
 .card {
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;

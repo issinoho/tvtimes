@@ -85,6 +85,11 @@ class SourcePatchIn(BaseModel):
     refresh_interval_minutes: int | None = Field(default=None, ge=15, le=10_080)
 
 
+class SourceOrderIn(BaseModel):
+    # The tenant's source ids, in the desired display order.
+    ids: list[uuid.UUID] = Field(min_length=1, max_length=500)
+
+
 class SourceOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -96,6 +101,7 @@ class SourceOut(BaseModel):
     timezone_override: str | None
     clock_shift_seconds: int
     refresh_interval_minutes: int
+    sort_rank: int
     last_status: str
     last_error: str | None
     channel_count: int

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -297,6 +298,57 @@ async def test_patch_unknown_channel_is_404(
         f"/api/channels/{uuid.uuid4()}", json={"clock_shift_seconds": 0}, headers=headers
     )
     assert resp.status_code == 404
+
+
+async def test_guide_orders_channels_by_source_rank(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    await register_and_verify(app_client, captured_emails)
+    headers = auth_header(await login(app_client))
+
+    def _ingest_named(chan_name: str, tvg: str) -> Callable[[object, object], Awaitable[Playlist]]:
+        async def fake(_kind: object, _config: object) -> Playlist:
+            return Playlist(
+                channels=[ParsedChannel(name=chan_name, stream_ref=f"http://s/{tvg}", tvg_id=tvg)]
+            )
+
+        return fake
+
+    src_ids = []
+    for name, tvg in (("Alpha", "a.tv"), ("Bravo", "b.tv")):
+        monkeypatch.setattr("app.services.sources._ingest", _ingest_named(f"{name} One", tvg))
+        r = await app_client.post(
+            "/api/sources",
+            json={"kind": "m3u", "display_name": name, "url": f"http://feed/{tvg}.m3u"},
+            headers=headers,
+        )
+        sid = r.json()["id"]
+        src_ids.append(sid)
+        from app.db import get_sessionmaker
+        from app.models.source import Source
+        from app.services import sources as src_svc
+
+        async with get_sessionmaker()() as session:
+            src = await session.get(Source, uuid.UUID(sid))
+            assert src is not None
+            await src_svc.refresh_source(session, src)
+            await session.commit()
+
+    def names(resp: object) -> list[str]:
+        return [c["name"] for c in resp["channels"]]  # type: ignore[index]
+
+    params = {
+        "from": (_BASE - timedelta(hours=1)).isoformat(),
+        "to": (_BASE + timedelta(hours=3)).isoformat(),
+    }
+    g1 = await app_client.get("/api/guide", params=params, headers=headers)
+    assert names(g1.json()) == ["Alpha One", "Bravo One"]
+
+    await app_client.put(
+        "/api/sources/order", json={"ids": [src_ids[1], src_ids[0]]}, headers=headers
+    )
+    g2 = await app_client.get("/api/guide", params=params, headers=headers)
+    assert names(g2.json()) == ["Bravo One", "Alpha One"]
 
 
 async def test_guide_rejects_over_wide_window(

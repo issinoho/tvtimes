@@ -17,6 +17,7 @@ from app.schemas.source import (
     ChannelOut,
     ChannelPage,
     SourceIn,
+    SourceOrderIn,
     SourceOut,
     SourcePatchIn,
 )
@@ -62,6 +63,22 @@ async def create_source(body: SourceIn, user: VerifiedUser, session: SessionDep)
     await session.flush()
     await enqueue_source_refresh(source.id)
     return _to_out(source)
+
+
+@router.put("/order", response_model=list[SourceOut])
+async def reorder_sources(
+    body: SourceOrderIn, user: VerifiedUser, session: SessionDep
+) -> list[SourceOut]:
+    try:
+        await svc.reorder_sources(session, user.tenant_id, body.ids)
+    except svc.SourceNotFound as exc:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "The id list must be exactly your current sources.",
+        ) from exc
+    await session.flush()
+    rows = await svc.list_sources(session, user.tenant_id)
+    return [_to_out(s) for s in rows]
 
 
 async def _load(session: SessionDep, user: VerifiedUser, source_id: uuid.UUID) -> Source:

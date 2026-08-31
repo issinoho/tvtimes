@@ -400,6 +400,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sources/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Reorder Sources */
+        put: operations["reorder_sources_api_sources_order_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sources/{source_id}": {
         parameters: {
             query?: never;
@@ -1284,6 +1301,11 @@ export interface components {
              */
             current: boolean;
         };
+        /** SourceOrderIn */
+        SourceOrderIn: {
+            /** Ids */
+            ids: string[];
+        };
         /** SourceOut */
         SourceOut: {
             /**
@@ -1308,6 +1330,8 @@ export interface components {
             clock_shift_seconds: number;
             /** Refresh Interval Minutes */
             refresh_interval_minutes: number;
+            /** Sort Rank */
+            sort_rank: number;
             /** Last Status */
             last_status: string;
             /** Last Error */
@@ -2344,6 +2368,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SourceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reorder_sources_api_sources_order_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SourceOrderIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceOut"][];
                 };
             };
             /** @description Validation Error */
