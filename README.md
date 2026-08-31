@@ -54,6 +54,8 @@ name: tvtimes
 x-app: &app
   image: ${TVTIMES_IMAGE:-issinoho1969/tvtimes:latest}
   restart: unless-stopped
+  env_file:
+    - .env          # everything in .env reaches the container; the values below still win
   environment:
     TVTIMES_ENV: prod
     TVTIMES_DATABASE_URL: postgresql+asyncpg://tvtimes:${POSTGRES_PASSWORD:-tvtimes}@db:5432/tvtimes
