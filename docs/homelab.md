@@ -128,3 +128,8 @@ or `TVTIMES_EMAIL_PROVIDER=resend` with `TVTIMES_RESEND_API_KEY`.
   that `redis` is healthy.
 - **HDHomeRun source errors with "not a private LAN address"** — the address
   must resolve to an RFC1918 range (`10.`, `172.16–31.`, `192.168.`).
+- **M3U / Xtream / XMLTV URL rejected: "resolves to a non-public address"** —
+  the guard blocks LAN targets by default. If it's a service on your own
+  network (a Pluto proxy, xTeVe/Threadfin, another box), allow it:
+  `TVTIMES_FETCH_ALLOWLIST=192.168.0.218` (or a CIDR like `192.168.0.0/24`),
+  then `docker compose up -d --force-recreate`.

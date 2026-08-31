@@ -54,6 +54,22 @@ async def _resolve(host: str) -> list[str]:
     return [str(info[4][0]) for info in infos]
 
 
+_IpNetwork = ipaddress.IPv4Network | ipaddress.IPv6Network
+
+
+def _parse_allowlist(entries: list[str] | None) -> tuple[set[str], list[_IpNetwork]]:
+    """An allowlist entry is either a hostname (matched exactly, case-insensitively)
+    or an IP / CIDR (e.g. ``192.168.0.0/24``) that a resolved address may fall in."""
+    hosts: set[str] = set()
+    nets: list[_IpNetwork] = []
+    for entry in entries or []:
+        try:
+            nets.append(ipaddress.ip_network(entry, strict=False))
+        except ValueError:
+            hosts.add(entry.lower())
+    return hosts, nets
+
+
 async def assert_allowed_url(url: str, *, allowlist: list[str] | None = None) -> None:
     parts = urlsplit(url)
     if parts.scheme not in _ALLOWED_SCHEMES:
@@ -61,7 +77,9 @@ async def assert_allowed_url(url: str, *, allowlist: list[str] | None = None) ->
     host = parts.hostname
     if not host:
         raise SourceRejected("The URL has no host.")
-    if allowlist and host in allowlist:
+
+    allow_hosts, allow_nets = _parse_allowlist(allowlist)
+    if host.lower() in allow_hosts:
         return
 
     literal: ipaddress.IPv4Address | ipaddress.IPv6Address | None = None
@@ -72,9 +90,13 @@ async def assert_allowed_url(url: str, *, allowlist: list[str] | None = None) ->
 
     addresses = [str(literal)] if literal is not None else await _resolve(host)
     for addr in addresses:
-        if not _ip_is_public(ipaddress.ip_address(addr)):
+        ip = ipaddress.ip_address(addr)
+        if allow_nets and any(ip in net for net in allow_nets):
+            continue  # explicitly allow-listed range (e.g. your LAN)
+        if not _ip_is_public(ip):
             raise SourceRejected(
-                f"{host!r} resolves to a non-public address ({addr}); refusing to fetch it."
+                f"{host!r} resolves to a non-public address ({addr}); refusing to fetch it. "
+                "Add it to TVTIMES_FETCH_ALLOWLIST (a host, IP, or CIDR) to permit it."
             )
 
 
