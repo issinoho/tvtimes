@@ -6,6 +6,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 import { SearchPage } from '@/features/search/SearchPage';
 import { setAccessToken } from '@/lib/api/client';
+import { AuthProvider } from '@/lib/auth/AuthProvider';
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -46,7 +47,9 @@ function renderPage() {
   return render(
     <QueryClientProvider client={qc}>
       <MemoryRouter>
-        <SearchPage />
+        <AuthProvider>
+          <SearchPage />
+        </AuthProvider>
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -54,6 +57,7 @@ function renderPage() {
 
 beforeEach(() => {
   setAccessToken('t');
+  document.cookie = 'tvtimes_csrf=x';
 });
 
 afterEach(() => {
@@ -62,9 +66,16 @@ afterEach(() => {
 });
 
 test('searching shows hits and a hit opens the programme sheet', async () => {
-  const fetchMock = vi.fn((i: RequestInfo | URL) => {
+  const posted: unknown[] = [];
+  const fetchMock = vi.fn(async (i: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof i === 'string' ? i : i instanceof URL ? i.href : i.url;
     const { pathname, searchParams } = new URL(url, 'http://x');
+    const method = init?.method ?? (i instanceof Request ? i.method : 'GET');
+    if (pathname === '/api/watchlist' && method === 'POST') {
+      const raw = init?.body ?? (i instanceof Request ? await i.text() : null);
+      posted.push(raw ? JSON.parse(raw as string) : null);
+      return json({ id: 'w1', kind: 'programme', title: 'Blade Runner', lead_minutes: 15 }, 201);
+    }
     if (pathname === '/api/guide/search') {
       expect(searchParams.get('q')).toBe('blade');
       return Promise.resolve(json({ query: 'blade', from: '', to: '', results: [HIT] }));
@@ -74,6 +85,23 @@ test('searching shows hits and a hit opens the programme sheet', async () => {
         json({ tmdb_connected: false, enriching: false, enrichment: null, categories: [] }),
       );
     }
+    if (pathname === '/api/auth/refresh') return Promise.resolve(json({ code: 'x' }, 401));
+    if (pathname === '/api/account/me') {
+      return Promise.resolve(
+        json({
+          id: 'u',
+          email: 'a@b.c',
+          display_name: 'A',
+          email_verified: true,
+          tenant_id: 't',
+          default_timezone: 'UTC',
+          totp_enabled: false,
+          passkey_count: 1,
+          tmdb_connected: false,
+        }),
+      );
+    }
+    if (pathname === '/api/watchlist') return Promise.resolve(json({ items: [] }, 200));
     return Promise.resolve(json({ code: 'nf' }, 404));
   });
   vi.stubGlobal('fetch', fetchMock);
@@ -88,5 +116,12 @@ test('searching shows hits and a hit opens the programme sheet', async () => {
 
   await waitFor(() =>
     expect(screen.getByRole('dialog', { name: 'Blade Runner' })).toBeInTheDocument(),
+  );
+
+  await user.click(screen.getByRole('button', { name: 'Remind me' }));
+  await waitFor(() =>
+    expect(posted).toContainEqual(
+      expect.objectContaining({ kind: 'programme', programme_id: 'p1' }),
+    ),
   );
 });

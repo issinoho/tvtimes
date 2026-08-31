@@ -28,6 +28,7 @@ from app.models.token import (
     WebAuthnChallengeKind,
 )
 from app.models.user import User
+from app.models.watchlist import WatchKind, WatchlistItem, WatchlistNotification
 
 __all__ = [
     "AuditLog",
@@ -50,6 +51,9 @@ __all__ = [
     "TmdbEnrichment",
     "TotpSecret",
     "User",
+    "WatchKind",
+    "WatchlistItem",
+    "WatchlistNotification",
     "WebAuthnChallenge",
     "WebAuthnChallengeKind",
     "WebAuthnCredential",

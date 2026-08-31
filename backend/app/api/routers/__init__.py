@@ -14,6 +14,7 @@ from app.api.routers import (
     health,
     hero,
     sources,
+    watchlist,
 )
 
 api_router = APIRouter()
@@ -26,5 +27,6 @@ api_router.include_router(exports.router)
 api_router.include_router(hero.router)
 api_router.include_router(connectors.router)
 api_router.include_router(connector.router)
+api_router.include_router(watchlist.router)
 
 __all__ = ["api_router"]

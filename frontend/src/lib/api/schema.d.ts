@@ -732,6 +732,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/watchlist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Watchlist */
+        get: operations["list_watchlist_api_watchlist_get"];
+        put?: never;
+        /** Add Watchlist */
+        post: operations["add_watchlist_api_watchlist_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/watchlist/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Watchlist */
+        delete: operations["delete_watchlist_api_watchlist__item_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1548,6 +1583,57 @@ export interface components {
         VerifyIn: {
             /** Token */
             token: string;
+        };
+        /** WatchlistAddIn */
+        WatchlistAddIn: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "programme" | "title";
+            /** Programme Id */
+            programme_id?: string | null;
+            /** Title */
+            title?: string | null;
+            /**
+             * Lead Minutes
+             * @default 15
+             */
+            lead_minutes: number;
+        };
+        /** WatchlistItemOut */
+        WatchlistItemOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Title */
+            title: string;
+            /** Lead Minutes */
+            lead_minutes: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Channel Id */
+            channel_id?: string | null;
+            /** Channel Name */
+            channel_name?: string | null;
+            /** Start */
+            start?: string | null;
+            /** Stop */
+            stop?: string | null;
+            /** Timezone */
+            timezone?: string | null;
+        };
+        /** WatchlistOut */
+        WatchlistOut: {
+            /** Items */
+            items: components["schemas"]["WatchlistItemOut"][];
         };
         /** WebAuthnCompleteIn */
         WebAuthnCompleteIn: {
@@ -3285,6 +3371,105 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LineupOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_watchlist_api_watchlist_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_watchlist_api_watchlist_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WatchlistAddIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistItemOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_watchlist_api_watchlist__item_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"];
                 };
             };
             /** @description Validation Error */
