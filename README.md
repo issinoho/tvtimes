@@ -176,8 +176,14 @@ cd frontend && npm run lint && npm run typecheck && npm test && npm run build
 | `v*` | `issinoho1969/tvtimes` + GHCR mirror, multi-arch |
 | `connector-v*` | connector image + the wheel/sdist on the GitHub Release |
 
+## Contributing
+
+Bug reports, ideas and PRs welcome — see [`CONTRIBUTING.md`](CONTRIBUTING.md)
+and the [`Code of Conduct`](CODE_OF_CONDUCT.md). Security issues go through
+[`SECURITY.md`](SECURITY.md), not a public issue.
+
 ## Licence
 
-MIT. Source parsing and EPG logic is adapted from the
+[MIT](LICENSE). Source parsing and EPG logic is adapted from the
 [`tvdinner`](https://github.com/issinoho/tvdinner) CLI (MIT). Brand mark built
 from openly-licensed base glyphs — see [`docs/brand.md`](docs/brand.md).

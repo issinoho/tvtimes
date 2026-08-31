@@ -1,0 +1,60 @@
+name: Bug report
+description: Something isn't working the way it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. For security issues use
+        [private reporting](https://github.com/issinoho/tvtimes/security/advisories/new)
+        instead.
+  - type: input
+    id: version
+    attributes:
+      label: tvtimes version
+      description: '`docker compose images tvtimes` — the TAG column (e.g. 0.1.15).'
+      placeholder: "0.1.15"
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How it's running
+      options:
+        - Docker Compose (published image)
+        - Docker Compose (built from source, docker-compose.dev.yml)
+        - Behind a reverse proxy (HTTPS)
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what you got instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Add an HDHomeRun source with …
+        2. Open the guide
+        3. …
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: >
+        `docker compose logs tvtimes --since 15m` and/or `docker compose logs worker`.
+        Redact any tokens / URLs with credentials.
+      render: text
+  - type: input
+    id: browser
+    attributes:
+      label: Browser / device
+      description: Only if it's a UI issue.
+      placeholder: Firefox 130 on Linux
