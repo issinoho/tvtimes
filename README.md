@@ -17,13 +17,15 @@
 
 ## What it is
 
-Create an account, connect your TV sources, and browse a fast, virtualised
-guide grid enriched with channel logos, release years, genres and a cinematic
-TMDB "hero" panel. Everything runs on your own hardware.
+Create an account, connect your TV sources, and land on a "tonight" overview —
+what's on now, films coming up, the week's best-rated — backed by a fast,
+virtualised guide grid enriched with channel logos, release years, genres and a
+cinematic TMDB "hero" panel. Everything runs on your own hardware.
 
 | | |
 |---|---|
 | **Sources** | M3U / M3U8 playlists · Xtream Codes · Stalker portals · **HDHomeRun** (native discovery, or the connector agent for tuners on another network). Drag to reorder them — the guide lists channels source-by-source in that order. |
+| **Tonight** | the landing view: a card per channel that's on air now (with what's next), films starting in the next few hours, and the highest TMDB-rated films across the coming week — each card opens the programme panel |
 | **Guide** | virtualised grid + live "now" line on desktop, single-channel agenda on phones; genre colours, date nav, group filter, channel search, full keyboard nav; programme labels stay pinned as you scroll through a long film; installable PWA with an offline shell and an in-app "new version" prompt |
 | **Time** | one account timezone (captured from your browser at signup) with a per-source override and a per-channel offset you nudge from a programme's info panel — line a US-West feed up with an East-coast EPG without touching its sibling |
 | **Enrichment** | your own TMDB API key powers backdrops, logos, cast, ratings and synopses for film programmes. Channel logos come from the playlist, else the iptv-org database, else the SiliconDust guide for HDHomeRun — shown on a neutral plate so dark and light marks both read |
