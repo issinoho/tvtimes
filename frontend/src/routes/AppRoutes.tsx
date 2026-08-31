@@ -42,8 +42,9 @@ export function AppRoutes() {
           </RequireAuth>
         }
       >
-        <Route index element={<GuidePage />} />
-        <Route path="tonight" element={<TonightPage />} />
+        <Route index element={<TonightPage />} />
+        <Route path="guide" element={<GuidePage />} />
+        <Route path="tonight" element={<Navigate to="/" replace />} />
         <Route path="search" element={<SearchPage />} />
         <Route path="watchlist" element={<WatchlistPage />} />
         <Route path="sources" element={<SourcesPage />} />

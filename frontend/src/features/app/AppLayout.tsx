@@ -31,10 +31,10 @@ export function AppLayout() {
         <BrandLockup />
         <nav className={styles.nav} aria-label="Main">
           <NavLink to="/" end className={styles.navLink}>
-            {({ isActive }) => <span data-active={isActive}>Guide</span>}
-          </NavLink>
-          <NavLink to="/tonight" className={styles.navLink}>
             {({ isActive }) => <span data-active={isActive}>Tonight</span>}
+          </NavLink>
+          <NavLink to="/guide" className={styles.navLink}>
+            {({ isActive }) => <span data-active={isActive}>Guide</span>}
           </NavLink>
           <NavLink to="/search" className={styles.navLink}>
             {({ isActive }) => <span data-active={isActive}>Search</span>}
