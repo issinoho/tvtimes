@@ -1,4 +1,5 @@
 import { ConnectorsSection } from '@/features/settings/ConnectorsSection';
+import { ExportsSection } from '@/features/settings/ExportsSection';
 import { PasskeysSection } from '@/features/settings/PasskeysSection';
 import { SessionsSection } from '@/features/settings/SessionsSection';
 import { TimezoneSection } from '@/features/settings/TimezoneSection';
@@ -27,6 +28,7 @@ export function SettingsPage() {
       <TimezoneSection />
       <TmdbSection />
       <ConnectorsSection />
+      <ExportsSection />
     </div>
   );
 }

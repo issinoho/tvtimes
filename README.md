@@ -27,6 +27,7 @@ TMDB "hero" panel. Everything runs on your own hardware.
 | **Guide** | virtualised grid + live "now" line on desktop, single-channel agenda on phones; genre colours, date nav, group filter, channel search, full keyboard nav; programme labels stay pinned as you scroll through a long film; installable PWA with an offline shell and an in-app "new version" prompt |
 | **Time** | one account timezone (captured from your browser at signup) with a per-source override and a per-channel offset you nudge from a programme's info panel — line a US-West feed up with an East-coast EPG without touching its sibling |
 | **Enrichment** | your own TMDB API key powers backdrops, logos, cast, ratings and synopses for film programmes. Channel logos come from the playlist, else the iptv-org database, else the SiliconDust guide for HDHomeRun — shown on a neutral plate so dark and light marks both read |
+| **Export** | hand your whole line-up to another player — one merged, de-duplicated **M3U playlist** + **XMLTV guide** (times already timezone-corrected per channel) behind a rotatable token. Drop the two URLs into Jellyfin, Plex, Emby, TiviMate or Threadfin |
 | **Auth** | WebAuthn passkeys first (with a clear message when the RP-ID/origin is misconfigured), Argon2id password + HIBP check as a fallback, TOTP 2FA, 60-day rotating refresh sessions with replay detection, a device/session list (one row per login), audit log |
 
 ## Run it
