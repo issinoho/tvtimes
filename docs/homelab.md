@@ -113,10 +113,15 @@ and you can remove it again from the same panel. A LAN URL you've added to
 
 ## Finding something to watch
 
+You land on **Tonight**: a card for every channel that's on air now (with what's
+on next), a row of films starting in the next few hours, and — if TMDB is
+connected — the highest-rated films across the coming week. Every card opens the
+programme panel. The full grid is one click away under **Guide**.
+
 The **Search** page matches programme titles across every channel for the next
-two weeks, in the guide's channel order. From a result — or any programme's info
-panel — pick **Remind me** for that single airing or **Watch this title** to be
-mailed before every future showing (see Email, below).
+two weeks, in the guide's channel order. From a Tonight card, a search result, or
+any programme's info panel, pick **Remind me** for that single airing or **Watch
+this title** to be mailed before every future showing (see Email, below).
 
 ## Use tvtimes as your playlist / EPG provider
 
