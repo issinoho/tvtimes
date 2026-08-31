@@ -612,6 +612,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/guide/now-next": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Guide Now Next */
+        get: operations["guide_now_next_api_guide_now_next_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/guide/highlights": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Guide Highlights */
+        get: operations["guide_highlights_api_guide_highlights_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/guide/programme/{programme_id}/hero": {
         parameters: {
             query?: never;
@@ -1104,6 +1138,13 @@ export interface components {
             enriching: boolean;
             enrichment: components["schemas"]["EnrichmentOut"] | null;
         };
+        /** HighlightsOut */
+        HighlightsOut: {
+            /** Films Soon */
+            films_soon: components["schemas"]["SearchHitOut"][];
+            /** Top Rated */
+            top_rated: components["schemas"]["SearchHitOut"][];
+        };
         /** LineupChannelIn */
         LineupChannelIn: {
             /** Name */
@@ -1223,6 +1264,22 @@ export interface components {
             mfa_token: string;
             /** Code */
             code: string;
+        };
+        /** NowNextOut */
+        NowNextOut: {
+            /**
+             * Now
+             * Format: date-time
+             */
+            now: string;
+            /** Channels */
+            channels: components["schemas"]["NowNextRowOut"][];
+        };
+        /** NowNextRowOut */
+        NowNextRowOut: {
+            channel: components["schemas"]["SearchChannelOut"];
+            current: components["schemas"]["ProgrammeOut"] | null;
+            upcoming: components["schemas"]["ProgrammeOut"] | null;
         };
         /** OptionsOut */
         OptionsOut: {
@@ -3103,6 +3160,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SearchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    guide_now_next_api_guide_now_next_get: {
+        parameters: {
+            query?: {
+                source_id?: string | null;
+                group?: string | null;
+                limit?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NowNextOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    guide_highlights_api_guide_highlights_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HighlightsOut"];
                 };
             };
             /** @description Validation Error */

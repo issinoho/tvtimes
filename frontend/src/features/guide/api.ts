@@ -9,6 +9,7 @@ export type Programme = components['schemas']['ProgrammeOut'];
 export type SearchHit = components['schemas']['SearchHitOut'];
 /** A channel as it arrives on a search hit — no per-row programme list. */
 export type SearchChannel = components['schemas']['SearchChannelOut'];
+export type NowNextRow = components['schemas']['NowNextRowOut'];
 
 export interface GuideParams {
   from: string;
@@ -39,6 +40,23 @@ export function useProgrammeSearch(query: string, moviesOnly: boolean) {
           params: { query: { q, movies_only: moviesOnly } },
         }),
       ),
+  });
+}
+
+export function useNowNext() {
+  return useQuery({
+    queryKey: ['now-next'],
+    queryFn: async () => unwrap(await api.GET('/api/guide/now-next')),
+    staleTime: 60_000,
+    refetchInterval: 5 * 60_000,
+  });
+}
+
+export function useHighlights() {
+  return useQuery({
+    queryKey: ['highlights'],
+    queryFn: async () => unwrap(await api.GET('/api/guide/highlights')),
+    staleTime: 5 * 60_000,
   });
 }
 
