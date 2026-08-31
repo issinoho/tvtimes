@@ -12,6 +12,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.crypto import decrypt, encrypt
+from app.config import get_settings
 from app.ingest import channel_logos, hdhomerun, m3u, stalker, xtream
 from app.ingest.errors import SourceError, SourceRejected, SourceUnreachable
 from app.ingest.models import Channel as ParsedChannel
@@ -77,7 +78,9 @@ async def assert_config_url_allowed(kind: SourceKind, config: dict[str, object])
         return
     url = str(config[field])
     try:
-        await assert_allowed_url(url)
+        # Honour the same allowlist the actual fetch uses, so a LAN source the
+        # operator has explicitly permitted isn't rejected at create time.
+        await assert_allowed_url(url, allowlist=get_settings().fetch_allowlist_entries)
     except SourceRejected:
         raise
     except SourceUnreachable:
