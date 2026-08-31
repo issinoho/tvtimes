@@ -353,15 +353,22 @@ async def guide(
 ) -> list[GuideRow]:
     """Programmes for many channels in ``[start, end)``, one row per channel,
     each with times already resolved to that channel's display timezone."""
-    stmt = select(Channel).where(Channel.tenant_id == tenant_id)
+    stmt = select(Channel).join(Source, Channel.source_id == Source.id)
+    stmt = stmt.where(Channel.tenant_id == tenant_id)
     if source_id is not None:
         stmt = stmt.where(Channel.source_id == source_id)
     if group:
         stmt = stmt.where(Channel.group_title == group)
     if channel_ids:
         stmt = stmt.where(Channel.id.in_(list(channel_ids)))
+    # Source order (from the Sources screen) first, then the usual within-source
+    # ordering.
     stmt = stmt.order_by(
-        Channel.number.is_(None), Channel.number, Channel.sort_order, Channel.name
+        Source.sort_rank,
+        Channel.number.is_(None),
+        Channel.number,
+        Channel.sort_order,
+        Channel.name,
     ).limit(limit)
     channels = list(await session.scalars(stmt))
     if not channels:

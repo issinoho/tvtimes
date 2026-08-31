@@ -151,6 +151,40 @@ async def test_same_tvg_id_different_names_are_kept_separate(
     assert sorted(c["name"] for c in body["items"]) == ["TCM", "TCM", "TCM US East", "TCM US West"]
 
 
+async def test_sources_can_be_reordered(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    headers = await _auth(app_client, captured_emails, "sam@example.com")
+    ids = []
+    for name in ("A", "B", "C"):
+        r = await app_client.post(
+            "/api/sources", json={**M3U_BODY, "display_name": name}, headers=headers
+        )
+        ids.append(r.json()["id"])
+    initial = (await app_client.get("/api/sources", headers=headers)).json()
+    assert [s["sort_rank"] for s in initial] == [0, 1, 2]
+
+    reordered = [ids[2], ids[0], ids[1]]
+    resp = await app_client.put("/api/sources/order", json={"ids": reordered}, headers=headers)
+    assert resp.status_code == 200, resp.text
+    assert [s["id"] for s in resp.json()] == reordered
+    assert [s["sort_rank"] for s in resp.json()] == [0, 1, 2]
+
+    listed = await app_client.get("/api/sources", headers=headers)
+    assert [s["display_name"] for s in listed.json()] == ["C", "A", "B"]
+
+
+async def test_reorder_rejects_incomplete_id_list(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    headers = await _auth(app_client, captured_emails, "sam@example.com")
+    a = (await app_client.post("/api/sources", json=M3U_BODY, headers=headers)).json()["id"]
+    (await app_client.post("/api/sources", json=M3U_BODY, headers=headers)).json()
+
+    resp = await app_client.put("/api/sources/order", json={"ids": [a]}, headers=headers)
+    assert resp.status_code == 422
+
+
 async def test_missing_logo_is_backfilled_from_iptv_org(
     app_client: AsyncClient, captured_emails: list[dict[str, str]], monkeypatch: pytest.MonkeyPatch
 ) -> None:

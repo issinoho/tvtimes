@@ -77,6 +77,34 @@ export function useDeleteSource() {
   });
 }
 
+/** Persist the source order shown on the Sources screen (also reorders the guide). */
+export function useReorderSources() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (ids: string[]) =>
+      unwrap(await api.PUT('/api/sources/order', { body: { ids } })),
+    onMutate: async (ids) => {
+      await qc.cancelQueries({ queryKey: ['sources'] });
+      const prev = qc.getQueryData<SourceOut[]>(['sources']);
+      if (prev) {
+        const byId = new Map(prev.map((s) => [s.id, s]));
+        qc.setQueryData<SourceOut[]>(
+          ['sources'],
+          ids.map((id) => byId.get(id)).filter((s): s is SourceOut => Boolean(s)),
+        );
+      }
+      return { prev };
+    },
+    onError: (_err, _ids, ctx) => {
+      if (ctx?.prev) qc.setQueryData(['sources'], ctx.prev);
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ['sources'] });
+      void qc.invalidateQueries({ queryKey: ['guide'] });
+    },
+  });
+}
+
 export function useRefreshSource() {
   const qc = useQueryClient();
   return useMutation({

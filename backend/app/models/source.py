@@ -51,6 +51,10 @@ class Source(PkUuidMixin, TimestampMixin, Base):
     enabled: Mapped[bool] = mapped_column(nullable=False, default=True)
     refresh_interval_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=360)
 
+    # User-defined order on the Sources screen; the guide lists channels
+    # source-by-source in this order.
+    sort_rank: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
     last_refreshed_at: Mapped[datetime | None] = mapped_column(TZDateTime)
     last_status: Mapped[SourceStatus] = mapped_column(
         Enum(SourceStatus, native_enum=False, length=16),

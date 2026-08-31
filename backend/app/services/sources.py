@@ -97,6 +97,9 @@ async def create_source(
 ) -> Source:
     normalized = _normalize_config(kind, config)
     await assert_config_url_allowed(kind, normalized)
+    max_rank = await session.scalar(
+        select(func.max(Source.sort_rank)).where(Source.tenant_id == tenant_id)
+    )
     source = Source(
         tenant_id=tenant_id,
         kind=kind,
@@ -105,6 +108,7 @@ async def create_source(
         timezone_override=timezone_override,
         clock_shift_seconds=clock_shift_seconds,
         refresh_interval_minutes=refresh_interval_minutes,
+        sort_rank=(max_rank + 1) if max_rank is not None else 0,
         last_status=SourceStatus.pending,
     )
     session.add(source)
@@ -114,9 +118,25 @@ async def create_source(
 
 async def list_sources(session: AsyncSession, tenant_id: uuid.UUID) -> Sequence[Source]:
     rows = await session.scalars(
-        select(Source).where(Source.tenant_id == tenant_id).order_by(Source.created_at.desc())
+        select(Source)
+        .where(Source.tenant_id == tenant_id)
+        .order_by(Source.sort_rank, Source.created_at)
     )
     return list(rows)
+
+
+async def reorder_sources(
+    session: AsyncSession, tenant_id: uuid.UUID, ordered_ids: Sequence[uuid.UUID]
+) -> None:
+    """Set ``sort_rank`` from the given order. ``ordered_ids`` must be exactly
+    the tenant's current source ids."""
+    rows = {
+        s.id: s for s in await session.scalars(select(Source).where(Source.tenant_id == tenant_id))
+    }
+    if set(ordered_ids) != set(rows) or len(ordered_ids) != len(rows):
+        raise SourceNotFound
+    for rank, sid in enumerate(ordered_ids):
+        rows[sid].sort_rank = rank
 
 
 async def get_source(session: AsyncSession, tenant_id: uuid.UUID, source_id: uuid.UUID) -> Source:
