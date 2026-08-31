@@ -72,8 +72,8 @@ export function ExportsSection() {
       <p className={styles.hint}>
         Serve your whole line-up — every enabled source, de-duplicated and with the guide times
         already corrected for each channel&rsquo;s timezone — as a single M3U playlist and XMLTV
-        guide. Point Jellyfin, Plex, Emby, TiviMate or Threadfin at the two URLs below. Anyone
-        with a link can read your line-up and stream through it, so treat them as secrets.
+        guide. Point Jellyfin, Plex, Emby, TiviMate or Threadfin at the two URLs below. Anyone with
+        a link can read your line-up and stream through it, so treat them as secrets.
       </p>
 
       {links ? (
@@ -87,8 +87,8 @@ export function ExportsSection() {
         </>
       ) : enabled ? (
         <p className={styles.hint}>
-          Feeds are enabled. The URLs are only shown once, when generated — rotate below if you
-          need them again.
+          Feeds are enabled. The URLs are only shown once, when generated — rotate below if you need
+          them again.
         </p>
       ) : null}
 
