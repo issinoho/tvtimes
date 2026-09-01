@@ -28,6 +28,8 @@ dependencies = [
     # worker + redis (phases 3+)
     "arq>=0.26",
     "redis>=5.2",
+    # push notifications (Gotify / ntfy / Discord / … via one URL scheme)
+    "apprise>=1.9",
 ]
 
 [project.optional-dependencies]
@@ -71,6 +73,8 @@ filterwarnings = [
     "error",
     "ignore::ResourceWarning",
     "ignore::pytest.PytestUnraisableExceptionWarning",
+    # apprise lazily imports the stdlib `imghdr` shim on plugin load (py3.13 prep)
+    "ignore:'imghdr' is deprecated:DeprecationWarning",
 ]
 
 [tool.mypy]
@@ -82,5 +86,5 @@ disallow_untyped_decorators = false
 exclude = ["alembic/"]
 
 [[tool.mypy.overrides]]
-module = ["webauthn.*", "arq.*", "soft_webauthn.*", "slowapi.*"]
+module = ["webauthn.*", "arq.*", "soft_webauthn.*", "slowapi.*", "apprise.*"]
 ignore_missing_imports = true

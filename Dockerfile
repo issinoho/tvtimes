@@ -45,7 +45,8 @@ RUN uv pip install --system \
         "sqlalchemy[asyncio]>=2.0.36" "alembic>=1.14" "asyncpg>=0.30" "aiosqlite>=0.20" \
         "greenlet>=3.1" "structlog>=24.4" "httpx>=0.28" "python-multipart>=0.0.12" \
         "email-validator>=2.2" "webauthn>=2.2" "argon2-cffi>=23.1" "pyotp>=2.9" \
-        "pyjwt[crypto]>=2.10" "cryptography>=44" "slowapi>=0.1.9" "arq>=0.26" "redis>=5.2"
+        "pyjwt[crypto]>=2.10" "cryptography>=44" "slowapi>=0.1.9" "arq>=0.26" "redis>=5.2" \
+        "apprise>=1.9"
 
 COPY backend/ ./
 COPY --from=web /web/dist ./web
