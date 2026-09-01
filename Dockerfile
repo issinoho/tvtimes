@@ -31,6 +31,13 @@ WORKDIR /app
 
 COPY --from=ghcr.io/astral-sh/uv:0.10 /uv /bin/uv
 
+# gosu lets the entrypoint start as root (to take ownership of a bind-mounted
+# /data) and drop to the unprivileged app user before exec'ing anything.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends gosu \
+    && rm -rf /var/lib/apt/lists/* \
+    && gosu nobody true
+
 # Runtime dependencies (mirrors backend/pyproject.toml [project.dependencies],
 # minus the dev extras). Its own layer so it caches across app-code changes.
 RUN uv pip install --system \
@@ -46,7 +53,11 @@ COPY docker/entrypoint.sh /usr/local/bin/entrypoint
 RUN chmod +x /usr/local/bin/entrypoint \
     && useradd --system --uid 10001 --home /app tvtimes \
     && mkdir -p /data && chown -R tvtimes:tvtimes /app /data
-USER tvtimes
+
+# No `USER` — the entrypoint starts as root, chowns /data (usually a fresh
+# bind mount), then re-execs itself as `tvtimes` via gosu. An operator who
+# wants a non-root PID 1 can still set `user:` in compose; the entrypoint
+# then skips the chown and fails loudly if /data isn't writable.
 
 EXPOSE 8000
 ENTRYPOINT ["entrypoint"]

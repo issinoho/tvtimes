@@ -193,6 +193,10 @@ if you want them to actually arrive.
   address bar, or `TVTIMES_WEBAUTHN_RP_ID` isn't the origin's domain.
 - **Worker idle / guide not filling** — check `docker compose logs worker` and
   that `redis` is healthy.
+- **`PermissionError: … '/data/…'` in a crash loop** — `/data` is a bind mount
+  the container's user can't write to. The entrypoint normally fixes this
+  itself; you'll only see it if you've set a `user:` override in compose. Then
+  `chown` the host directory to that uid and restart.
 - **HDHomeRun source errors with "not a private LAN address"** — the address
   must resolve to an RFC1918 range (`10.`, `172.16–31.`, `192.168.`).
 - **M3U / Xtream / XMLTV URL rejected: "resolves to a non-public address"** —

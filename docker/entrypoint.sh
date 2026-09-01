@@ -11,10 +11,29 @@
 set -eu
 
 DATA_DIR="${TVTIMES_DATA_DIR:-/data}"
+APP_USER="${TVTIMES_USER:-tvtimes}"
 JWT_FILE="$DATA_DIR/jwt_ed25519.pem"
 ENC_FILE="$DATA_DIR/encryption.key"
 
+# The app runs unprivileged, but /data is almost always an operator-supplied
+# bind mount or a volume created before this image went rootless, so it lands
+# owned by root. Take ownership while we're still root, then drop to APP_USER
+# and re-exec. Without this the secret bootstrap below dies with a bare
+# PermissionError that `restart:` hides in a crash loop.
+if [ "$(id -u)" = "0" ]; then
+    mkdir -p "$DATA_DIR"
+    chown -R "$APP_USER" "$DATA_DIR"
+    exec gosu "$APP_USER" "$0" "$@"
+fi
+
 mkdir -p "$DATA_DIR"
+
+if [ ! -w "$DATA_DIR" ]; then
+    echo "tvtimes: $DATA_DIR is not writable by $(id -un) (uid $(id -u))." >&2
+    echo "tvtimes: fix its ownership on the host (chown to this uid), or drop the" >&2
+    echo "tvtimes: 'user:' override so the entrypoint can take ownership itself." >&2
+    exit 1
+fi
 
 if [ ! -f "$JWT_FILE" ]; then
     echo "tvtimes: generating signing key -> $JWT_FILE (first run)"
