@@ -15,8 +15,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.epg import Programme
+from app.models.source import Channel, Source
 from app.models.user import User
 from app.models.watchlist import WatchKind, WatchlistItem, WatchlistNotification
+from app.services.epg import MAX_CLOCK_SHIFT, _shift_seconds
 
 MAX_LEAD_MINUTES = 180
 # How far past "now" the title-match scan looks — covers the largest lead plus a
@@ -157,11 +159,43 @@ async def due_reminders(session: AsyncSession, *, now: datetime) -> list[DueRemi
     title_items = [i for i in items if i.kind == WatchKind.by_title and i.title_norm]
     upcoming: list[Programme] = []
     if title_items:
+        # Widened by the max clock-shift: a corrected channel's raw start_utc
+        # can sit up to a day either side of the reminder's real fire time.
         upcoming = list(
             await session.scalars(
-                select(Programme).where(Programme.start_utc > now, Programme.start_utc <= horizon)
+                select(Programme).where(
+                    Programme.start_utc > now - MAX_CLOCK_SHIFT,
+                    Programme.start_utc <= horizon + MAX_CLOCK_SHIFT,
+                )
             )
         )
+
+    # A channel's clock-shift correction is what the user saw in the guide, so
+    # the reminder fires relative to ``start_utc + shift``, not the raw feed
+    # time. The airing_key stays raw so the send-once ledger is unaffected.
+    shift_ids = {i.channel_id for i in items if i.kind == WatchKind.programme and i.channel_id}
+    shift_ids |= {p.channel_id for p in upcoming}
+    channels = (
+        {c.id: c for c in await session.scalars(select(Channel).where(Channel.id.in_(shift_ids)))}
+        if shift_ids
+        else {}
+    )
+    sources = (
+        {
+            s.id: s
+            for s in await session.scalars(
+                select(Source).where(Source.id.in_({c.source_id for c in channels.values()}))
+            )
+        }
+        if channels
+        else {}
+    )
+
+    def _shift(channel_id: uuid.UUID) -> timedelta:
+        channel = channels.get(channel_id)
+        if channel is None:
+            return timedelta()
+        return timedelta(seconds=_shift_seconds(channel, sources.get(channel.source_id)))
 
     due: list[DueReminder] = []
 
@@ -174,7 +208,8 @@ async def due_reminders(session: AsyncSession, *, now: datetime) -> list[DueRemi
         if item.kind == WatchKind.programme:
             if item.channel_id is None or item.start_utc is None or item.stop_utc is None:
                 continue
-            if not (item.start_utc - lead <= now < item.start_utc):
+            eff_start = item.start_utc + _shift(item.channel_id)
+            if not (eff_start - lead <= now < eff_start):
                 continue
             key = airing_key(item.channel_id, item.start_utc)
             if (item.id, key) in sent:
@@ -195,7 +230,8 @@ async def due_reminders(session: AsyncSession, *, now: datetime) -> list[DueRemi
                     continue
                 if normalize_title(p.title) != item.title_norm:
                     continue
-                if not (p.start_utc - lead <= now < p.start_utc):
+                eff_start = p.start_utc + _shift(p.channel_id)
+                if not (eff_start - lead <= now < eff_start):
                     continue
                 key = airing_key(p.channel_id, p.start_utc)
                 if (item.id, key) in sent:
@@ -231,15 +267,42 @@ async def next_airing(
     session: AsyncSession, item: WatchlistItem, *, now: datetime
 ) -> Programme | None:
     """The soonest upcoming programme a title watch would match — for the list
-    UI. ``None`` for a programme item or when nothing is scheduled."""
+    UI. ``None`` for a programme item or when nothing is scheduled. "Soonest"
+    is by the channel's corrected (clock-shifted) airtime, matching the guide."""
     if item.kind != WatchKind.by_title or not item.title_norm:
         return None
-    rows = await session.scalars(
-        select(Programme)
-        .where(Programme.tenant_id == item.tenant_id, Programme.start_utc > now)
-        .order_by(Programme.start_utc)
+    rows = list(
+        await session.scalars(
+            select(Programme)
+            .where(
+                Programme.tenant_id == item.tenant_id,
+                Programme.start_utc > now - MAX_CLOCK_SHIFT,
+            )
+            .order_by(Programme.start_utc)
+        )
     )
-    for p in rows:
-        if normalize_title(p.title) == item.title_norm:
-            return p
-    return None
+    matches = [p for p in rows if normalize_title(p.title) == item.title_norm]
+    if not matches:
+        return None
+    channels = {
+        c.id: c
+        for c in await session.scalars(
+            select(Channel).where(Channel.id.in_({p.channel_id for p in matches}))
+        )
+    }
+    sources = {
+        s.id: s
+        for s in await session.scalars(
+            select(Source).where(Source.id.in_({c.source_id for c in channels.values()}))
+        )
+    }
+
+    def _eff(p: Programme) -> datetime:
+        channel = channels.get(p.channel_id)
+        shift = _shift_seconds(channel, sources.get(channel.source_id)) if channel else 0
+        return p.start_utc + timedelta(seconds=shift)
+
+    future = [(p, _eff(p)) for p in matches if _eff(p) > now]
+    if not future:
+        return None
+    return min(future, key=lambda t: t[1])[0]

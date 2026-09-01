@@ -22,7 +22,7 @@ from tests.conftest import auth_header, login, register_and_verify
 NOW = datetime(2026, 9, 1, 20, 0, tzinfo=UTC)
 
 
-async def _seed(*, verified: bool = True) -> dict[str, uuid.UUID]:
+async def _seed(*, verified: bool = True, ch_a_shift_seconds: int = 0) -> dict[str, uuid.UUID]:
     async with get_sessionmaker()() as session:
         tenant = Tenant(name="T", default_timezone="UTC")
         session.add(tenant)
@@ -49,6 +49,7 @@ async def _seed(*, verified: bool = True) -> dict[str, uuid.UUID]:
             dedupe_key="a",
             name="Alpha",
             stream_ref_encrypted="x",
+            clock_shift_seconds=ch_a_shift_seconds,
         )
         ch_b = Channel(
             tenant_id=tenant.id,
@@ -179,6 +180,45 @@ async def test_title_reminder_matches_each_airing(db_schema: None) -> None:
         await session.commit()
 
     # NOW+80: now the Beta airing (starts NOW+90) is inside; Alpha already sent.
+    async with get_sessionmaker()() as session:
+        due = await svc.due_reminders(session, now=NOW + timedelta(minutes=80))
+        assert [d.channel_id for d in due] == [ids["ch_b"]]
+
+
+async def test_programme_reminder_uses_the_channel_clock_shift(db_schema: None) -> None:
+    # Alpha is corrected +1h, so p1's raw start NOW+10 airs (and is shown) at NOW+70.
+    ids = await _seed(ch_a_shift_seconds=3600)
+    async with get_sessionmaker()() as session:
+        user = await _user(session, ids["user"])
+        await svc.add_programme(session, user, programme_id=ids["p1"], lead_minutes=15)
+        await session.commit()
+
+    # NOW+5 is 5 min after the *raw* start but 65 min before the corrected one:
+    # under the old raw comparison this fired; it must not now.
+    async with get_sessionmaker()() as session:
+        assert await svc.due_reminders(session, now=NOW + timedelta(minutes=5)) == []
+
+    # NOW+60: inside the 15-min lead before the corrected NOW+70 start.
+    async with get_sessionmaker()() as session:
+        due = await svc.due_reminders(session, now=NOW + timedelta(minutes=60))
+        assert len(due) == 1 and due[0].title == "Interstellar"
+        # the airing key stays keyed on the raw start, so the ledger is stable
+        assert due[0].key == svc.airing_key(ids["ch_a"], NOW + timedelta(minutes=10))
+
+
+async def test_title_reminder_uses_the_channel_clock_shift(db_schema: None) -> None:
+    ids = await _seed(ch_a_shift_seconds=3600)  # Alpha +1h; Beta unshifted
+    async with get_sessionmaker()() as session:
+        user = await _user(session, ids["user"])
+        await svc.add_title(session, user, title="Interstellar", lead_minutes=15)
+        await session.commit()
+
+    # NOW+60: Alpha's corrected start is NOW+70 -> inside its lead; Beta's is NOW+90.
+    async with get_sessionmaker()() as session:
+        due = await svc.due_reminders(session, now=NOW + timedelta(minutes=60))
+        assert [d.channel_id for d in due] == [ids["ch_a"]]
+
+    # NOW+80: Beta (unshifted, starts NOW+90) is now inside; Alpha's window has passed.
     async with get_sessionmaker()() as session:
         due = await svc.due_reminders(session, now=NOW + timedelta(minutes=80))
         assert [d.channel_id for d in due] == [ids["ch_b"]]
