@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import respx
 from app.ingest.tmdb import (
     _best_backdrop,
     _best_logo,
     build_enrichment,
     guess_title_year,
+    guess_trailing_year,
+    search,
     strip_embedded_year,
     title_search_candidates,
 )
+from httpx import AsyncClient, Response
 
 
 def test_guess_title_year() -> None:
@@ -18,6 +22,18 @@ def test_guess_title_year() -> None:
         "1940",
     )
     assert guess_title_year("No year here") == ("No year here", None)
+
+
+def test_guess_trailing_year() -> None:
+    assert guess_trailing_year("The Longest Yard (1974)") == ("The Longest Yard", "1974")
+    assert guess_trailing_year("The Longest Yard [1974]") == ("The Longest Yard", "1974")
+    # no parens -> the number is part of the actual title, not a year to extract
+    assert guess_trailing_year("1917") == ("1917", None)
+    assert guess_trailing_year("Blade Runner 2049") == ("Blade Runner 2049", None)
+    assert guess_trailing_year("2001: A Space Odyssey") == ("2001: A Space Odyssey", None)
+    # a year elsewhere than the trailing position doesn't match either
+    assert guess_trailing_year("1940 - His Girl Friday") == ("1940 - His Girl Friday", None)
+    assert guess_trailing_year("No year here") == ("No year here", None)
 
 
 def test_title_search_candidates() -> None:
@@ -90,3 +106,48 @@ def test_build_enrichment_movie() -> None:
     ]
     assert e.backdrop_url == "https://image.tmdb.org/t/p/w1280/big.jpg"
     assert e.logo_url == "https://image.tmdb.org/t/p/w500/logo.png"
+
+
+@respx.mock
+async def test_search_prefers_the_year_embedded_in_the_title() -> None:
+    """No <date> from the source, but the title itself says "(1974)" -- the
+    1974 original must win over the far more popular 2005 remake, both
+    titled identically by TMDB."""
+    remake = {"id": 2005, "title": "The Longest Yard", "release_date": "2005-05-27"}
+    original = {"id": 1974, "title": "The Longest Yard", "release_date": "1974-08-21"}
+    route = respx.get(f"{'https://api.themoviedb.org/3'}/search/movie").mock(
+        return_value=Response(200, json={"results": [remake, original]})
+    )
+    async with AsyncClient() as http:
+        result = await search(http, "movie", "The Longest Yard (1974)", None, "tok")
+
+    assert result is not None and result["id"] == 1974
+    sent_query = dict(route.calls.last.request.url.params)["query"]
+    assert sent_query == "The Longest Yard"  # the embedded year is stripped from the query
+
+
+@respx.mock
+async def test_search_without_any_year_signal_falls_back_to_first_result() -> None:
+    """No <date> and no embedded year -> unchanged behaviour: TMDB's own
+    relevance/popularity order wins (there's nothing left to disambiguate on)."""
+    remake = {"id": 2005, "title": "The Longest Yard", "release_date": "2005-05-27"}
+    original = {"id": 1974, "title": "The Longest Yard", "release_date": "1974-08-21"}
+    respx.get(f"{'https://api.themoviedb.org/3'}/search/movie").mock(
+        return_value=Response(200, json={"results": [remake, original]})
+    )
+    async with AsyncClient() as http:
+        result = await search(http, "movie", "The Longest Yard", None, "tok")
+
+    assert result is not None and result["id"] == 2005
+
+
+def test_cache_key_falls_back_to_title_embedded_year() -> None:
+    from app.services.tmdb import cache_key
+
+    assert cache_key("The Longest Yard (1974)", None) == ("the longest yard", "1974")
+    # an explicit year always wins over anything embedded in the title
+    assert cache_key("The Longest Yard (1974)", "2005") == (
+        "the longest yard (1974)",
+        "2005",
+    )
+    assert cache_key("The Longest Yard", None) == ("the longest yard", "")

@@ -91,7 +91,14 @@ async def _paced() -> None:
 
 def cache_key(title: str, year: str | None) -> tuple[str, str]:
     """The (query_key, query_year) a programme maps to in ``tmdb_enrichment``.
-    Shared with ``services.epg`` so the guide highlights join on the same key."""
+    Shared with ``services.epg`` so the guide highlights join on the same key.
+
+    Falls back to a year embedded in the title itself (e.g. "The Longest
+    Yard (1974)") when the source's own ``<date>`` is missing — see
+    ``app.ingest.tmdb.guess_trailing_year``. ``client.search`` applies the
+    same fallback, so the two stay in step."""
+    if not year:
+        title, year = client.guess_trailing_year(title)
     return normalize_name(title)[:300], (year or "")
 
 

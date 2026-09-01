@@ -5,6 +5,9 @@ Design rules kept from tvdinner:
   * never send ``year`` as a hard search filter — pick the best candidate
     client-side after a title-only search
   * strip an exact ``(YYYY)`` suffix before searching
+  * when the source has no year at all, fall back to one embedded as a
+    trailing "(YYYY)" on the title, so a same-titled remake doesn't win on
+    TMDB's popularity sort (e.g. "The Longest Yard (1974)" vs. the 2005 remake)
   * prefer a textless, widest backdrop and an English, non-SVG, widest logo
   * a genuine no-match is cacheable; a request failure is not
 
@@ -27,6 +30,7 @@ POSTER = f"{_IMG}/w500"
 LOGO = f"{_IMG}/w500"
 
 _YEAR_RE = re.compile(r"[(\[]?((?:19|20)\d{2})[)\]]?")
+_TRAILING_YEAR_RE = re.compile(r"\s*[(\[]((?:19|20)\d{2})[)\]]\s*$")
 _SEGMENT_SPLIT_RE = re.compile(r"\s[-|·–—]\s")  # noqa: RUF001 - en/em dash separators are intentional
 _STRIP = " -()[]"
 _MAX_CAST = 8
@@ -66,6 +70,23 @@ def strip_embedded_year(title: str, year: str | None) -> str:
     return title
 
 
+def guess_trailing_year(title: str) -> tuple[str, str | None]:
+    """A year the source embedded as a trailing "(YYYY)"/"[YYYY]" on the
+    title, e.g. "The Longest Yard (1974)" — the fallback used when the feed's
+    own ``<date>`` is missing, so a same-titled remake doesn't win on TMDB's
+    popularity-sorted search.
+
+    Deliberately narrow: the year must be the last, parenthesised token, so a
+    title that's bare digits ("1917") or ends in an unparenthesised one
+    ("Blade Runner 2049") has nothing to match and is returned unchanged.
+    """
+    match = _TRAILING_YEAR_RE.search(title)
+    if not match:
+        return title, None
+    stripped = title[: match.start()].rstrip()
+    return (stripped or title), match.group(1)
+
+
 # --- fetching -------------------------------------------------------------------
 
 
@@ -89,6 +110,8 @@ async def search(
 ) -> dict[str, Any] | None:
     """Best result dict, or None for a genuine no-match. Raises TmdbError on a
     request failure."""
+    if not year:
+        title, year = guess_trailing_year(title)
     payload = await _get(
         client, f"/search/{media_type}", token, query=strip_embedded_year(title, year)
     )
