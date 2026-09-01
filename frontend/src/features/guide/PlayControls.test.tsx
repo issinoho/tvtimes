@@ -91,9 +91,16 @@ test('does not mint a link on mount', () => {
   expect(calls.some((c) => c.includes('/play-link'))).toBe(false);
 });
 
-test('desktop: Play navigates to the .m3u url', async () => {
+test('desktop: Play hands off with a tvdinner: link', async () => {
   mountPlay();
   await userEvent.setup().click(screen.getByRole('button', { name: 'Play' }));
+  await waitFor(() => expect(assign).toHaveBeenCalledWith(`tvdinner:${LINK.m3u_url}`));
+  expect(assign).toHaveBeenCalledTimes(1);
+});
+
+test('desktop: Download .m3u navigates to the raw playlist url', async () => {
+  mountPlay();
+  await userEvent.setup().click(screen.getByRole('button', { name: 'Download .m3u' }));
   await waitFor(() => expect(assign).toHaveBeenCalledWith(LINK.m3u_url));
   expect(assign).toHaveBeenCalledTimes(1);
 });

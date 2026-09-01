@@ -162,11 +162,28 @@ export function PlayControls({ channel }: { channel: SearchChannel }) {
     );
   }
 
+  const android = isAndroid();
+
   async function play() {
     setError(null);
     try {
       const link = await getLink();
-      window.location.assign(isAndroid() ? androidIntentUrl(link, channel.name) : link.m3u_url);
+      // Desktop: hand the OS a `tvdinner:` link so it opens straight in
+      // tvdinner (one remembered browser prompt, nothing saved). Android:
+      // the intent chooser, as before.
+      window.location.assign(
+        android ? androidIntentUrl(link, channel.name) : `tvdinner:${link.m3u_url}`,
+      );
+    } catch (err) {
+      fail(err);
+    }
+  }
+
+  async function download() {
+    setError(null);
+    try {
+      const link = await getLink();
+      window.location.assign(link.m3u_url); // plain .m3u download, for any other player
     } catch (err) {
       fail(err);
     }
@@ -190,6 +207,9 @@ export function PlayControls({ channel }: { channel: SearchChannel }) {
         <button type="button" className={styles.btn} disabled={mint.isPending} onClick={play}>
           {mint.isPending ? 'Starting…' : 'Play'}
         </button>
+        <button type="button" className={styles.btn} disabled={mint.isPending} onClick={download}>
+          Download .m3u
+        </button>
         <button type="button" className={styles.btn} disabled={mint.isPending} onClick={copy}>
           {copied ? 'Copied' : 'Copy stream URL'}
         </button>
@@ -197,7 +217,11 @@ export function PlayControls({ channel }: { channel: SearchChannel }) {
       {error ? (
         <p className={styles.watchHint}>{error}</p>
       ) : (
-        <p className={styles.watchHint}>Opens in your device&rsquo;s default media player.</p>
+        <p className={styles.watchHint}>
+          {android
+            ? 'Opens in your device’s default media player.'
+            : 'Play hands off to tvdinner; Download .m3u opens in any player.'}
+        </p>
       )}
     </div>
   );
