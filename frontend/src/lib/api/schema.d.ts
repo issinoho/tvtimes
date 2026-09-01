@@ -265,6 +265,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/account/source-alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Source Alerts */
+        put: operations["set_source_alerts_api_account_source_alerts_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/account/timezone": {
         parameters: {
             query?: never;
@@ -1300,6 +1317,11 @@ export interface components {
             tmdb_connected: boolean;
             /** Export Token Set At */
             export_token_set_at?: string | null;
+            /**
+             * Source Alerts Enabled
+             * @default true
+             */
+            source_alerts_enabled: boolean;
         };
         /** MessageOut */
         MessageOut: {
@@ -1538,6 +1560,11 @@ export interface components {
              * @default false
              */
             current: boolean;
+        };
+        /** SourceAlertsIn */
+        SourceAlertsIn: {
+            /** Enabled */
+            enabled: boolean;
         };
         /** SourceOrderIn */
         SourceOrderIn: {
@@ -2305,6 +2332,41 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_source_alerts_api_account_source_alerts_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SourceAlertsIn"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

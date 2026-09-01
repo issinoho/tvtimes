@@ -121,3 +121,4 @@ class MeOut(BaseModel):
     passkey_count: int
     tmdb_connected: bool = False
     export_token_set_at: datetime | None = None
+    source_alerts_enabled: bool = True
