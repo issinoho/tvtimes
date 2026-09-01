@@ -562,6 +562,51 @@
     font-weight: 500;
   }
 
+  /* ---- companion (tvdinner) ------------------------- */
+  .companion {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    margin-top: 26px;
+    padding: 26px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: color-mix(in srgb, var(--raised) 70%, transparent);
+    text-decoration: none;
+    color: inherit;
+    transition:
+      border-color 0.16s ease,
+      transform 0.16s ease;
+  }
+  .companion:hover {
+    border-color: var(--violet);
+    transform: translateY(-2px);
+  }
+  .companion img {
+    flex: none;
+    width: 60px;
+    height: 60px;
+    border-radius: 14px;
+  }
+  .companion p {
+    margin: 0 0 10px;
+    color: var(--ink-dim);
+  }
+  .companion p a {
+    color: var(--ink);
+  }
+  .companion .go {
+    color: var(--magenta);
+    font-weight: 600;
+    font-size: 14px;
+  }
+  @media (max-width: 640px) {
+    .companion {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+  }
+
   /* ---- footer ---------------------------------------- */
   footer {
     border-top: 1px solid var(--line);
@@ -891,6 +936,27 @@ docker compose up <span class="p">-d</span>
           <dd><b>ruff</b> + <b>mypy --strict</b> + eslint + tsc in CI, plus a full image build on every PR</dd>
         </div>
       </dl>
+    </div>
+  </section>
+
+  <section id="tvdinner">
+    <div class="wrap">
+      <p class="eyebrow"><span>06</span> companion</p>
+      <h2>Watch it in <code>tvdinner</code>.</h2>
+      <a class="companion" href="https://tvdinner.issinoho.com/">
+        <img src="tvdinner-mark.svg" alt="tvdinner logo" width="60" height="60" />
+        <div>
+          <p>
+            <a href="https://github.com/issinoho/tvdinner"><b>tvdinner</b></a> is a
+            command-line IPTV player for mpv — a TiviMate-style on-screen guide in your
+            terminal. Press <b>Play</b> on any tvtimes programme and the channel opens
+            straight in it, single-channel guide and all (via <code>url-tvg</code>); or
+            drop tvtimes' export URLs into it like any other playlist. It's where this
+            app's source-parsing and EPG logic came from.
+          </p>
+          <span class="go">tvdinner.issinoho.com&nbsp;&rarr;</span>
+        </div>
+      </a>
     </div>
   </section>
 </main>
