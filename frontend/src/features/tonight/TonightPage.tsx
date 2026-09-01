@@ -9,17 +9,21 @@ import {
   type SearchChannel,
   type SearchHit,
 } from '@/features/guide/api';
+import { ChannelLogo } from '@/features/guide/ChannelLogo';
 import { ProgrammeSheet } from '@/features/guide/ProgrammeSheet';
 import { fmtDayTime, fmtTime } from '@/features/guide/time';
 import styles from '@/features/tonight/tonight.module.css';
 
 type Open = { channel: SearchChannel; programme: Programme } | null;
 
-function Logo({ url }: { url: string | null }) {
-  return url ? (
-    <img className={styles.logo} src={url} alt="" />
-  ) : (
-    <span className={styles.logoEmpty} />
+function Logo({ channel }: { channel: SearchChannel }) {
+  return (
+    <ChannelLogo
+      channelId={channel.id}
+      hasLogo={Boolean(channel.logo_url)}
+      imgClassName={styles.logo}
+      emptyClassName={styles.logoEmpty}
+    />
   );
 }
 
@@ -46,7 +50,7 @@ function HitSection({
             onClick={() => onOpen({ channel: h.channel, programme: h.programme })}
           >
             <div className={styles.cardHead}>
-              <Logo url={h.channel.logo_url} />
+              <Logo channel={h.channel} />
               <span className={styles.channel}>
                 {ranked ? <span className={styles.rank}>#{i + 1} · </span> : null}
                 {h.channel.name}
@@ -120,7 +124,7 @@ export function TonightPage() {
                 onClick={() => setOpen({ channel: r.channel, programme: r.current })}
               >
                 <div className={styles.cardHead}>
-                  <Logo url={r.channel.logo_url} />
+                  <Logo channel={r.channel} />
                   <span className={styles.channel}>{r.channel.name}</span>
                   <FavStar channelId={r.channel.id} />
                 </div>

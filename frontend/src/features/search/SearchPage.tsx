@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { useProgrammeSearch, type SearchChannel, type Programme } from '@/features/guide/api';
+import { ChannelLogo } from '@/features/guide/ChannelLogo';
 import { ProgrammeSheet } from '@/features/guide/ProgrammeSheet';
 import { fmtDayTime } from '@/features/guide/time';
 import styles from '@/features/search/search.module.css';
@@ -64,11 +65,12 @@ export function SearchPage() {
                 className={styles.row}
                 onClick={() => setOpen({ channel: hit.channel, programme: hit.programme })}
               >
-                {hit.channel.logo_url ? (
-                  <img className={styles.logo} src={hit.channel.logo_url} alt="" />
-                ) : (
-                  <span className={styles.logoEmpty} />
-                )}
+                <ChannelLogo
+                  channelId={hit.channel.id}
+                  hasLogo={Boolean(hit.channel.logo_url)}
+                  imgClassName={styles.logo}
+                  emptyClassName={styles.logoEmpty}
+                />
                 <span className={styles.main}>
                   <span className={styles.name}>
                     {hit.programme.title}
