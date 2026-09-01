@@ -171,3 +171,78 @@ async def test_worker_skips_tenant_with_alerts_off(
     async with get_sessionmaker()() as session:
         src = (await session.scalars(select(Source))).one()
         assert src.alerted_health == "error"
+
+
+async def test_worker_pushes_to_notification_targets(
+    db_schema: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import apprise
+    from app import worker
+    from app.models.notification import NotificationTarget
+
+    ids = await _seed(status=SourceStatus.error, verified=False)  # no verified users at all
+    async with get_sessionmaker()() as session:
+        session.add(
+            NotificationTarget(
+                tenant_id=ids["tenant"],
+                label="Gotify",
+                url_encrypted=encrypt("gotify://gotify.example.com/AbCdToken"),
+            )
+        )
+        await session.commit()
+
+    pushes: list[dict[str, str]] = []
+
+    async def _fake_notify(self: apprise.Apprise, *a: object, **k: object) -> bool:
+        pushes.append({"title": str(k.get("title")), "body": str(k.get("body"))})
+        return True
+
+    async def _no_email(*, to: str, subject: str, body_text: str) -> None:
+        raise AssertionError("must not email a tenant with no verified users")
+
+    monkeypatch.setattr(apprise.Apprise, "async_notify", _fake_notify)
+    monkeypatch.setattr(worker, "send_email", _no_email)
+    monkeypatch.setattr(worker, "_now", lambda: NOW)
+
+    await worker.source_alerts({})
+    assert len(pushes) == 1
+    assert "My playlist" in pushes[0]["title"]
+    assert "502 Bad Gateway" in pushes[0]["body"]
+
+    await worker.source_alerts({})  # no new transition -> nothing more
+    assert len(pushes) == 1
+
+
+async def test_worker_push_respects_tenant_alerts_toggle(
+    db_schema: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import apprise
+    from app import worker
+    from app.models.notification import NotificationTarget
+
+    ids = await _seed(status=SourceStatus.error, alerts_enabled=False)
+    async with get_sessionmaker()() as session:
+        session.add(
+            NotificationTarget(
+                tenant_id=ids["tenant"],
+                label="Gotify",
+                url_encrypted=encrypt("gotify://gotify.example.com/AbCdToken"),
+            )
+        )
+        await session.commit()
+
+    pushes: list[object] = []
+
+    async def _fake_notify(self: apprise.Apprise, *a: object, **k: object) -> bool:
+        pushes.append(k)
+        return True
+
+    async def _capture(*, to: str, subject: str, body_text: str) -> None:
+        pass
+
+    monkeypatch.setattr(apprise.Apprise, "async_notify", _fake_notify)
+    monkeypatch.setattr(worker, "send_email", _capture)
+    monkeypatch.setattr(worker, "_now", lambda: NOW)
+
+    await worker.source_alerts({})
+    assert pushes == []  # master toggle gates push too

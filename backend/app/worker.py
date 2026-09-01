@@ -10,9 +10,9 @@ Jobs:
   - ``enrich_epg(tenant_id)`` — warm the TMDB cache for the coming week
   - ``enrich_programme(tenant_id, programme_id)`` — on-demand single enrichment
   - ``sweep`` (cron, every 15 min) — enqueue refreshes that are due
-  - ``reminders`` (cron, every 5 min) — email watchlist reminders
-  - ``source_alerts`` (cron, every 15 min) — email a tenant when a source's
-    health changes (broke, went stale, recovered)
+  - ``reminders`` (cron, every 5 min) — email + push watchlist reminders
+  - ``source_alerts`` (cron, every 15 min) — email + push a tenant when a
+    source's health changes (broke, went stale, recovered)
 """
 
 from __future__ import annotations
@@ -35,6 +35,7 @@ from app.models.source import Channel, Source
 from app.models.tenant import Tenant
 from app.models.user import User
 from app.services import epg as epg_svc
+from app.services import notify as notify_svc
 from app.services import sources as src_svc
 from app.services import tmdb as tmdb_svc
 from app.services import watchlist as watchlist_svc
@@ -116,6 +117,8 @@ async def reminders(ctx: dict[str, Any]) -> None:
     the send-once ledger keeps a title watch from double-emailing an airing."""
     now = _now()
     sent = 0
+    pushed = 0
+    pushed_keys: set[tuple[uuid.UUID, str]] = set()
     async with get_sessionmaker()() as session:
         due = await watchlist_svc.due_reminders(session, now=now)
         for r in due:
@@ -135,12 +138,29 @@ async def reminders(ctx: dict[str, Any]) -> None:
                     f"{get_settings().public_origin}\n"
                 ),
             )
+            # Push targets are tenant-level; two users watching the same airing
+            # must not double-notify the tenant's devices.
+            push_key = (r.item.tenant_id, r.key)
+            if push_key not in pushed_keys:
+                pushed_keys.add(push_key)
+                pushed += await notify_svc.dispatch(
+                    session,
+                    r.item.tenant_id,
+                    notify_svc.Notification(
+                        title=f"Reminder: {r.title}",
+                        body=(
+                            f"{channel.name} — {when} ({tz})\n"
+                            f"Starting in about {r.item.lead_minutes} minutes."
+                        ),
+                    ),
+                    event="reminders",
+                )
             await watchlist_svc.mark_sent(session, r.item, key=r.key, now=now)
             sent += 1
         await watchlist_svc.prune(session, now=now)
         await session.commit()
     if sent:
-        _log.info("worker.reminders", sent=sent)
+        _log.info("worker.reminders", sent=sent, pushed=pushed)
 
 
 def _alert_email(changes: list[src_svc.HealthChange], origin: str) -> tuple[str, str]:
@@ -164,6 +184,7 @@ async def source_alerts(ctx: dict[str, Any]) -> None:
     per transition, not one per tick."""
     now = _now()
     emails = 0
+    pushed = 0
     async with get_sessionmaker()() as session:
         changes = await src_svc.scan_health_changes(session, now=now)
         by_tenant: dict[uuid.UUID, list[src_svc.HealthChange]] = defaultdict(list)
@@ -174,6 +195,15 @@ async def source_alerts(ctx: dict[str, Any]) -> None:
             tenant = await session.get(Tenant, tenant_id)
             if tenant is None or not tenant.source_alerts_enabled:
                 continue  # markers are still stamped, so re-enabling won't replay
+            subject, body = _alert_email(group, origin)
+            # Push fires per tenant (targets are tenant-level), independent of
+            # whether any user has a verified email address.
+            pushed += await notify_svc.dispatch(
+                session,
+                tenant_id,
+                notify_svc.Notification(title=subject, body=body),
+                event="source_alerts",
+            )
             users = list(
                 await session.scalars(
                     select(User).where(
@@ -181,15 +211,12 @@ async def source_alerts(ctx: dict[str, Any]) -> None:
                     )
                 )
             )
-            if not users:
-                continue
-            subject, body = _alert_email(group, origin)
             for u in users:
                 await send_email(to=u.email, subject=subject, body_text=body)
                 emails += 1
         await session.commit()  # persist the alerted_health stamps
     if changes:
-        _log.info("worker.source_alerts", changes=len(changes), emails=emails)
+        _log.info("worker.source_alerts", changes=len(changes), emails=emails, pushed=pushed)
 
 
 class WorkerSettings:

@@ -18,6 +18,7 @@ from app.models.connector import Connector, ConnectorStatus
 from app.models.credentials import PasswordCredential, TotpSecret, WebAuthnCredential
 from app.models.epg import EpgSource, EpgStatus, Programme
 from app.models.favourite import FavouriteChannel
+from app.models.notification import NotificationTarget
 from app.models.session import AuthSession
 from app.models.source import Channel, Source, SourceKind, SourceStatus
 from app.models.tenant import Tenant
@@ -44,6 +45,7 @@ __all__ = [
     "EpgStatus",
     "FavouriteChannel",
     "MediaType",
+    "NotificationTarget",
     "PasswordCredential",
     "Programme",
     "Source",

@@ -14,6 +14,7 @@ from app.api.routers import (
     favourites,
     health,
     hero,
+    notifications,
     sources,
     watchlist,
 )
@@ -30,5 +31,6 @@ api_router.include_router(connectors.router)
 api_router.include_router(connector.router)
 api_router.include_router(watchlist.router)
 api_router.include_router(favourites.router)
+api_router.include_router(notifications.router)
 
 __all__ = ["api_router"]

@@ -229,6 +229,57 @@ async def test_worker_emails_and_records(db_schema: None, monkeypatch: pytest.Mo
     assert len(outbox) == 1
 
 
+async def test_worker_dedupes_push_across_users(
+    db_schema: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import apprise
+    from app import worker
+    from app.auth.crypto import encrypt
+    from app.models.notification import NotificationTarget
+
+    ids = await _seed()
+    async with get_sessionmaker()() as session:
+        user1 = await _user(session, ids["user"])
+        await svc.add_programme(session, user1, programme_id=ids["p1"], lead_minutes=15)
+        user2 = User(
+            tenant_id=ids["tenant"],
+            email="pat@example.com",
+            display_name="Pat",
+            email_verified_at=NOW,
+        )
+        session.add(user2)
+        await session.flush()
+        await svc.add_programme(session, user2, programme_id=ids["p1"], lead_minutes=15)
+        session.add(
+            NotificationTarget(
+                tenant_id=ids["tenant"],
+                label="Gotify",
+                url_encrypted=encrypt("gotify://gotify.example.com/AbCdToken"),
+            )
+        )
+        await session.commit()
+
+    emails: list[str] = []
+    pushes: list[dict[str, str]] = []
+
+    async def _capture_email(*, to: str, subject: str, body_text: str) -> None:
+        emails.append(to)
+
+    async def _fake_notify(self: apprise.Apprise, *a: object, **k: object) -> bool:
+        pushes.append({"title": str(k.get("title")), "body": str(k.get("body"))})
+        return True
+
+    monkeypatch.setattr(worker, "send_email", _capture_email)
+    monkeypatch.setattr(apprise.Apprise, "async_notify", _fake_notify)
+    monkeypatch.setattr(worker, "_now", lambda: NOW + timedelta(minutes=5))
+
+    await worker.reminders({})
+
+    assert sorted(emails) == ["pat@example.com", "sam@example.com"]  # every watcher emailed
+    assert len(pushes) == 1  # the tenant's device is notified once
+    assert "Interstellar" in pushes[0]["title"]
+
+
 # --- API ---------------------------------------------------------------------
 
 
