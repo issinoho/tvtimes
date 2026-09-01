@@ -31,6 +31,7 @@ cinematic TMDB "hero" panel. Everything runs on your own hardware.
 | **Enrichment** | your own TMDB API key powers backdrops, logos, cast, ratings and synopses for film programmes. Channel logos come from the playlist, else the iptv-org database, else the SiliconDust guide for HDHomeRun — shown on a neutral plate so dark and light marks both read |
 | **Export** | hand your whole line-up to another player — one merged, de-duplicated **M3U playlist** + **XMLTV guide** (times already timezone-corrected per channel) behind a rotatable token. Drop the two URLs into Jellyfin, Plex, Emby, TiviMate or Threadfin |
 | **Search & reminders** | search titles across every channel for the next two weeks; add an airing or a whole title to your watchlist and get an email ~15 min before it starts |
+| **Notifications** | source-health alerts (a source broke, went stale, recovered) and watchlist reminders go out by email, and — alongside it — to any number of [Apprise](https://github.com/caronc/apprise) push targets (Gotify, ntfy, Discord, Telegram, Pushover, …) you add in Settings, each toggleable per event |
 | **Auth** | WebAuthn passkeys first (with a clear message when the RP-ID/origin is misconfigured), Argon2id password + HIBP check as a fallback, TOTP 2FA, 60-day rotating refresh sessions with replay detection, a device/session list (one row per login), audit log |
 
 ## Run it

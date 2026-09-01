@@ -172,6 +172,25 @@
   cursor: pointer;
 }
 
+.ntHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.ntFlags {
+  display: flex;
+  gap: 1.1rem;
+  flex-wrap: wrap;
+}
+.ntForm {
+  margin-top: 1rem;
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
 .error {
   color: #ffbcbc;
   font-size: 0.85rem;

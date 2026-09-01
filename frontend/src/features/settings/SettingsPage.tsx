@@ -1,5 +1,6 @@
 import { ConnectorsSection } from '@/features/settings/ConnectorsSection';
 import { ExportsSection } from '@/features/settings/ExportsSection';
+import { NotificationsSection } from '@/features/settings/NotificationsSection';
 import { PasskeysSection } from '@/features/settings/PasskeysSection';
 import { SessionsSection } from '@/features/settings/SessionsSection';
 import { SourceAlertsSection } from '@/features/settings/SourceAlertsSection';
@@ -35,6 +36,7 @@ export function SettingsPage() {
       <ConnectorsSection />
       <ExportsSection />
       <SourceAlertsSection />
+      <NotificationsSection />
 
       {version ? (
         <p className={styles.version}>
