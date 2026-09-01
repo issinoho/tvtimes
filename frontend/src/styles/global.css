@@ -12,6 +12,14 @@ body,
   height: 100%;
 }
 
+/* Nothing should scroll the document sideways. `clip` (not `hidden`) keeps the
+   sticky header anchored to the viewport — `hidden` would make <body> a scroll
+   container and break it. */
+html,
+body {
+  overflow-x: clip;
+}
+
 body {
   margin: 0;
   font-family: var(--font-sans);
