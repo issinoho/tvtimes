@@ -184,6 +184,19 @@ verified account on the tenant.
 With `console` these are only written to the worker log, so set a real provider
 if you want them to actually arrive.
 
+### Push notifications
+
+Independently of email, **Settings → Push notifications** takes any number of
+[Apprise](https://github.com/caronc/apprise) URLs — Gotify, ntfy, Discord,
+Telegram, Pushover and ~100 other services behind one URL scheme. Each target
+can be toggled for source-health alerts and watchlist reminders separately, and
+the same events fan out to every enabled target alongside email. The URL is
+stored encrypted (it usually carries a token) and only ever shown back
+redacted; **Test** sends a one-off to check it. Delivery is fail-open — a dead
+target is logged and skipped, never blocking the others or the email path.
+Targets are outbound-only and *not* subject to the SSRF guard, so a
+LAN address like `gotify://192.168.1.10/…` is fine.
+
 ## Troubleshooting
 
 - **"insecure production config" on start** — you set your own
