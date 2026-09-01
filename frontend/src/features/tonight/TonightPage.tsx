@@ -1,5 +1,7 @@
 import { useState } from 'react';
 
+import { useFavourites } from '@/features/favourites/api';
+import { FavStar } from '@/features/favourites/FavStar';
 import {
   useHighlights,
   useNowNext,
@@ -65,11 +67,22 @@ function HitSection({
 export function TonightPage() {
   const nowNext = useNowNext();
   const highlights = useHighlights();
+  const { data: favs } = useFavourites();
   const [open, setOpen] = useState<Open>(null);
+  const [favFilter, setFavFilter] = useState<boolean | null>(null);
 
-  const onAir = (nowNext.data?.channels ?? [])
-    .flatMap((r) => (r.current ? [{ ...r, current: r.current }] : []))
+  const hasFavs = (favs?.size ?? 0) > 0;
+  const favOnly = favFilter ?? hasFavs; // default to favourites when the user has some
+
+  const onAirAll = (nowNext.data?.channels ?? []).flatMap((r) =>
+    r.current ? [{ ...r, current: r.current }] : [],
+  );
+  const onAir = (favOnly && favs ? onAirAll.filter((r) => favs.has(r.channel.id)) : onAirAll)
+    .sort(
+      (a, b) => Number(favs?.has(b.channel.id) ?? false) - Number(favs?.has(a.channel.id) ?? false),
+    )
     .slice(0, 40);
+
   const filmsSoon = highlights.data?.films_soon ?? [];
   const topRated = highlights.data?.top_rated ?? [];
 
@@ -78,10 +91,24 @@ export function TonightPage() {
       <h1 className={styles.title}>Tonight</h1>
 
       <section className={styles.section}>
-        <h2 className={styles.heading}>On now</h2>
+        <div className={styles.sectionHead}>
+          <h2 className={styles.heading}>On now</h2>
+          {hasFavs ? (
+            <button
+              type="button"
+              className={styles.railToggle}
+              aria-pressed={favOnly}
+              onClick={() => setFavFilter(!favOnly)}
+            >
+              {favOnly ? '★ Favourites' : 'All channels'}
+            </button>
+          ) : null}
+        </div>
         {nowNext.isLoading ? null : onAir.length === 0 ? (
           <p className={styles.hint}>
-            Nothing on air right now — add a source and its guide data on the Sources page.
+            {favOnly && hasFavs
+              ? 'None of your favourite channels are on air right now.'
+              : 'Nothing on air right now — add a source and its guide data on the Sources page.'}
           </p>
         ) : (
           <div className={styles.rail}>
@@ -95,6 +122,7 @@ export function TonightPage() {
                 <div className={styles.cardHead}>
                   <Logo url={r.channel.logo_url} />
                   <span className={styles.channel}>{r.channel.name}</span>
+                  <FavStar channelId={r.channel.id} />
                 </div>
                 <span className={styles.now}>{r.current.title}</span>
                 {r.upcoming ? (
