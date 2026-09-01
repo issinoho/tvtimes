@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
 import type { GuideChannel, Programme } from '@/features/guide/api';
+import { FavStar } from '@/features/favourites/FavStar';
 import { GENRE_VAR, genreOf } from '@/features/guide/genre';
 import { fmtTime } from '@/features/guide/time';
 import { useNow } from '@/features/guide/useNow';
@@ -33,6 +34,16 @@ export function GuideAgenda({ channels, onOpen }: Props) {
           </button>
         ))}
       </div>
+
+      {channel ? (
+        <div className={styles.agendaHead}>
+          <span>
+            {channel.number ? `${channel.number} · ` : ''}
+            {channel.name}
+          </span>
+          <FavStar channelId={channel.id} />
+        </div>
+      ) : null}
 
       <div className={styles.agenda}>
         {!channel || channel.programmes.length === 0 ? (

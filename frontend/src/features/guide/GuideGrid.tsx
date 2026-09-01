@@ -2,6 +2,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { GuideChannel, Programme } from '@/features/guide/api';
+import { FavStar } from '@/features/favourites/FavStar';
 import { GENRE_VAR, genreOf } from '@/features/guide/genre';
 import { fmtTime, hourTicks, ROW_H, trackWidth, WINDOW_MINUTES, xOf } from '@/features/guide/time';
 import { useNow } from '@/features/guide/useNow';
@@ -200,6 +201,7 @@ export function GuideGrid({ channels, windowStart, onOpen }: Props) {
                   <span className={styles.chanLogoEmpty} aria-hidden />
                 )}
                 <span className={styles.chanName}>{ch.name}</span>
+                <FavStar channelId={ch.id} />
               </div>
             );
           })}

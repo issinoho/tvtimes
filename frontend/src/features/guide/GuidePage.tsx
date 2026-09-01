@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
+import { useFavourites } from '@/features/favourites/api';
 import type { GuideChannel, Programme } from '@/features/guide/api';
 import { useGuide } from '@/features/guide/api';
 import { GuideAgenda } from '@/features/guide/GuideAgenda';
@@ -22,9 +23,11 @@ export function GuidePage() {
   const [sourceId, setSourceId] = useState('');
   const [group, setGroup] = useState('');
   const [search, setSearch] = useState('');
+  const [favOnly, setFavOnly] = useState(false);
   const [open, setOpen] = useState<{ channel: GuideChannel; programme: Programme } | null>(null);
 
   const { data: sources } = useSources();
+  const { data: favs } = useFavourites();
   const windowEnd = new Date(windowStart.getTime() + HALF_DAY);
   const guide = useGuide({
     from: windowStart.toISOString(),
@@ -40,8 +43,11 @@ export function GuidePage() {
   );
   const channels = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return q ? allChannels.filter((c) => c.name.toLowerCase().includes(q)) : allChannels;
-  }, [allChannels, search]);
+    let list = allChannels;
+    if (favOnly && favs) list = list.filter((c) => favs.has(c.id));
+    if (q) list = list.filter((c) => c.name.toLowerCase().includes(q));
+    return list;
+  }, [allChannels, search, favOnly, favs]);
 
   const shift = (ms: number) => setWindowStart((d) => new Date(d.getTime() + ms));
   const dayLabel = windowStart.toLocaleDateString('en-GB', {
@@ -73,6 +79,17 @@ export function GuidePage() {
           onClick={() => setWindowStart(defaultWindowStart())}
         >
           Now
+        </button>
+
+        <button
+          type="button"
+          className={styles.btn}
+          data-active={favOnly || undefined}
+          aria-pressed={favOnly}
+          onClick={() => setFavOnly((v) => !v)}
+          title="Show only favourite channels"
+        >
+          ★ Favourites
         </button>
 
         <div className={styles.spacer} />
@@ -123,7 +140,11 @@ export function GuidePage() {
         </div>
       ) : channels.length === 0 ? (
         <div className={styles.empty}>
-          <p>No channels match “{search}”.</p>
+          <p>
+            {favOnly && (favs?.size ?? 0) === 0
+              ? 'No favourite channels yet — tap the star on a channel to add one.'
+              : `No channels match “${search}”.`}
+          </p>
         </div>
       ) : isMobile ? (
         <GuideAgenda

@@ -4,6 +4,7 @@ import { useSetChannelShift, type SearchChannel, type Programme } from '@/featur
 import { GENRE_VAR, genreOf } from '@/features/guide/genre';
 import { fmtDayTime } from '@/features/guide/time';
 import { useHero } from '@/features/guide/hero';
+import { FavStar } from '@/features/favourites/FavStar';
 import { useAddWatch, useRemoveWatch, useWatchlist } from '@/features/watchlist/api';
 import { useAuth } from '@/lib/auth/AuthProvider';
 import { useDialogFocus } from '@/lib/useDialogFocus';
@@ -172,7 +173,10 @@ export function ProgrammeSheet({ channel, programme, onClose }: Props) {
           </div>
         ) : null}
 
-        <p className={styles.kv}>{channel.name}</p>
+        <p className={styles.kv}>
+          {channel.name}
+          <FavStar channelId={channel.id} />
+        </p>
         <h2>{programme.title}</h2>
         {programme.sub_title ? <p className={styles.kv}>{programme.sub_title}</p> : null}
         {e?.tagline ? <p className={styles.tagline}>{e.tagline}</p> : null}

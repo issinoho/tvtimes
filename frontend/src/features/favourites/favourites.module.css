@@ -1,0 +1,17 @@
+.star {
+  border: 0;
+  background: none;
+  cursor: pointer;
+  padding: 0.15rem;
+  font-size: 0.95rem;
+  line-height: 1;
+  color: var(--text-dim);
+  flex: 0 0 auto;
+}
+.star:hover,
+.star:focus-visible {
+  color: var(--brand-amber);
+}
+.star[data-on] {
+  color: var(--brand-amber);
+}
