@@ -141,6 +141,36 @@ async def test_search_without_any_year_signal_falls_back_to_first_result() -> No
     assert result is not None and result["id"] == 2005
 
 
+@respx.mock
+async def test_search_tolerates_an_off_by_one_feed_year() -> None:
+    """The feed says 1973, TMDB's original is 1974 -- close enough to beat the
+    2005 remake, which no exact-year match would have caught."""
+    remake = {"id": 2005, "title": "The Longest Yard", "release_date": "2005-05-27"}
+    original = {"id": 1974, "title": "The Longest Yard", "release_date": "1974-08-21"}
+    respx.get(f"{'https://api.themoviedb.org/3'}/search/movie").mock(
+        return_value=Response(200, json={"results": [remake, original]})
+    )
+    async with AsyncClient() as http:
+        result = await search(http, "movie", "The Longest Yard", "1973", "tok")
+
+    assert result is not None and result["id"] == 1974
+
+
+@respx.mock
+async def test_search_ignores_a_wildly_wrong_feed_year() -> None:
+    """No candidate within the tolerance window -> fall back to TMDB's ranking,
+    don't let a bad feed year pull the match somewhere random."""
+    remake = {"id": 2005, "title": "The Longest Yard", "release_date": "2005-05-27"}
+    original = {"id": 1974, "title": "The Longest Yard", "release_date": "1974-08-21"}
+    respx.get(f"{'https://api.themoviedb.org/3'}/search/movie").mock(
+        return_value=Response(200, json={"results": [remake, original]})
+    )
+    async with AsyncClient() as http:
+        result = await search(http, "movie", "The Longest Yard", "1990", "tok")
+
+    assert result is not None and result["id"] == 2005
+
+
 def test_cache_key_falls_back_to_title_embedded_year() -> None:
     from app.services.tmdb import cache_key
 

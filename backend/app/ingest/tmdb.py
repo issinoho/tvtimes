@@ -105,6 +105,13 @@ async def _get(client: httpx.AsyncClient, path: str, token: str, **params: str) 
         raise TmdbError(f"TMDB {path} failed: {exc.__class__.__name__}") from exc
 
 
+# Feed metadata routinely disagrees with TMDB's release year by a year or so
+# (copyright vs. release, festival vs. wide). Within this window we trust the
+# closest-year candidate; beyond it we fall back to TMDB's own ranking so a
+# badly-wrong feed year can't drag the match to some obscure same-titled film.
+_YEAR_TOLERANCE = 2
+
+
 async def search(
     client: httpx.AsyncClient, media_type: str, title: str, year: str | None, token: str
 ) -> dict[str, Any] | None:
@@ -115,17 +122,25 @@ async def search(
     payload = await _get(
         client, f"/search/{media_type}", token, query=strip_embedded_year(title, year)
     )
-    results = payload.get("results") or []
+    results: list[dict[str, Any]] = payload.get("results") or []
     if not results:
         return None
+
+    want = int(year) if year and year.isdigit() else None
+    if want is None:
+        return results[0]
+
     date_field = "release_date" if media_type == "movie" else "first_air_date"
-    best: dict[str, Any] = results[0]
-    if year:
-        for r in results:
-            if str(r.get(date_field, ""))[:4] == year:
-                best = r
-                break
-    return best
+    dated = [
+        (abs(int(str(r.get(date_field, ""))[:4]) - want), r)
+        for r in results
+        if str(r.get(date_field, ""))[:4].isdigit()
+    ]
+    if dated:
+        diff, closest = min(dated, key=lambda t: t[0])  # ties keep TMDB's order
+        if diff <= _YEAR_TOLERANCE:
+            return closest
+    return results[0]
 
 
 async def details(
