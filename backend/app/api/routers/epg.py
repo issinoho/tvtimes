@@ -163,10 +163,11 @@ async def patch_channel(
 async def create_play_link(
     request: Request, channel_id: uuid.UUID, user: VerifiedUser, session: SessionDep
 ) -> PlayLinkOut:
-    """Mint a short-lived link the browser hands to the OS so the default media
-    player opens this channel. The ticket is scoped to this one channel and
-    expires quickly, so it's safe to leave in a downloaded ``.m3u`` or the URL
-    bar — unlike the tenant-wide export token."""
+    """Mint a link the browser hands to the OS so the default media player
+    opens this channel. The ticket is scoped to this one channel and expires
+    within a day (see ``PLAY_TOKEN_TTL``), so it's fine to leave in a
+    downloaded ``.m3u`` or the URL bar — unlike the tenant-wide export token,
+    which reaches the whole line-up and only ends when it's rotated."""
     channel = await session.get(Channel, channel_id)
     if channel is None or channel.tenant_id != user.tenant_id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Unknown channel")

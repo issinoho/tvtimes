@@ -173,8 +173,9 @@ in the browser itself.
 - **Copy stream URL** gives you the raw address to paste into VLC's *Open
   Network Stream* or any other player.
 
-The play link is single-channel and expires after ~10 minutes — unlike the
-export token it isn't a standing secret, and it needs no export feed enabled.
+The play link is single-channel and expires after 24 hours — long enough to
+open a `.m3u` you saved earlier, but, unlike the export token, not a standing
+secret, and it needs no export feed enabled.
 **Stalker portal** channels can't produce a static URL, so Play is unavailable
 for them (same limitation as the export feed above).
 

@@ -80,7 +80,7 @@ async def stream(
     return RedirectResponse(url, status_code=status.HTTP_302_FOUND)
 
 
-# --- "Play externally" hand-off (short-lived per-channel ticket) --------------
+# --- "Play externally" hand-off (time-limited per-channel ticket) ------------
 # Kept off /stream/{id} so the ?token= (export) and ?ticket= (play) auth schemes
 # never mix on one path.
 
