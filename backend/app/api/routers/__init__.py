@@ -11,6 +11,7 @@ from app.api.routers import (
     connectors,
     epg,
     exports,
+    favourites,
     health,
     hero,
     sources,
@@ -28,5 +29,6 @@ api_router.include_router(hero.router)
 api_router.include_router(connectors.router)
 api_router.include_router(connector.router)
 api_router.include_router(watchlist.router)
+api_router.include_router(favourites.router)
 
 __all__ = ["api_router"]
