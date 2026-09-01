@@ -27,6 +27,44 @@ jobs:
       - run: uv run mypy .
       - run: uv run pytest -q
 
+  migrations:
+    # The backend suite runs on SQLite; this catches migrations that only break
+    # on Postgres (the production DB) — e.g. dialect-specific DDL literals.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: tvtimes
+          POSTGRES_PASSWORD: tvtimes
+          POSTGRES_DB: tvtimes
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tvtimes"
+          --health-interval 5s --health-timeout 5s --health-retries 15
+    env:
+      TVTIMES_DATABASE_URL: postgresql+asyncpg://tvtimes:tvtimes@localhost:5432/tvtimes
+      TVTIMES_ENCRYPTION_KEY: ci-not-a-real-key
+      TVTIMES_PUBLIC_ORIGIN: http://localhost
+      TVTIMES_WEBAUTHN_RP_ID: localhost
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          version: '0.10.x'
+      - run: uv python install 3.12
+      - run: uv sync --extra dev
+      - name: alembic upgrade head (Postgres)
+        run: uv run alembic upgrade head
+      - name: alembic downgrade base, then upgrade again
+        run: |
+          uv run alembic downgrade base
+          uv run alembic upgrade head
+
   connector:
     runs-on: ubuntu-latest
     defaults:
