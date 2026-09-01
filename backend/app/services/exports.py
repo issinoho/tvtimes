@@ -34,7 +34,13 @@ from app.logging import get_logger
 from app.models.epg import Programme
 from app.models.source import Channel, Source, SourceKind
 from app.models.tenant import Tenant
-from app.services.epg import WINDOW_FUTURE, WINDOW_PAST, _shift_seconds, resolve_display_tz
+from app.services.epg import (
+    MAX_CLOCK_SHIFT,
+    WINDOW_FUTURE,
+    WINDOW_PAST,
+    _shift_seconds,
+    resolve_display_tz,
+)
 from app.services.sources import decrypt_config
 
 _log = get_logger("services.exports")
@@ -223,23 +229,24 @@ async def render_xmltv(session: AsyncSession, tenant: Tenant) -> AsyncIterator[s
     now = datetime.now(UTC)
     start, end = now - WINDOW_PAST, now + WINDOW_FUTURE
     ids = list(meta)
+    # Widen by the max clock-shift; each row is re-tested against [start, end)
+    # with its channel's shift applied, so a shifted feed's exported guide
+    # matches what the grid draws (see CLAUDE.md: export and grid must agree).
     result = await session.stream_scalars(
         select(Programme)
         .where(
             Programme.channel_id.in_(ids),
-            Programme.stop_utc > start,
-            Programme.start_utc < end,
+            Programme.stop_utc > start - MAX_CLOCK_SHIFT,
+            Programme.start_utc < end + MAX_CLOCK_SHIFT,
         )
         .order_by(Programme.channel_id, Programme.start_utc)
     )
     async for p in result:
         tz, shift = meta[p.channel_id]
-        for chunk in _programme_xml(
-            p,
-            p.channel_id,
-            (p.start_utc + shift).astimezone(tz),
-            (p.stop_utc + shift).astimezone(tz),
-        ):
+        s_utc, e_utc = p.start_utc + shift, p.stop_utc + shift
+        if e_utc <= start or s_utc >= end:
+            continue
+        for chunk in _programme_xml(p, p.channel_id, s_utc.astimezone(tz), e_utc.astimezone(tz)):
             yield chunk
 
     yield "</tv>\n"

@@ -35,6 +35,13 @@ _log = get_logger("services.epg")
 WINDOW_PAST = timedelta(days=1)
 WINDOW_FUTURE = timedelta(days=14)
 
+# A channel's (or its source's) clock-shift correction moves its wall-clock, so
+# a programme's *effective* airtime for any window / "now" comparison is
+# ``start_utc + shift``. Windowed queries filter on raw ``start_utc`` for index
+# use, then widen by this bound (the schema cap on ``clock_shift_seconds``) and
+# re-test each row against the shifted interval in Python.
+MAX_CLOCK_SHIFT = timedelta(seconds=86_400)
+
 
 class EpgSourceNotFound(Exception):
     pass
@@ -309,12 +316,14 @@ async def channel_schedule(
         tz, tz_name = zoneinfo.ZoneInfo("UTC"), "UTC"
     shift = timedelta(seconds=_shift_seconds(channel, source))
 
+    # The window is in wall-clock terms; a shifted channel's rows land in it
+    # when ``start_utc + shift`` does, i.e. raw ``start_utc`` in [start-shift, end-shift).
     rows = await session.scalars(
         select(Programme)
         .where(
             Programme.channel_id == channel.id,
-            Programme.stop_utc > start,
-            Programme.start_utc < end,
+            Programme.stop_utc > start - shift,
+            Programme.start_utc < end - shift,
         )
         .order_by(Programme.start_utc)
     )
@@ -394,12 +403,14 @@ async def guide(
     default_tz = tenant.default_timezone if tenant else "UTC"
 
     ids = [c.id for c in channels]
+    # Widen by the max clock-shift; each channel's rows are re-tested against
+    # the window with its own shift applied, below.
     programmes = await session.scalars(
         select(Programme)
         .where(
             Programme.channel_id.in_(ids),
-            Programme.stop_utc > start,
-            Programme.start_utc < end,
+            Programme.stop_utc > start - MAX_CLOCK_SHIFT,
+            Programme.start_utc < end + MAX_CLOCK_SHIFT,
         )
         .order_by(Programme.start_utc)
     )
@@ -412,16 +423,13 @@ async def guide(
         source = sources.get(channel.source_id)
         tz, tz_name = resolve_display_tz(source, default_tz)
         shift = timedelta(seconds=_shift_seconds(channel, source))
-        rows.append(
-            GuideRow(
-                channel=channel,
-                timezone=tz_name,
-                programmes=[
-                    (p, (p.start_utc + shift).astimezone(tz), (p.stop_utc + shift).astimezone(tz))
-                    for p in by_channel[channel.id]
-                ],
-            )
-        )
+        kept: list[tuple[Programme, datetime, datetime]] = []
+        for p in by_channel[channel.id]:
+            s_utc, e_utc = p.start_utc + shift, p.stop_utc + shift
+            if e_utc <= start or s_utc >= end:
+                continue
+            kept.append((p, s_utc.astimezone(tz), e_utc.astimezone(tz)))
+        rows.append(GuideRow(channel=channel, timezone=tz_name, programmes=kept))
     return rows
 
 
@@ -448,17 +456,18 @@ async def search_programmes(
     substring) and that air within ``[start, end)``, earliest first — one hit
     per airing, times resolved into each channel's display zone."""
     like = f"%{query.strip()}%"
+    # Widened by the max clock-shift; re-tested per channel with its own shift.
     stmt = (
         select(Programme)
         .join(Channel, Programme.channel_id == Channel.id)
         .where(
             Programme.tenant_id == tenant_id,
-            Programme.stop_utc > start,
-            Programme.start_utc < end,
+            Programme.stop_utc > start - MAX_CLOCK_SHIFT,
+            Programme.start_utc < end + MAX_CLOCK_SHIFT,
             or_(Programme.title.ilike(like), Programme.sub_title.ilike(like)),
         )
         .order_by(Programme.start_utc)
-        .limit(limit)
+        .limit(limit + 64)
     )
     if movies_only:
         stmt = stmt.where(Programme.is_movie.is_(True))
@@ -483,17 +492,20 @@ async def search_programmes(
         source = sources.get(channel.source_id)
         tz, tz_name = resolve_display_tz(source, default_tz)
         shift = timedelta(seconds=_shift_seconds(channel, source))
+        s_utc, e_utc = p.start_utc + shift, p.stop_utc + shift
+        if e_utc <= start or s_utc >= end:  # outside the window once its shift is applied
+            continue
         hits.append(
             SearchHit(
                 programme=p,
                 channel=channel,
-                local_start=(p.start_utc + shift).astimezone(tz),
-                local_stop=(p.stop_utc + shift).astimezone(tz),
+                local_start=s_utc.astimezone(tz),
+                local_stop=e_utc.astimezone(tz),
                 timezone=tz_name,
             )
         )
     hits.sort(key=lambda h: (h.local_start, h.channel.name))
-    return hits
+    return hits[:limit]
 
 
 # --- now/next + highlights -------------------------------------------------
@@ -555,12 +567,14 @@ async def now_next(
     default_tz = tenant.default_timezone if tenant else "UTC"
 
     ids = [c.id for c in channels]
+    # Widened by the max clock-shift; each channel's rows are tested against
+    # ``now`` with its own shift applied, below.
     rows = await session.scalars(
         select(Programme)
         .where(
             Programme.channel_id.in_(ids),
-            Programme.stop_utc > now,
-            Programme.start_utc < now + timedelta(hours=24),
+            Programme.stop_utc > now - MAX_CLOCK_SHIFT,
+            Programme.start_utc < now + timedelta(hours=24) + MAX_CLOCK_SHIFT,
         )
         .order_by(Programme.start_utc)
     )
@@ -576,9 +590,10 @@ async def now_next(
         current: tuple[Programme, datetime, datetime] | None = None
         upcoming: tuple[Programme, datetime, datetime] | None = None
         for p in by_channel[channel.id]:
-            if current is None and p.start_utc <= now < p.stop_utc:
+            s_utc, e_utc = p.start_utc + shift, p.stop_utc + shift
+            if current is None and s_utc <= now < e_utc:
                 current = _localize(p, shift, tz)
-            elif upcoming is None and p.start_utc > now:
+            elif upcoming is None and s_utc > now:
                 upcoming = _localize(p, shift, tz)
             if current is not None and upcoming is not None:
                 break
@@ -599,14 +614,17 @@ async def highlights(
     the highest TMDB-rated films across the next ``week_days``. Each list holds
     one entry per film (earliest airing), times in the channel's zone."""
     now = now or _now()
+    week_end = now + timedelta(days=week_days)
+    # Widened by the max clock-shift; re-filtered to the real window once each
+    # film's channel shift is known.
     films = list(
         await session.scalars(
             select(Programme)
             .where(
                 Programme.tenant_id == tenant_id,
                 Programme.is_movie.is_(True),
-                Programme.start_utc >= now,
-                Programme.start_utc <= now + timedelta(days=week_days),
+                Programme.start_utc >= now - MAX_CLOCK_SHIFT,
+                Programme.start_utc <= week_end + MAX_CLOCK_SHIFT,
             )
             .order_by(Programme.start_utc)
         )
@@ -629,20 +647,31 @@ async def highlights(
     tenant = await session.get(Tenant, tenant_id)
     default_tz = tenant.default_timezone if tenant else "UTC"
 
+    def _shift(p: Programme) -> timedelta:
+        channel = channels[p.channel_id]
+        return timedelta(seconds=_shift_seconds(channel, sources.get(channel.source_id)))
+
     def hit(p: Programme) -> SearchHit:
         channel = channels[p.channel_id]
         source = sources.get(channel.source_id)
         tz, tz_name = resolve_display_tz(source, default_tz)
-        _p, ls, le = _localize(p, timedelta(seconds=_shift_seconds(channel, source)), tz)
+        _p, ls, le = _localize(p, _shift(p), tz)
         return SearchHit(
             programme=p, channel=channel, local_start=ls, local_stop=le, timezone=tz_name
         )
+
+    # Keep only films whose *effective* (shift-applied) start is in the window,
+    # and order by that effective start.
+    films = [p for p in films if now <= p.start_utc + _shift(p) <= week_end]
+    if not films:
+        return [], []
+    films.sort(key=lambda p: p.start_utc + _shift(p))
 
     soon_end = now + timedelta(hours=soon_hours)
     seen_soon: set[tuple[str, str]] = set()
     films_soon: list[SearchHit] = []
     for p in films:
-        if p.start_utc > soon_end:
+        if p.start_utc + _shift(p) > soon_end:
             break
         k = cache_key(p.title, p.year)
         if k in seen_soon:
