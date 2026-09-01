@@ -15,3 +15,7 @@ class ExportTokenOut(BaseModel):
     token: str
     playlist_url: str
     epg_url: str
+
+
+class SourceAlertsIn(BaseModel):
+    enabled: bool

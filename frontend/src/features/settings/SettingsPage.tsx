@@ -2,6 +2,7 @@ import { ConnectorsSection } from '@/features/settings/ConnectorsSection';
 import { ExportsSection } from '@/features/settings/ExportsSection';
 import { PasskeysSection } from '@/features/settings/PasskeysSection';
 import { SessionsSection } from '@/features/settings/SessionsSection';
+import { SourceAlertsSection } from '@/features/settings/SourceAlertsSection';
 import { TimezoneSection } from '@/features/settings/TimezoneSection';
 import { TmdbSection } from '@/features/settings/TmdbSection';
 import { TotpSection } from '@/features/settings/TotpSection';
@@ -33,6 +34,7 @@ export function SettingsPage() {
       <TmdbSection />
       <ConnectorsSection />
       <ExportsSection />
+      <SourceAlertsSection />
 
       {version ? (
         <p className={styles.version}>

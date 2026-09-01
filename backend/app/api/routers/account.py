@@ -20,7 +20,7 @@ from app.auth.deps import (
 from app.auth.ratelimit import WEBAUTHN_LIMIT, limiter
 from app.config import get_settings
 from app.models.credentials import WebAuthnCredential
-from app.schemas.account import ExportTokenOut, TimezoneIn, TmdbTokenIn
+from app.schemas.account import ExportTokenOut, SourceAlertsIn, TimezoneIn, TmdbTokenIn
 from app.schemas.auth import (
     MeOut,
     MessageOut,
@@ -57,6 +57,7 @@ async def me(user: CurrentUser, session: SessionDep) -> MeOut:
         passkey_count=passkeys or 0,
         tmdb_connected=bool(user.tenant.tmdb_token_encrypted),
         export_token_set_at=user.tenant.export_token_set_at,
+        source_alerts_enabled=user.tenant.source_alerts_enabled,
     )
 
 
@@ -96,6 +97,17 @@ async def delete_export_token(user: VerifiedUser, session: SessionDep) -> Messag
     await session.refresh(user, ["tenant"])
     await exports_svc.revoke_token(session, user.tenant)
     return MessageOut(message="Export feeds disabled.")
+
+
+@router.put("/source-alerts", response_model=MessageOut)
+async def set_source_alerts(
+    body: SourceAlertsIn, user: VerifiedUser, session: SessionDep
+) -> MessageOut:
+    await session.refresh(user, ["tenant"])
+    user.tenant.source_alerts_enabled = body.enabled
+    return MessageOut(
+        message="Source alert emails on." if body.enabled else "Source alert emails off."
+    )
 
 
 @router.put("/timezone", response_model=MessageOut)

@@ -24,9 +24,10 @@ async def _seed(
     alerted: str | None = None,
     refreshed_ago: timedelta | None = timedelta(minutes=30),
     verified: bool = True,
+    alerts_enabled: bool = True,
 ) -> dict[str, uuid.UUID]:
     async with get_sessionmaker()() as session:
-        tenant = Tenant(name="T", default_timezone="UTC")
+        tenant = Tenant(name="T", default_timezone="UTC", source_alerts_enabled=alerts_enabled)
         session.add(tenant)
         await session.flush()
         session.add(
@@ -145,6 +146,28 @@ async def test_worker_skips_unverified_users(
     await worker.source_alerts({})
     assert outbox == []
     # but the marker is still stamped so it won't re-alert once verified
+    async with get_sessionmaker()() as session:
+        src = (await session.scalars(select(Source))).one()
+        assert src.alerted_health == "error"
+
+
+async def test_worker_skips_tenant_with_alerts_off(
+    db_schema: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app import worker
+
+    await _seed(status=SourceStatus.error, alerts_enabled=False)
+    outbox: list[str] = []
+
+    async def _capture(*, to: str, subject: str, body_text: str) -> None:
+        outbox.append(to)
+
+    monkeypatch.setattr(worker, "send_email", _capture)
+    monkeypatch.setattr(worker, "_now", lambda: NOW)
+
+    await worker.source_alerts({})
+    assert outbox == []
+    # marker still stamped, so flipping alerts back on won't replay old state
     async with get_sessionmaker()() as session:
         src = (await session.scalars(select(Source))).one()
         assert src.alerted_health == "error"

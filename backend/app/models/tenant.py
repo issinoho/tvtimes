@@ -6,7 +6,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import String
+from sqlalchemy import Boolean, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base, TZDateTime
@@ -29,5 +29,9 @@ class Tenant(PkUuidMixin, TimestampMixin, Base):
     # players). The raw token is shown once on creation and never stored.
     export_token_hash: Mapped[str | None] = mapped_column(String(64), unique=True, index=True)
     export_token_set_at: Mapped[datetime | None] = mapped_column(TZDateTime)
+
+    # Email the tenant's verified users when a source breaks / goes stale /
+    # recovers (app.worker.source_alerts). On by default.
+    source_alerts_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     users: Mapped[list[User]] = relationship(back_populates="tenant", cascade="all, delete-orphan")

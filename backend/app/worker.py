@@ -32,6 +32,7 @@ from app.db import dispose_engine, get_sessionmaker
 from app.logging import configure_logging, get_logger
 from app.models.epg import EpgSource
 from app.models.source import Channel, Source
+from app.models.tenant import Tenant
 from app.models.user import User
 from app.services import epg as epg_svc
 from app.services import sources as src_svc
@@ -170,6 +171,9 @@ async def source_alerts(ctx: dict[str, Any]) -> None:
             by_tenant[c.source.tenant_id].append(c)
         origin = get_settings().public_origin
         for tenant_id, group in by_tenant.items():
+            tenant = await session.get(Tenant, tenant_id)
+            if tenant is None or not tenant.source_alerts_enabled:
+                continue  # markers are still stamped, so re-enabling won't replay
             users = list(
                 await session.scalars(
                     select(User).where(
