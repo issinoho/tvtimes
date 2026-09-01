@@ -65,6 +65,11 @@ class Source(PkUuidMixin, TimestampMixin, Base):
     channel_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     epg_url: Mapped[str | None] = mapped_column(Text)
 
+    # The rolled-up health ("ok" | "stale" | "error") we last emailed the tenant
+    # about — so alerts fire on a transition, not every worker tick. None = the
+    # worker hasn't assessed this source yet.
+    alerted_health: Mapped[str | None] = mapped_column(String(16))
+
     tenant: Mapped[Tenant] = relationship()
     channels: Mapped[list[Channel]] = relationship(
         back_populates="source", cascade="all, delete-orphan"
