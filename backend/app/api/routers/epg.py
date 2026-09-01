@@ -167,7 +167,11 @@ async def create_play_link(
     opens this channel. The ticket is scoped to this one channel and expires
     within a day (see ``PLAY_TOKEN_TTL``), so it's fine to leave in a
     downloaded ``.m3u`` or the URL bar — unlike the tenant-wide export token,
-    which reaches the whole line-up and only ends when it's rotated."""
+    which reaches the whole line-up and only ends when it's rotated.
+
+    The downloaded ``.m3u`` carries a ``url-tvg=`` pointing at this same
+    channel's XMLTV (same ticket), so a player that reads it gets the guide
+    too."""
     channel = await session.get(Channel, channel_id)
     if channel is None or channel.tenant_id != user.tenant_id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Unknown channel")

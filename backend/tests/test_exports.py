@@ -407,6 +407,13 @@ async def _play_setup(
             group_title="Ents",
             stream_ref_encrypted=encrypt("http://provider.example/bbc.ts"),
         )
+        ch2 = Channel(
+            tenant_id=tenant_id,
+            source_id=m3u.id,
+            dedupe_key="c2",
+            name="ITV1 HD",
+            stream_ref_encrypted=encrypt("http://provider.example/itv.ts"),
+        )
         ch_stalker = Channel(
             tenant_id=tenant_id,
             source_id=portal.id,
@@ -414,9 +421,31 @@ async def _play_setup(
             name="Portal Chan",
             stream_ref_encrypted=encrypt("ffff"),
         )
-        session.add_all([ch, ch_stalker])
+        epg = EpgSource(tenant_id=tenant_id, source_id=m3u.id, url="http://x")
+        session.add_all([ch, ch2, ch_stalker, epg])
+        await session.flush()
+        session.add_all(
+            [
+                Programme(
+                    tenant_id=tenant_id,
+                    channel_id=ch.id,
+                    epg_source_id=epg.id,
+                    start_utc=PROG_START,
+                    stop_utc=PROG_START + timedelta(hours=1),
+                    title="Match of the Day",
+                ),
+                Programme(
+                    tenant_id=tenant_id,
+                    channel_id=ch2.id,
+                    epg_source_id=epg.id,
+                    start_utc=PROG_START,
+                    stop_utc=PROG_START + timedelta(hours=1),
+                    title="Coronation Street",
+                ),
+            ]
+        )
         await session.commit()
-        return h, {"m3u": ch.id, "stalker": ch_stalker.id}
+        return h, {"m3u": ch.id, "m3u2": ch2.id, "stalker": ch_stalker.id}
 
 
 def _rel(url: str) -> tuple[str, dict[str, str]]:
@@ -448,10 +477,33 @@ async def test_play_link_mint_and_serve_m3u(
     cd = m3u.headers["content-disposition"]
     assert "attachment" in cd and cd.rstrip().endswith('.m3u"')
     lines = m3u.text.splitlines()
-    assert lines[0] == "#EXTM3U"
+    assert lines[0].startswith("#EXTM3U ") and 'url-tvg="' in lines[0]
+    assert f"/api/exports/play/{ids['m3u']}/epg.xml?ticket=" in lines[0]
     assert lines[1].startswith("#EXTINF:-1 ") and f'tvg-id="{ids["m3u"]}"' in lines[1]
     assert lines[2] == body["stream_url"]
     assert "provider.example" not in m3u.text  # upstream URL never in the file
+
+    # ...and that url-tvg serves this one channel's guide, nothing else.
+    tvg_url = lines[0].split('url-tvg="', 1)[1].split('"', 1)[0]
+    ep_path, ep_params = _rel(tvg_url)
+    epg = await app_client.get(ep_path, params=ep_params)
+    assert epg.status_code == 200, epg.text
+    assert epg.headers["content-type"].startswith("application/xml")
+    root = ET.fromstring(epg.text)
+    assert [c.get("id") for c in root.findall("channel")] == [str(ids["m3u"])]
+    assert {p.get("channel") for p in root.findall("programme")} == {str(ids["m3u"])}
+    assert "Match of the Day" in epg.text
+    assert "Coronation Street" not in epg.text  # the other channel's programme
+    assert str(ids["m3u2"]) not in epg.text
+
+
+async def test_play_epg_xml_rejects_a_bad_ticket(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    _h, ids = await _play_setup(app_client, captured_emails)
+    for params in ({}, {"ticket": "garbage"}):
+        resp = await app_client.get(f"/api/exports/play/{ids['m3u']}/epg.xml", params=params)
+        assert resp.status_code == 401
 
 
 async def test_play_stream_redirects(

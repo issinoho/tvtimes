@@ -165,11 +165,17 @@ async def render_m3u(session: AsyncSession, tenant: Tenant, *, base_url: str, to
     return "\n".join(lines) + "\n"
 
 
-def render_channel_m3u(channel: Channel, stream_url: str) -> str:
+def render_channel_m3u(channel: Channel, stream_url: str, *, epg_url: str | None = None) -> str:
     """A one-entry playlist for the "Play externally" hand-off. ``stream_url``
     points back at our own ``/stream`` redirect, so the upstream URL (and any
-    Xtream credentials in it) never lands in the file the user's OS saves."""
-    return f"#EXTM3U\n{_extinf(channel)}\n{stream_url}\n"
+    Xtream credentials in it) never lands in the file the user's OS saves.
+
+    ``epg_url``, when given, rides along as ``url-tvg=`` on the ``#EXTM3U``
+    header — a player that reads it (tvdinner, TiviMate, …) then loads this one
+    channel's guide with no extra step, and the ``tvg-id`` on the ``#EXTINF``
+    line matches the ``<channel id>`` that URL serves."""
+    header = "#EXTM3U" if epg_url is None else f'#EXTM3U url-tvg="{epg_url}"'
+    return f"{header}\n{_extinf(channel)}\n{stream_url}\n"
 
 
 def play_m3u_filename(channel: Channel) -> str:
@@ -217,9 +223,28 @@ def _programme_xml(
 
 
 async def render_xmltv(session: AsyncSession, tenant: Tenant) -> AsyncIterator[str]:
+    """XMLTV for the tenant's whole enabled line-up (the export feed)."""
     channels = await _ordered_channels(session, tenant.id)
+    async for chunk in _render_xmltv(
+        session, channels, default_tz=tenant.default_timezone or "UTC"
+    ):
+        yield chunk
+
+
+async def render_channel_xmltv(
+    session: AsyncSession, channel: Channel, *, default_tz: str
+) -> AsyncIterator[str]:
+    """XMLTV for a single channel — the guide that rides along with the "Play
+    externally" hand-off (``url-tvg=`` in its one-entry ``.m3u``). Same window
+    and same per-channel zone + clock-shift handling as the full export."""
+    async for chunk in _render_xmltv(session, [channel], default_tz=default_tz):
+        yield chunk
+
+
+async def _render_xmltv(
+    session: AsyncSession, channels: list[Channel], *, default_tz: str
+) -> AsyncIterator[str]:
     sources = await _sources_by_id(session, channels)
-    default_tz = tenant.default_timezone or "UTC"
 
     yield '<?xml version="1.0" encoding="UTF-8"?>\n'
     yield '<tv generator-info-name="tvtimes">\n'
