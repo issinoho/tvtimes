@@ -160,14 +160,16 @@ Notes:
 ## Play a channel in your device's player
 
 To just watch one channel now — without wiring up a whole tuner — open a
-programme in the guide and press **Play**. tvtimes hands the stream to your
-device's default media app (VLC, mpv, MX Player, …); it does not play video
-in the browser itself.
+programme in the guide and press **Play**. tvtimes hands the channel to a
+media app; it does not play video in the browser itself.
 
-- **Windows / Linux** — a one-channel `.m3u` downloads; opening it launches
-  your player. Associate `.m3u` with VLC/MPC/PotPlayer on Windows, or on Linux
-  `xdg-mime default vlc.desktop audio/x-mpegurl` (swap in `mpv.desktop` to
-  taste).
+- **Desktop** — **Play** opens a `tvdinner:` link, which
+  [tvdinner](https://github.com/issinoho/tvdinner) picks up directly (run
+  `tvdinner default-handler` once): nothing is saved and there's no
+  application picker. For any other player, use **Download .m3u** and open
+  the file — associate `.m3u` with VLC/mpv on Linux
+  (`xdg-mime default vlc.desktop audio/x-mpegurl`) or PotPlayer/MPC on
+  Windows.
 - **Android** — an app chooser appears (tick "always" to skip it next time).
   Firefox for Android falls back to the `.m3u` download.
 - **Copy stream URL** gives you the raw address to paste into VLC's *Open
