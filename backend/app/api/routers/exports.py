@@ -7,9 +7,11 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
+import jwt
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import PlainTextResponse, RedirectResponse, StreamingResponse
 
+from app.auth import tokens
 from app.auth.deps import SessionDep
 from app.auth.ratelimit import limiter
 from app.config import get_settings
@@ -70,6 +72,66 @@ async def stream(
     channel = await session.get(Channel, channel_id)
     if channel is None or channel.tenant_id != tenant.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Unknown channel")
+    source = await session.get(Source, channel.source_id)
+    try:
+        url = svc.resolve_stream(channel, source)
+    except svc.StreamUnavailable as exc:
+        raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, str(exc)) from exc
+    return RedirectResponse(url, status_code=status.HTTP_302_FOUND)
+
+
+# --- "Play externally" hand-off (short-lived per-channel ticket) --------------
+# Kept off /stream/{id} so the ?token= (export) and ?ticket= (play) auth schemes
+# never mix on one path.
+
+
+async def _play_channel(
+    session: SessionDep,
+    channel_id: uuid.UUID,
+    ticket: Annotated[str, Query()] = "",
+) -> Channel:
+    try:
+        tok_channel_id, tok_tenant_id = tokens.decode_play_token(ticket)
+    except jwt.PyJWTError as exc:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired play link") from exc
+    if tok_channel_id != channel_id:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired play link")
+    channel = await session.get(Channel, channel_id)
+    if channel is None or channel.tenant_id != tok_tenant_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Unknown channel")
+    return channel
+
+
+PlayChannelDep = Annotated[Channel, Depends(_play_channel)]
+
+
+@router.get(
+    "/play/{channel_id}/playlist.m3u",
+    response_class=PlainTextResponse,
+    include_in_schema=False,
+)
+@limiter.limit(EXPORT_LIMIT)
+async def play_playlist(
+    request: Request,
+    channel: PlayChannelDep,
+    ticket: Annotated[str, Query()] = "",
+) -> PlainTextResponse:
+    base = get_settings().public_origin.rstrip("/")
+    stream_url = f"{base}/api/exports/play/{channel.id}/stream?ticket={ticket}"
+    return PlainTextResponse(
+        svc.render_channel_m3u(channel, stream_url),
+        media_type="audio/x-mpegurl",
+        headers={"Content-Disposition": f'attachment; filename="{svc.play_m3u_filename(channel)}"'},
+    )
+
+
+@router.get("/play/{channel_id}/stream", include_in_schema=False)
+@limiter.limit(EXPORT_LIMIT)
+async def play_stream(
+    request: Request,
+    channel: PlayChannelDep,
+    session: SessionDep,
+) -> RedirectResponse:
     source = await session.get(Source, channel.source_id)
     try:
         url = svc.resolve_stream(channel, source)

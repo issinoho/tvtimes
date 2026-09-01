@@ -111,6 +111,12 @@ class ChannelShiftOut(BaseModel):
     clock_shift_seconds: int
 
 
+class PlayLinkOut(BaseModel):
+    m3u_url: str  # absolute; carries ?ticket=<jwt>; downloads as a one-channel .m3u
+    stream_url: str  # absolute; carries ?ticket=<jwt>; 302s to the upstream stream
+    expires_in: int  # seconds until the ticket expires
+
+
 class GuideOut(BaseModel):
     from_: datetime = Field(serialization_alias="from")
     to: datetime

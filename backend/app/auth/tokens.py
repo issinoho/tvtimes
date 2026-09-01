@@ -101,6 +101,34 @@ def decode_mfa_token(token: str) -> uuid.UUID:
     return uuid.UUID(data["sub"])
 
 
+PLAY_TOKEN_TTL = timedelta(minutes=10)
+
+
+def issue_play_token(channel_id: uuid.UUID, tenant_id: uuid.UUID) -> str:
+    """Short-lived ticket that lets an external media player fetch one channel's
+    stream. Carried in the URL (`?ticket=`) because the player can't send a
+    bearer header; scoped to the one channel + tenant so a leaked link can't
+    reach the rest of the line-up."""
+    now = datetime.now(UTC)
+    payload = {
+        "sub": str(channel_id),
+        "tid": str(tenant_id),
+        "iat": int(now.timestamp()),
+        "exp": int((now + PLAY_TOKEN_TTL).timestamp()),
+        "typ": "play",
+    }
+    return jwt.encode(payload, _private_pem(), algorithm=_ALG)
+
+
+def decode_play_token(token: str) -> tuple[uuid.UUID, uuid.UUID]:
+    """`(channel_id, tenant_id)` from a play ticket. Raises `jwt.PyJWTError` on a
+    bad, expired, or wrong-type token."""
+    data = jwt.decode(token, _public_pem(), algorithms=[_ALG], options={"require": ["exp", "sub"]})
+    if data.get("typ") != "play":
+        raise jwt.InvalidTokenError("wrong token type")
+    return uuid.UUID(data["sub"]), uuid.UUID(data["tid"])
+
+
 def decode_access_token(token: str) -> AccessClaims:
     data = jwt.decode(token, _public_pem(), algorithms=[_ALG], options={"require": ["exp", "sub"]})
     if data.get("typ") != "access":

@@ -578,6 +578,29 @@ export interface paths {
         patch: operations["patch_channel_api_channels__channel_id__patch"];
         trace?: never;
     };
+    "/api/channels/{channel_id}/play-link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Play Link
+         * @description Mint a short-lived link the browser hands to the OS so the default media
+         *     player opens this channel. The ticket is scoped to this one channel and
+         *     expires quickly, so it's safe to leave in a downloaded ``.m3u`` or the URL
+         *     bar — unlike the tenant-wide export token.
+         */
+        post: operations["create_play_link_api_channels__channel_id__play_link_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/channels/{channel_id}/schedule": {
         parameters: {
             query?: never;
@@ -1504,6 +1527,15 @@ export interface components {
             last_used_at: string | null;
             /** Backed Up */
             backed_up: boolean;
+        };
+        /** PlayLinkOut */
+        PlayLinkOut: {
+            /** M3U Url */
+            m3u_url: string;
+            /** Stream Url */
+            stream_url: string;
+            /** Expires In */
+            expires_in: number;
         };
         /** ProgrammeOut */
         ProgrammeOut: {
@@ -3289,6 +3321,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ChannelShiftOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_play_link_api_channels__channel_id__play_link_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                channel_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlayLinkOut"];
                 };
             };
             /** @description Validation Error */

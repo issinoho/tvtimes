@@ -6,11 +6,14 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, Response, status
+from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 
+from app.auth import tokens
 from app.auth.deps import SessionDep, VerifiedUser
+from app.auth.ratelimit import limiter
+from app.config import get_settings
 from app.models.epg import EpgSource, Programme
-from app.models.source import Channel
+from app.models.source import Channel, Source
 from app.queue import enqueue_epg_refresh
 from app.schemas.auth import MessageOut
 from app.schemas.epg import (
@@ -23,6 +26,7 @@ from app.schemas.epg import (
     HighlightsOut,
     NowNextOut,
     NowNextRowOut,
+    PlayLinkOut,
     ProgrammeOut,
     ScheduleOut,
     SearchChannelOut,
@@ -30,6 +34,7 @@ from app.schemas.epg import (
     SearchOut,
 )
 from app.services import epg as svc
+from app.services import exports as exports_svc
 from app.services import logos as logo_svc
 from app.services import sources as src_svc
 
@@ -151,6 +156,33 @@ async def patch_channel(
     )
     await session.flush()
     return ChannelShiftOut(id=channel.id, clock_shift_seconds=channel.clock_shift_seconds)
+
+
+@router.post("/channels/{channel_id}/play-link", response_model=PlayLinkOut)
+@limiter.limit("30/minute")
+async def create_play_link(
+    request: Request, channel_id: uuid.UUID, user: VerifiedUser, session: SessionDep
+) -> PlayLinkOut:
+    """Mint a short-lived link the browser hands to the OS so the default media
+    player opens this channel. The ticket is scoped to this one channel and
+    expires quickly, so it's safe to leave in a downloaded ``.m3u`` or the URL
+    bar — unlike the tenant-wide export token."""
+    channel = await session.get(Channel, channel_id)
+    if channel is None or channel.tenant_id != user.tenant_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Unknown channel")
+    source = await session.get(Source, channel.source_id)
+    try:
+        exports_svc.resolve_stream(channel, source)  # pre-flight; body value unused
+    except exports_svc.StreamUnavailable as exc:
+        raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, str(exc)) from exc
+
+    ticket = tokens.issue_play_token(channel.id, user.tenant_id)
+    root = f"{get_settings().public_origin.rstrip('/')}/api/exports/play/{channel.id}"
+    return PlayLinkOut(
+        m3u_url=f"{root}/playlist.m3u?ticket={ticket}",
+        stream_url=f"{root}/stream?ticket={ticket}",
+        expires_in=int(tokens.PLAY_TOKEN_TTL.total_seconds()),
+    )
 
 
 @router.get("/channels/{channel_id}/logo", include_in_schema=False)
