@@ -13,7 +13,7 @@ no CORS and the refresh cookie is first-party.
 | | command | notes |
 |---|---|---|
 | Web/API | `entrypoint web` | runs `alembic upgrade head`, then `uvicorn` with `--proxy-headers`. Stateless; scale horizontally behind a load balancer. |
-| Worker | `entrypoint worker` | `arq app.worker.WorkerSettings`. One is enough — refreshes sources/EPG, warms the TMDB cache, sends watchlist reminder emails (`reminders` cron, every 5 min). |
+| Worker | `entrypoint worker` | `arq app.worker.WorkerSettings`. One is enough — refreshes sources/EPG, warms the TMDB cache, sends watchlist reminders (`reminders`, every 5 min) and source-health alerts (`source_alerts`, every 15 min). |
 | Postgres 16 | — | the only stateful store |
 | Redis 7 | — | arq queue + rate-limit storage |
 

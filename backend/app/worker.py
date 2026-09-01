@@ -10,16 +10,21 @@ Jobs:
   - ``enrich_epg(tenant_id)`` — warm the TMDB cache for the coming week
   - ``enrich_programme(tenant_id, programme_id)`` — on-demand single enrichment
   - ``sweep`` (cron, every 15 min) — enqueue refreshes that are due
+  - ``reminders`` (cron, every 5 min) — email watchlist reminders
+  - ``source_alerts`` (cron, every 15 min) — email a tenant when a source's
+    health changes (broke, went stale, recovered)
 """
 
 from __future__ import annotations
 
 import uuid
+from collections import defaultdict
 from datetime import UTC, datetime
 from typing import Any, ClassVar
 
 from arq import cron
 from arq.connections import RedisSettings
+from sqlalchemy import select
 
 from app.auth.email import send_email
 from app.config import get_settings
@@ -27,6 +32,7 @@ from app.db import dispose_engine, get_sessionmaker
 from app.logging import configure_logging, get_logger
 from app.models.epg import EpgSource
 from app.models.source import Channel, Source
+from app.models.user import User
 from app.services import epg as epg_svc
 from app.services import sources as src_svc
 from app.services import tmdb as tmdb_svc
@@ -136,6 +142,52 @@ async def reminders(ctx: dict[str, Any]) -> None:
         _log.info("worker.reminders", sent=sent)
 
 
+def _alert_email(changes: list[src_svc.HealthChange], origin: str) -> tuple[str, str]:
+    bad = [c for c in changes if c.health != "ok"]
+    if len(changes) == 1:
+        c = changes[0]
+        verb = "recovered" if c.health == "ok" else "needs attention"
+        subject = f"tvtimes: {c.source.display_name} {verb}"
+    elif not bad:
+        subject = f"tvtimes: {len(changes)} sources recovered"
+    else:
+        subject = f"tvtimes: {len(bad)} source(s) need attention"
+    lines = [f"- {c.source.display_name} ({c.source.kind.value}): {c.reason}" for c in changes]
+    body = "\n".join(lines) + f"\n\nManage them: {origin}/sources\n"
+    return subject, body
+
+
+async def source_alerts(ctx: dict[str, Any]) -> None:
+    """Email a tenant when one of its sources breaks, goes stale, or recovers.
+    Runs every 15 min; a per-source ``alerted_health`` marker means one email
+    per transition, not one per tick."""
+    now = _now()
+    emails = 0
+    async with get_sessionmaker()() as session:
+        changes = await src_svc.scan_health_changes(session, now=now)
+        by_tenant: dict[uuid.UUID, list[src_svc.HealthChange]] = defaultdict(list)
+        for c in changes:
+            by_tenant[c.source.tenant_id].append(c)
+        origin = get_settings().public_origin
+        for tenant_id, group in by_tenant.items():
+            users = list(
+                await session.scalars(
+                    select(User).where(
+                        User.tenant_id == tenant_id, User.email_verified_at.is_not(None)
+                    )
+                )
+            )
+            if not users:
+                continue
+            subject, body = _alert_email(group, origin)
+            for u in users:
+                await send_email(to=u.email, subject=subject, body_text=body)
+                emails += 1
+        await session.commit()  # persist the alerted_health stamps
+    if changes:
+        _log.info("worker.source_alerts", changes=len(changes), emails=emails)
+
+
 class WorkerSettings:
     functions: ClassVar[list[Any]] = [
         refresh_source,
@@ -146,6 +198,8 @@ class WorkerSettings:
     cron_jobs: ClassVar[list[Any]] = [
         cron(sweep, minute=set(range(0, 60, 15))),
         cron(reminders, minute=set(range(0, 60, 5))),
+        # a few minutes after the sweep, so it sees this cycle's refresh results
+        cron(source_alerts, minute=set(range(7, 60, 15))),
     ]
     on_startup = startup
     on_shutdown = shutdown

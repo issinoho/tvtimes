@@ -412,6 +412,50 @@ async def health_by_source(
     return {s.id: _health(s, epg.get(s.id), at) for s in sources}
 
 
+@dataclass(slots=True)
+class HealthChange:
+    source: Source
+    health: Health  # the new state
+    previous: str | None
+    reason: str  # one human-readable line for the alert email
+
+
+def _reason(source: Source, h: SourceHealth, state: Health, now: datetime) -> str:
+    if state == "ok":
+        return "recovered — it's healthy again"
+    if source.last_status == SourceStatus.error and source.last_error:
+        return f"channel fetch failed: {source.last_error}"
+    if h.epg_status == EpgStatus.error.value and h.epg_error:
+        return f"guide feed failed: {h.epg_error}"
+    if source.last_refreshed_at is not None:
+        return f"hasn't refreshed since {source.last_refreshed_at:%d %b %H:%M UTC}"
+    return "hasn't completed its first refresh"
+
+
+async def scan_health_changes(
+    session: AsyncSession, *, now: datetime | None = None
+) -> list[HealthChange]:
+    """Every source whose current health differs from what we last alerted on.
+    Stamps ``alerted_health`` to the new value on each (the caller commits).
+    A change is only *returned* if it's a bad transition or a recovery from
+    one — a fresh source coming up ``ok`` is stamped silently."""
+    at = now or _now()
+    sources = list(await session.scalars(select(Source)))
+    if not sources:
+        return []
+    health = await health_by_source(session, sources, now=at)
+    changes: list[HealthChange] = []
+    for s in sources:
+        cur = health[s.id].health
+        if cur == s.alerted_health:
+            continue
+        prev = s.alerted_health
+        s.alerted_health = cur
+        if cur in ("stale", "error") or prev in ("stale", "error"):
+            changes.append(HealthChange(s, cur, prev, _reason(s, health[s.id], cur, at)))
+    return changes
+
+
 async def due_for_refresh(session: AsyncSession) -> list[uuid.UUID]:
     """Ids of enabled, fetch-backed sources whose refresh interval has elapsed.
     Connector sources are pushed, not pulled, so they are excluded."""
