@@ -28,17 +28,48 @@
   position: sticky;
   top: 0;
   z-index: 10;
+  max-width: 100%;
 }
 
 .header svg {
   height: 26px;
   width: auto;
+  flex: 0 0 auto; /* never let the wordmark get shrunk away */
 }
 
 .nav {
   display: flex;
   align-items: center;
   gap: 0.35rem;
+}
+.nav > * {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .header {
+    gap: 0.6rem;
+    padding: 0.6rem 0.9rem;
+  }
+  .header svg {
+    height: 22px;
+  }
+  /* The menu bar scrolls, not the window. */
+  .nav {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    /* room so the last item isn't jammed against the edge */
+    padding-right: 0.9rem;
+    margin-right: -0.9rem;
+  }
+  .nav::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 .navLink {

@@ -271,6 +271,10 @@
   gap: 0.4rem;
   overflow-x: auto;
   padding-bottom: 0.3rem;
+  scroll-padding-inline-end: 1.25rem;
+}
+.chips > :last-child {
+  margin-inline-end: 1.25rem;
 }
 .chip {
   flex: none;
@@ -324,7 +328,9 @@
   background: var(--bg-raised);
   border: 1px solid var(--line);
   padding: 1.25rem;
+  overflow-x: hidden;
   overflow-y: auto;
+  overflow-wrap: anywhere;
   top: 0;
   right: 0;
   bottom: 0;
@@ -338,7 +344,7 @@
     left: 0;
     bottom: 0;
     width: auto;
-    max-height: 80dvh;
+    max-height: 85dvh;
     border-radius: var(--radius) var(--radius) 0 0;
   }
 }
