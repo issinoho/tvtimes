@@ -29,9 +29,15 @@
   overflow-x: auto;
   padding-bottom: 0.4rem;
   scroll-snap-type: x proximity;
+  scroll-padding-inline-end: 1.25rem;
 }
 .rail > * {
   scroll-snap-align: start;
+}
+/* trailing breathing room so the last card isn't jammed against the edge
+   (a flex scroll container's own padding-inline-end is unreliable) */
+.rail > :last-child {
+  margin-inline-end: 1.25rem;
 }
 
 .card {
