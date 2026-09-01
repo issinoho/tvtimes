@@ -6,7 +6,9 @@ import hashlib
 import json
 import uuid
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import Literal
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,6 +21,7 @@ from app.ingest.models import Channel as ParsedChannel
 from app.ingest.models import Playlist
 from app.ingest.ssrf import assert_allowed_url
 from app.logging import get_logger
+from app.models.epg import EpgSource, EpgStatus
 from app.models.source import Channel, Source, SourceKind, SourceStatus
 
 _CONFIG_URL_FIELD = {
@@ -333,6 +336,80 @@ async def list_channels(
     rows = await session.scalars(stmt)
     total = await session.scalar(count_stmt) or 0
     return list(rows), total
+
+
+# --- health -----------------------------------------------------------------
+
+_PENDING_GRACE = timedelta(hours=1)
+_STALE_FACTOR = 2  # a refresh is "stale" once it's this many intervals overdue
+
+Health = Literal["ok", "stale", "error"]
+
+
+@dataclass(slots=True)
+class SourceHealth:
+    health: Health
+    epg_status: str | None
+    epg_error: str | None
+    epg_last_fetched_at: datetime | None
+    programme_count: int
+
+
+def _overdue(last: datetime | None, interval_minutes: int, now: datetime) -> bool:
+    return last is not None and now - last > _STALE_FACTOR * timedelta(minutes=interval_minutes)
+
+
+def _stale(source: Source, epg: EpgSource | None, now: datetime) -> bool:
+    if not source.enabled:
+        return False  # a disabled source isn't unhealthy, just off
+    # channels never resolved, or last success too long ago
+    if source.last_refreshed_at is None:
+        return now - source.created_at > _PENDING_GRACE
+    if _overdue(source.last_refreshed_at, source.refresh_interval_minutes, now):
+        return True
+    # the guide feed
+    if epg is not None:
+        if epg.last_status == EpgStatus.pending:
+            return now - epg.created_at > _PENDING_GRACE
+        return _overdue(epg.last_fetched_at, epg.refresh_interval_minutes, now)
+    if source.epg_url:  # advertises a guide but no epg_source row appeared
+        return now - source.created_at > _PENDING_GRACE
+    return False
+
+
+def _health(source: Source, epg: EpgSource | None, now: datetime) -> SourceHealth:
+    if not source.enabled:
+        health: Health = "ok"  # a disabled source is off, not broken
+    elif source.last_status == SourceStatus.error or (
+        epg is not None and epg.last_status == EpgStatus.error
+    ):
+        health = "error"
+    elif _stale(source, epg, now):
+        health = "stale"
+    else:
+        health = "ok"
+    return SourceHealth(
+        health=health,
+        epg_status=epg.last_status.value if epg else None,
+        epg_error=epg.last_error if epg else None,
+        epg_last_fetched_at=epg.last_fetched_at if epg else None,
+        programme_count=epg.programme_count if epg else 0,
+    )
+
+
+async def health_by_source(
+    session: AsyncSession, sources: Sequence[Source], *, now: datetime | None = None
+) -> dict[uuid.UUID, SourceHealth]:
+    """Rolled-up health per source: channel-fetch status + its guide feed +
+    staleness. Standalone (all-channel) XMLTV URLs aren't folded in here — they
+    show on the source's detail page."""
+    at = now or _now()
+    ids = [s.id for s in sources]
+    epg = {
+        e.source_id: e
+        for e in await session.scalars(select(EpgSource).where(EpgSource.source_id.in_(ids)))
+    }
+    return {s.id: _health(s, epg.get(s.id), at) for s in sources}
 
 
 async def due_for_refresh(session: AsyncSession) -> list[uuid.UUID]:

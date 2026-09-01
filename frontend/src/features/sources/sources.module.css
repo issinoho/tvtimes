@@ -102,6 +102,10 @@
   background: color-mix(in srgb, var(--brand-violet) 22%, transparent);
   color: var(--text);
 }
+.pill.stale {
+  background: color-mix(in srgb, var(--brand-amber) 22%, transparent);
+  color: #ffe2ad;
+}
 
 .btn {
   font: inherit;

@@ -48,11 +48,16 @@ export function SourceDetailPage() {
             {source.config_summary}
           </p>
         </div>
-        <StatusPill status={source.last_status} />
+        <StatusPill status={source.health} />
       </div>
 
       {source.last_status === 'error' && source.last_error ? (
         <p className={styles.err}>{source.last_error}</p>
+      ) : null}
+      {source.health === 'stale' && source.last_status !== 'error' ? (
+        <p className={styles.sub}>
+          Hasn’t refreshed recently — check the worker is running, then try “Refresh now”.
+        </p>
       ) : null}
 
       <EpgPanel sourceId={sourceId} />

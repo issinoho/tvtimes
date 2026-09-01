@@ -109,6 +109,14 @@ class SourceOut(BaseModel):
     last_refreshed_at: datetime | None
     created_at: datetime
 
+    # Rolled-up health (channel fetch + guide feed + staleness), filled by the
+    # router. Defaults keep ``model_validate(source)`` happy.
+    health: Literal["ok", "stale", "error"] = "ok"
+    epg_status: str | None = None
+    epg_error: str | None = None
+    epg_last_fetched_at: datetime | None = None
+    programme_count: int = 0
+
 
 class ChannelOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)

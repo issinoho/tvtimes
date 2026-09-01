@@ -1585,6 +1585,23 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /**
+             * Health
+             * @default ok
+             * @enum {string}
+             */
+            health: "ok" | "stale" | "error";
+            /** Epg Status */
+            epg_status?: string | null;
+            /** Epg Error */
+            epg_error?: string | null;
+            /** Epg Last Fetched At */
+            epg_last_fetched_at?: string | null;
+            /**
+             * Programme Count
+             * @default 0
+             */
+            programme_count: number;
         };
         /** SourcePatchIn */
         SourcePatchIn: {
