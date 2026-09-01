@@ -36,6 +36,11 @@ const M3U_SOURCE = {
   epg_url: null,
   last_refreshed_at: null,
   created_at: new Date().toISOString(),
+  health: 'ok',
+  epg_status: null,
+  epg_error: null,
+  epg_last_fetched_at: null,
+  programme_count: 0,
 };
 
 function renderPage() {

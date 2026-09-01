@@ -26,10 +26,20 @@ from app.services import sources as svc
 router = APIRouter(prefix="/sources", tags=["sources"])
 
 
-def _to_out(source: Source) -> SourceOut:
+def _to_out(source: Source, health: svc.SourceHealth) -> SourceOut:
     out = SourceOut.model_validate(source)
     out.config_summary = source_config_summary(source.kind.value, svc.decrypt_config(source))
+    out.health = health.health
+    out.epg_status = health.epg_status
+    out.epg_error = health.epg_error
+    out.epg_last_fetched_at = health.epg_last_fetched_at
+    out.programme_count = health.programme_count
     return out
+
+
+async def _one_out(session: SessionDep, source: Source) -> SourceOut:
+    health = (await svc.health_by_source(session, [source]))[source.id]
+    return _to_out(source, health)
 
 
 def _check_timezone(name: str | None) -> None:
@@ -44,7 +54,8 @@ def _check_timezone(name: str | None) -> None:
 @router.get("", response_model=list[SourceOut])
 async def list_sources(user: VerifiedUser, session: SessionDep) -> list[SourceOut]:
     rows = await svc.list_sources(session, user.tenant_id)
-    return [_to_out(s) for s in rows]
+    health = await svc.health_by_source(session, rows)
+    return [_to_out(s, health[s.id]) for s in rows]
 
 
 @router.post("", response_model=SourceOut, status_code=status.HTTP_201_CREATED)
@@ -62,7 +73,7 @@ async def create_source(body: SourceIn, user: VerifiedUser, session: SessionDep)
     )
     await session.flush()
     await enqueue_source_refresh(source.id)
-    return _to_out(source)
+    return await _one_out(session, source)
 
 
 @router.put("/order", response_model=list[SourceOut])
@@ -78,7 +89,8 @@ async def reorder_sources(
         ) from exc
     await session.flush()
     rows = await svc.list_sources(session, user.tenant_id)
-    return [_to_out(s) for s in rows]
+    health = await svc.health_by_source(session, rows)
+    return [_to_out(s, health[s.id]) for s in rows]
 
 
 async def _load(session: SessionDep, user: VerifiedUser, source_id: uuid.UUID) -> Source:
@@ -90,7 +102,7 @@ async def _load(session: SessionDep, user: VerifiedUser, source_id: uuid.UUID) -
 
 @router.get("/{source_id}", response_model=SourceOut)
 async def get_source(source_id: uuid.UUID, user: VerifiedUser, session: SessionDep) -> SourceOut:
-    return _to_out(await _load(session, user, source_id))
+    return await _one_out(session, await _load(session, user, source_id))
 
 
 @router.patch("/{source_id}", response_model=SourceOut)
@@ -111,7 +123,7 @@ async def patch_source(
         refresh_interval_minutes=fields.get("refresh_interval_minutes"),
     )
     await session.flush()
-    return _to_out(source)
+    return await _one_out(session, source)
 
 
 @router.delete("/{source_id}", response_model=MessageOut)

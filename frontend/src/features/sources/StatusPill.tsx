@@ -4,6 +4,7 @@ const LABEL: Record<string, string> = {
   ok: 'Ready',
   error: 'Error',
   pending: 'Refreshing…',
+  stale: 'Stale',
 };
 
 export function StatusPill({ status }: { status: string }) {

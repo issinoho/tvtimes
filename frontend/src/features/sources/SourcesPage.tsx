@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { AddSourceDialog } from '@/features/sources/AddSourceDialog';
 import { StatusPill } from '@/features/sources/StatusPill';
 import { useReorderSources, useSources, type SourceOut } from '@/features/sources/api';
+import { timeAgo } from '@/features/sources/relativeTime';
 import styles from '@/features/sources/sources.module.css';
 
 export function SourcesPage() {
@@ -93,12 +94,26 @@ export function SourcesPage() {
                   </h3>
                   <div className={styles.sub}>
                     {s.config_summary}
-                    {s.last_status === 'ok' ? ` · ${s.channel_count} channels` : ''}
+                    {s.channel_count ? ` · ${s.channel_count} channels` : ''}
                     {s.last_status === 'error' && s.last_error ? ` · ${s.last_error}` : ''}
                     {!s.enabled ? ' · disabled' : ''}
                   </div>
+                  <div className={styles.sub}>
+                    {s.epg_status === 'error'
+                      ? `guide: error${s.epg_error ? ` — ${s.epg_error}` : ''}`
+                      : s.epg_status
+                        ? `guide: ${(s.programme_count ?? 0).toLocaleString()} programmes · ${timeAgo(
+                            s.epg_last_fetched_at ?? null,
+                          )}`
+                        : s.epg_url
+                          ? 'guide: waiting for the first fetch'
+                          : 'no guide feed'}
+                    {s.last_refreshed_at
+                      ? ` · channels checked ${timeAgo(s.last_refreshed_at)}`
+                      : ''}
+                  </div>
                 </div>
-                <StatusPill status={s.last_status} />
+                <StatusPill status={s.health ?? s.last_status} />
               </Link>
             </li>
           ))}
