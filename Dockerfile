@@ -19,11 +19,14 @@ RUN npm run build
 
 # --- stage 2: python runtime --------------------------------------------------
 FROM python:3.12-slim AS runtime
+# Release tag, passed by .github/workflows/release.yml; "dev" for a plain build.
+ARG TVTIMES_VERSION=dev
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
-    TVTIMES_STATIC_DIR=/app/web
+    TVTIMES_STATIC_DIR=/app/web \
+    TVTIMES_VERSION=$TVTIMES_VERSION
 WORKDIR /app
 
 COPY --from=ghcr.io/astral-sh/uv:0.10 /uv /bin/uv

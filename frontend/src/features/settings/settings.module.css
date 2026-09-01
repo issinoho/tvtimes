@@ -27,6 +27,16 @@
   line-height: 1.5;
 }
 
+.version {
+  margin: 0.5rem 0 0;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+.version a {
+  color: inherit;
+}
+
 .list {
   list-style: none;
   margin: 0;
