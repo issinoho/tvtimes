@@ -116,12 +116,34 @@ async def play_playlist(
     channel: PlayChannelDep,
     ticket: Annotated[str, Query()] = "",
 ) -> PlainTextResponse:
-    base = get_settings().public_origin.rstrip("/")
-    stream_url = f"{base}/api/exports/play/{channel.id}/stream?ticket={ticket}"
+    root = f"{get_settings().public_origin.rstrip('/')}/api/exports/play/{channel.id}"
     return PlainTextResponse(
-        svc.render_channel_m3u(channel, stream_url),
+        svc.render_channel_m3u(
+            channel,
+            f"{root}/stream?ticket={ticket}",
+            epg_url=f"{root}/epg.xml?ticket={ticket}",
+        ),
         media_type="audio/x-mpegurl",
         headers={"Content-Disposition": f'attachment; filename="{svc.play_m3u_filename(channel)}"'},
+    )
+
+
+@router.get("/play/{channel_id}/epg.xml", include_in_schema=False)
+@limiter.limit(EXPORT_LIMIT)
+async def play_epg_xml(
+    request: Request,
+    channel: PlayChannelDep,
+    session: SessionDep,
+) -> StreamingResponse:
+    """One channel's XMLTV — what the hand-off `.m3u`'s ``url-tvg=`` points at.
+    Same play ticket, so it reaches exactly the one channel and nothing else."""
+    tenant = await session.get(Tenant, channel.tenant_id)
+    default_tz = (tenant.default_timezone if tenant else None) or "UTC"
+    filename = svc.play_m3u_filename(channel).removesuffix(".m3u") + ".xml"
+    return StreamingResponse(
+        svc.render_channel_xmltv(session, channel, default_tz=default_tz),
+        media_type="application/xml",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 

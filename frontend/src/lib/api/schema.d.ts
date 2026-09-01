@@ -594,6 +594,10 @@ export interface paths {
          *     within a day (see ``PLAY_TOKEN_TTL``), so it's fine to leave in a
          *     downloaded ``.m3u`` or the URL bar — unlike the tenant-wide export token,
          *     which reaches the whole line-up and only ends when it's rotated.
+         *
+         *     The downloaded ``.m3u`` carries a ``url-tvg=`` pointing at this same
+         *     channel's XMLTV (same ticket), so a player that reads it gets the guide
+         *     too.
          */
         post: operations["create_play_link_api_channels__channel_id__play_link_post"];
         delete?: never;

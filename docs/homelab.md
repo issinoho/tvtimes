@@ -173,6 +173,10 @@ in the browser itself.
 - **Copy stream URL** gives you the raw address to paste into VLC's *Open
   Network Stream* or any other player.
 
+The downloaded `.m3u` also carries a `url-tvg=` link to that one channel's
+XMLTV, so a player that reads it (tvdinner, TiviMate, …) shows the guide for
+the channel too — no separate EPG setup.
+
 The play link is single-channel and expires after 24 hours — long enough to
 open a `.m3u` you saved earlier, but, unlike the export token, not a standing
 secret, and it needs no export feed enabled.
