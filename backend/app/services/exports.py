@@ -165,6 +165,21 @@ async def render_m3u(session: AsyncSession, tenant: Tenant, *, base_url: str, to
     return "\n".join(lines) + "\n"
 
 
+def render_channel_m3u(channel: Channel, stream_url: str) -> str:
+    """A one-entry playlist for the "Play externally" hand-off. ``stream_url``
+    points back at our own ``/stream`` redirect, so the upstream URL (and any
+    Xtream credentials in it) never lands in the file the user's OS saves."""
+    return f"#EXTM3U\n{_extinf(channel)}\n{stream_url}\n"
+
+
+def play_m3u_filename(channel: Channel) -> str:
+    """A safe ASCII ``filename=`` for the downloaded playlist."""
+    name = _clean(channel.name)
+    name = "".join(c for c in name if c.isascii() and c not in '"/\\' and c.isprintable())
+    name = " ".join(name.split())[:60].strip()
+    return f"{name or 'channel'}.m3u"
+
+
 # --- XMLTV ----------------------------------------------------------------------
 
 

@@ -6,9 +6,12 @@ import json
 import uuid
 import xml.etree.ElementTree as ET
 from datetime import UTC, datetime, timedelta
+from urllib.parse import parse_qsl, urlparse
 from zoneinfo import ZoneInfo
 
+import jwt
 import pytest
+from app.auth import tokens
 from app.auth.crypto import encrypt
 from app.db import get_sessionmaker
 from app.models.epg import EpgSource, Programme
@@ -333,3 +336,167 @@ async def test_stream_redirects(
 
     missing = await app_client.get(f"/api/exports/stream/{uuid.uuid4()}", params={"token": token})
     assert missing.status_code == 404
+
+
+# --- "Play externally" hand-off -------------------------------------------------
+
+
+def test_play_token_roundtrip() -> None:
+    cid, tid = uuid.uuid4(), uuid.uuid4()
+    assert tokens.decode_play_token(tokens.issue_play_token(cid, tid)) == (cid, tid)
+
+
+def test_play_token_rejects_other_types_and_junk() -> None:
+    with pytest.raises(jwt.PyJWTError):
+        tokens.decode_play_token(tokens.issue_mfa_token(uuid.uuid4()))
+    with pytest.raises(jwt.PyJWTError):
+        tokens.decode_play_token("not-a-jwt")
+
+
+def test_play_token_expires(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(tokens, "PLAY_TOKEN_TTL", timedelta(seconds=-1))
+    tok = tokens.issue_play_token(uuid.uuid4(), uuid.uuid4())
+    with pytest.raises(jwt.ExpiredSignatureError):
+        tokens.decode_play_token(tok)
+
+
+def test_play_m3u_filename_is_safe() -> None:
+    class _C:
+        name = 'BBC One "HD" / North\tπ'
+
+    # quotes / slashes / tabs / non-ascii stripped, spaces collapsed
+    assert svc.play_m3u_filename(_C()) == "BBC One HD North.m3u"  # type: ignore[arg-type]
+    assert svc.play_m3u_filename(type("X", (), {"name": "  \t "})()) == "channel.m3u"
+
+
+async def _play_setup(
+    app_client: AsyncClient,
+    captured_emails: list[dict[str, str]],
+    *,
+    email: str = "sam@example.com",
+) -> tuple[dict[str, str], dict[str, uuid.UUID]]:
+    await register_and_verify(app_client, captured_emails, email=email, display_name="Sam")
+    h = auth_header(await login(app_client, email=email))
+    me = (await app_client.get("/api/account/me", headers=h)).json()
+    tenant_id = uuid.UUID(me["tenant_id"])
+    async with get_sessionmaker()() as session:
+        m3u = Source(
+            tenant_id=tenant_id,
+            kind=SourceKind.m3u,
+            display_name="P",
+            config_encrypted="x",
+            last_status=SourceStatus.ok,
+        )
+        portal = Source(
+            tenant_id=tenant_id,
+            kind=SourceKind.stalker,
+            display_name="Portal",
+            config_encrypted="x",
+            last_status=SourceStatus.ok,
+        )
+        session.add_all([m3u, portal])
+        await session.flush()
+        ch = Channel(
+            tenant_id=tenant_id,
+            source_id=m3u.id,
+            dedupe_key="c",
+            name="BBC One HD",
+            tvg_name="BBC One HD",
+            logo_url="http://logos.example/bbc.png",
+            number=1,
+            group_title="Ents",
+            stream_ref_encrypted=encrypt("http://provider.example/bbc.ts"),
+        )
+        ch_stalker = Channel(
+            tenant_id=tenant_id,
+            source_id=portal.id,
+            dedupe_key="s",
+            name="Portal Chan",
+            stream_ref_encrypted=encrypt("ffff"),
+        )
+        session.add_all([ch, ch_stalker])
+        await session.commit()
+        return h, {"m3u": ch.id, "stalker": ch_stalker.id}
+
+
+def _rel(url: str) -> tuple[str, dict[str, str]]:
+    """Absolute play URL -> (path, query dict) for the ASGI test client."""
+    u = urlparse(url)
+    return u.path, dict(parse_qsl(u.query))
+
+
+async def test_play_link_requires_auth(app_client: AsyncClient) -> None:
+    resp = await app_client.post(f"/api/channels/{uuid.uuid4()}/play-link")
+    assert resp.status_code == 401
+
+
+async def test_play_link_mint_and_serve_m3u(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    h, ids = await _play_setup(app_client, captured_emails)
+    minted = await app_client.post(f"/api/channels/{ids['m3u']}/play-link", headers=h)
+    assert minted.status_code == 200, minted.text
+    body = minted.json()
+    assert body["expires_in"] == 600
+    assert f"/api/exports/play/{ids['m3u']}/playlist.m3u?ticket=" in body["m3u_url"]
+    assert f"/api/exports/play/{ids['m3u']}/stream?ticket=" in body["stream_url"]
+
+    path, params = _rel(body["m3u_url"])
+    m3u = await app_client.get(path, params=params)
+    assert m3u.status_code == 200, m3u.text
+    assert m3u.headers["content-type"].startswith("audio/x-mpegurl")
+    cd = m3u.headers["content-disposition"]
+    assert "attachment" in cd and cd.rstrip().endswith('.m3u"')
+    lines = m3u.text.splitlines()
+    assert lines[0] == "#EXTM3U"
+    assert lines[1].startswith("#EXTINF:-1 ") and f'tvg-id="{ids["m3u"]}"' in lines[1]
+    assert lines[2] == body["stream_url"]
+    assert "provider.example" not in m3u.text  # upstream URL never in the file
+
+
+async def test_play_stream_redirects(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    h, ids = await _play_setup(app_client, captured_emails)
+    body = (await app_client.post(f"/api/channels/{ids['m3u']}/play-link", headers=h)).json()
+    path, params = _rel(body["stream_url"])
+    resp = await app_client.get(path, params=params)
+    assert resp.status_code == 302
+    assert resp.headers["location"] == "http://provider.example/bbc.ts"
+
+
+async def test_play_link_stalker_501(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    h, ids = await _play_setup(app_client, captured_emails)
+    resp = await app_client.post(f"/api/channels/{ids['stalker']}/play-link", headers=h)
+    assert resp.status_code == 501
+
+
+async def test_play_link_unknown_and_cross_tenant_404(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    h, ids = await _play_setup(app_client, captured_emails)
+    assert (
+        await app_client.post(f"/api/channels/{uuid.uuid4()}/play-link", headers=h)
+    ).status_code == 404
+
+    h2, _ = await _play_setup(app_client, captured_emails, email="other@example.com")
+    assert (
+        await app_client.post(f"/api/channels/{ids['m3u']}/play-link", headers=h2)
+    ).status_code == 404
+
+
+async def test_play_ticket_invalid_or_wrong_channel_401(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    h, ids = await _play_setup(app_client, captured_emails)
+    for params in ({}, {"ticket": "garbage"}):
+        resp = await app_client.get(f"/api/exports/play/{ids['m3u']}/playlist.m3u", params=params)
+        assert resp.status_code == 401
+
+    body = (await app_client.post(f"/api/channels/{ids['m3u']}/play-link", headers=h)).json()
+    _p, params = _rel(body["stream_url"])
+    # channel m3u's ticket used on the stalker channel's path
+    resp = await app_client.get(f"/api/exports/play/{ids['stalker']}/stream", params=params)
+    assert resp.status_code == 401

@@ -1,12 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
-import { useSetChannelShift, type SearchChannel, type Programme } from '@/features/guide/api';
+import {
+  usePlayLink,
+  useSetChannelShift,
+  type PlayLink,
+  type SearchChannel,
+  type Programme,
+} from '@/features/guide/api';
 import { GENRE_VAR, genreOf } from '@/features/guide/genre';
 import { fmtDayTime } from '@/features/guide/time';
 import { useHero } from '@/features/guide/hero';
 import { FavStar } from '@/features/favourites/FavStar';
 import { useAddWatch, useRemoveWatch, useWatchlist } from '@/features/watchlist/api';
+import { ApiError } from '@/lib/api/client';
 import { useAuth } from '@/lib/auth/AuthProvider';
+import { isAndroid } from '@/lib/platform';
 import { useDialogFocus } from '@/lib/useDialogFocus';
 import styles from '@/features/guide/guide.module.css';
 
@@ -122,6 +130,79 @@ function WatchControls({ channel, programme }: { channel: SearchChannel; program
   );
 }
 
+function androidIntentUrl(link: PlayLink, title: string): string {
+  const u = new URL(link.stream_url);
+  const scheme = u.protocol.replace(':', '');
+  return (
+    `intent://${u.host}${u.pathname}${u.search}` +
+    `#Intent;scheme=${scheme};action=android.intent.action.VIEW;type=video/*;` +
+    `S.title=${encodeURIComponent(title)};` +
+    `S.browser_fallback_url=${encodeURIComponent(link.m3u_url)};end`
+  );
+}
+
+export function PlayControls({ channel }: { channel: SearchChannel }) {
+  const mint = usePlayLink();
+  const cached = useRef<{ id: string; link: PlayLink } | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function getLink(): Promise<PlayLink> {
+    if (cached.current?.id === channel.id) return cached.current.link;
+    const link = await mint.mutateAsync(channel.id);
+    cached.current = { id: channel.id, link };
+    return link;
+  }
+
+  function fail(err: unknown) {
+    setError(
+      err instanceof ApiError && err.status === 501
+        ? 'Not available for this source.'
+        : "Couldn't start playback.",
+    );
+  }
+
+  async function play() {
+    setError(null);
+    try {
+      const link = await getLink();
+      window.location.assign(isAndroid() ? androidIntentUrl(link, channel.name) : link.m3u_url);
+    } catch (err) {
+      fail(err);
+    }
+  }
+
+  async function copy() {
+    setError(null);
+    try {
+      const link = await getLink();
+      await navigator.clipboard.writeText(link.stream_url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch (err) {
+      if (err instanceof ApiError) fail(err);
+    }
+  }
+
+  return (
+    <div>
+      <div className={styles.watchRow}>
+        <button type="button" className={styles.btn} disabled={mint.isPending} onClick={play}>
+          {mint.isPending ? 'Starting…' : 'Play'}
+        </button>
+        <button type="button" className={styles.btn} disabled={mint.isPending} onClick={copy}>
+          {copied ? 'Copied' : 'Copy stream URL'}
+        </button>
+      </div>
+      {error ? (
+        <p className={styles.watchHint}>{error}</p>
+      ) : (
+        <p className={styles.watchHint}>Opens in your device&rsquo;s default media player.</p>
+      )}
+    </div>
+  );
+}
+
 export function ProgrammeSheet({ channel, programme, onClose }: Props) {
   const { data: hero } = useHero(programme.id);
   const sheetRef = useDialogFocus<HTMLElement>();
@@ -194,6 +275,7 @@ export function ProgrammeSheet({ channel, programme, onClose }: Props) {
         ) : null}
 
         <WatchControls channel={channel} programme={programme} />
+        <PlayControls channel={channel} />
 
         {e?.rating != null ? (
           <p className={styles.rating}>

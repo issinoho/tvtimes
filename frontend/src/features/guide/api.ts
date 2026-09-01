@@ -10,6 +10,7 @@ export type SearchHit = components['schemas']['SearchHitOut'];
 /** A channel as it arrives on a search hit — no per-row programme list. */
 export type SearchChannel = components['schemas']['SearchChannelOut'];
 export type NowNextRow = components['schemas']['NowNextRowOut'];
+export type PlayLink = components['schemas']['PlayLinkOut'];
 
 export interface GuideParams {
   from: string;
@@ -57,6 +58,22 @@ export function useHighlights() {
     queryKey: ['highlights'],
     queryFn: async () => unwrap(await api.GET('/api/guide/highlights')),
     staleTime: 5 * 60_000,
+  });
+}
+
+/**
+ * Mint a short-lived link the browser hands to the OS so the device's default
+ * media player opens this channel. Minted on click (never on sheet open) — the
+ * ticket lasts ~10 min.
+ */
+export function usePlayLink() {
+  return useMutation({
+    mutationFn: async (channelId: string) =>
+      unwrap(
+        await api.POST('/api/channels/{channel_id}/play-link', {
+          params: { path: { channel_id: channelId } },
+        }),
+      ),
   });
 }
 
