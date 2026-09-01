@@ -101,14 +101,16 @@ def decode_mfa_token(token: str) -> uuid.UUID:
     return uuid.UUID(data["sub"])
 
 
-PLAY_TOKEN_TTL = timedelta(minutes=10)
+PLAY_TOKEN_TTL = timedelta(hours=24)
 
 
 def issue_play_token(channel_id: uuid.UUID, tenant_id: uuid.UUID) -> str:
-    """Short-lived ticket that lets an external media player fetch one channel's
-    stream. Carried in the URL (`?ticket=`) because the player can't send a
-    bearer header; scoped to the one channel + tenant so a leaked link can't
-    reach the rest of the line-up."""
+    """Time-limited ticket that lets an external media player fetch one
+    channel's stream. Carried in the URL (`?ticket=`) because the player can't
+    send a bearer header; scoped to the one channel + tenant so a leaked link
+    can't reach the rest of the line-up. The 24h TTL is long enough to survive
+    the "download the `.m3u`, open it later" flow (and a reconnect after a
+    mid-view drop) while still being nothing like a permanent key."""
     now = datetime.now(UTC)
     payload = {
         "sub": str(channel_id),

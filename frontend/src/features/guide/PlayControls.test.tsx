@@ -16,7 +16,7 @@ let assign: Mock;
 const LINK = {
   m3u_url: 'https://x/api/exports/play/ch1/playlist.m3u?ticket=T',
   stream_url: 'https://x/api/exports/play/ch1/stream?ticket=T',
-  expires_in: 600,
+  expires_in: 86400,
 };
 
 const CHANNEL = {

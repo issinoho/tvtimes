@@ -589,10 +589,11 @@ export interface paths {
         put?: never;
         /**
          * Create Play Link
-         * @description Mint a short-lived link the browser hands to the OS so the default media
-         *     player opens this channel. The ticket is scoped to this one channel and
-         *     expires quickly, so it's safe to leave in a downloaded ``.m3u`` or the URL
-         *     bar — unlike the tenant-wide export token.
+         * @description Mint a link the browser hands to the OS so the default media player
+         *     opens this channel. The ticket is scoped to this one channel and expires
+         *     within a day (see ``PLAY_TOKEN_TTL``), so it's fine to leave in a
+         *     downloaded ``.m3u`` or the URL bar — unlike the tenant-wide export token,
+         *     which reaches the whole line-up and only ends when it's rotated.
          */
         post: operations["create_play_link_api_channels__channel_id__play_link_post"];
         delete?: never;

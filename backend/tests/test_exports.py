@@ -437,7 +437,7 @@ async def test_play_link_mint_and_serve_m3u(
     minted = await app_client.post(f"/api/channels/{ids['m3u']}/play-link", headers=h)
     assert minted.status_code == 200, minted.text
     body = minted.json()
-    assert body["expires_in"] == 600
+    assert body["expires_in"] == 86400
     assert f"/api/exports/play/{ids['m3u']}/playlist.m3u?ticket=" in body["m3u_url"]
     assert f"/api/exports/play/{ids['m3u']}/stream?ticket=" in body["stream_url"]
 

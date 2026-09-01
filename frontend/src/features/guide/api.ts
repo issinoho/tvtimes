@@ -62,9 +62,10 @@ export function useHighlights() {
 }
 
 /**
- * Mint a short-lived link the browser hands to the OS so the device's default
- * media player opens this channel. Minted on click (never on sheet open) — the
- * ticket lasts ~10 min.
+ * Mint a link the browser hands to the OS so the device's default media
+ * player opens this channel. Minted on click (never on sheet open) — the
+ * ticket is scoped to the one channel and lasts 24h, enough to open a `.m3u`
+ * saved earlier.
  */
 export function usePlayLink() {
   return useMutation({
