@@ -4,10 +4,19 @@ Every fetch resolves the host and refuses non-public addresses (loopback,
 private, link-local — including the cloud metadata IP 169.254.169.254 — CGNAT,
 reserved). Redirects are followed manually so each hop is re-checked. Bodies
 are size-capped.
+
+The connection is **pinned to the address we validated**: the socket connects
+to that IP while the URL — and therefore the ``Host`` header and the TLS SNI /
+certificate check — keeps the original hostname (:class:`_PinnedBackend`).
+Without this a hostname could resolve public for the check and to
+``127.0.0.1`` / ``169.254.169.254`` for httpx's own second lookup on connect —
+DNS rebinding. An explicitly allow-listed *hostname* is trusted as-is and not
+pinned.
 """
 
 from __future__ import annotations
 
+import contextvars
 import ipaddress
 import socket
 from dataclasses import dataclass
@@ -25,6 +34,11 @@ _ALLOWED_SCHEMES = {"http", "https"}
 _MAX_REDIRECTS = 5
 _CGNAT = ipaddress.ip_network("100.64.0.0/10")
 _M3U_SNIFF_BYTES = 4096
+
+# The address the *next* request must connect to, set per redirect hop by the
+# fetch helpers and read by _PinnedBackend at connect time. A ContextVar so
+# concurrent fetches in the worker don't tread on each other.
+_pin_ctx: contextvars.ContextVar[str | None] = contextvars.ContextVar("tvtimes_pin", default=None)
 
 
 def _ip_is_public(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
@@ -70,7 +84,17 @@ def _parse_allowlist(entries: list[str] | None) -> tuple[set[str], list[_IpNetwo
     return hosts, nets
 
 
-async def assert_allowed_url(url: str, *, allowlist: list[str] | None = None) -> None:
+async def resolve_allowed(url: str, *, allowlist: list[str] | None = None) -> list[str] | None:
+    """Validate `url` against the SSRF policy and return the addresses a request
+    may connect to:
+
+    * ``None`` — the host is an explicitly allow-listed *hostname*; trust it and
+      let the client resolve it normally (no pinning).
+    * ``[ip, ...]`` — validated addresses; the caller must connect to one of
+      these (see ``_PinningTransport``), never re-resolve.
+
+    Raises ``SourceRejected`` for a bad scheme or a non-public address, and
+    ``SourceUnreachable`` if the host can't be resolved."""
     parts = urlsplit(url)
     if parts.scheme not in _ALLOWED_SCHEMES:
         raise SourceRejected(f"Only http(s) URLs are allowed (got {parts.scheme or 'no'} scheme).")
@@ -80,7 +104,7 @@ async def assert_allowed_url(url: str, *, allowlist: list[str] | None = None) ->
 
     allow_hosts, allow_nets = _parse_allowlist(allowlist)
     if host.lower() in allow_hosts:
-        return
+        return None
 
     literal: ipaddress.IPv4Address | ipaddress.IPv6Address | None = None
     try:
@@ -98,6 +122,46 @@ async def assert_allowed_url(url: str, *, allowlist: list[str] | None = None) ->
                 f"{host!r} resolves to a non-public address ({addr}); refusing to fetch it. "
                 "Add it to TVTIMES_FETCH_ALLOWLIST (a host, IP, or CIDR) to permit it."
             )
+    return addresses
+
+
+async def assert_allowed_url(url: str, *, allowlist: list[str] | None = None) -> None:
+    """A pre-flight of :func:`resolve_allowed` for callers that only need the
+    yes/no (e.g. validating a source URL at save time, before any fetch)."""
+    await resolve_allowed(url, allowlist=allowlist)
+
+
+class _PinnedBackend:
+    """Wraps httpcore's network backend so ``connect_tcp`` goes to the IP in
+    ``_pin_ctx`` instead of the URL's hostname. The URL (and therefore the
+    ``Host`` header and the TLS SNI / cert check, which httpcore derives from
+    it) is untouched — only the socket target changes. When ``_pin_ctx`` is
+    unset (an allow-listed hostname) the hostname is used as normal."""
+
+    def __init__(self, inner: Any) -> None:
+        self._inner = inner
+
+    async def connect_tcp(self, host: str, port: int, **kwargs: Any) -> Any:
+        return await self._inner.connect_tcp(_pin_ctx.get() or host, port, **kwargs)
+
+    def __getattr__(self, name: str) -> Any:  # delegate connect_unix_socket, sleep, …
+        return getattr(self._inner, name)
+
+
+class _GuardedTransport(httpx.AsyncHTTPTransport):
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        # Duck-typed drop-in for httpcore's AsyncNetworkBackend (delegates
+        # everything except connect_tcp).
+        self._pool._network_backend = _PinnedBackend(self._pool._network_backend)  # type: ignore[assignment]
+
+
+def _client(timeout: float) -> httpx.AsyncClient:
+    return httpx.AsyncClient(
+        transport=_GuardedTransport(),
+        follow_redirects=False,
+        timeout=timeout,
+    )
 
 
 async def fetch_text(
@@ -114,9 +178,10 @@ async def fetch_text(
     allowlist = allowlist if allowlist is not None else settings.fetch_allowlist_entries
 
     current = url
-    async with httpx.AsyncClient(follow_redirects=False, timeout=timeout) as client:
+    async with _client(timeout) as client:
         for _ in range(_MAX_REDIRECTS + 1):
-            await assert_allowed_url(current, allowlist=allowlist)
+            pins = await resolve_allowed(current, allowlist=allowlist)
+            token = _pin_ctx.set(pins[0] if pins else None)
             try:
                 async with client.stream("GET", current) as response:
                     if response.is_redirect:
@@ -134,6 +199,8 @@ async def fetch_text(
                 raise SourceUnreachable(
                     f"Could not fetch {redact_resource_url(current)}: {exc.__class__.__name__}."
                 ) from exc
+            finally:
+                _pin_ctx.reset(token)
     raise SourceUnreachable("Too many redirects.")
 
 
@@ -170,9 +237,10 @@ async def fetch_bytes(
         headers["If-Modified-Since"] = last_modified
 
     current = url
-    async with httpx.AsyncClient(follow_redirects=False, timeout=timeout) as client:
+    async with _client(timeout) as client:
         for _ in range(_MAX_REDIRECTS + 1):
-            await assert_allowed_url(current, allowlist=allowlist)
+            pins = await resolve_allowed(current, allowlist=allowlist)
+            token = _pin_ctx.set(pins[0] if pins else None)
             try:
                 async with client.stream("GET", current, headers=headers) as response:
                     if response.is_redirect:
@@ -198,6 +266,8 @@ async def fetch_bytes(
                 raise SourceUnreachable(
                     f"Could not fetch {redact_resource_url(current)}: {exc.__class__.__name__}."
                 ) from exc
+            finally:
+                _pin_ctx.reset(token)
     raise SourceUnreachable("Too many redirects.")
 
 
@@ -241,14 +311,17 @@ async def fetch_json(
     timeout = timeout or settings.fetch_timeout_seconds
     allowlist = allowlist if allowlist is not None else settings.fetch_allowlist_entries
 
-    await assert_allowed_url(url, allowlist=allowlist)
+    pins = await resolve_allowed(url, allowlist=allowlist)
+    token = _pin_ctx.set(pins[0] if pins else None)
     try:
-        async with httpx.AsyncClient(follow_redirects=False, timeout=timeout) as client:
+        async with _client(timeout) as client:
             response = await client.get(url, params=params, headers=headers)
     except httpx.HTTPError as exc:
         raise SourceUnreachable(
             f"Could not reach {redact_resource_url(url)}: {exc.__class__.__name__}."
         ) from exc
+    finally:
+        _pin_ctx.reset(token)
     if response.is_redirect:
         raise SourceUnreachable(f"{redact_resource_url(url)} unexpectedly redirected.")
     if response.status_code >= 400:

@@ -76,3 +76,60 @@ async def test_allowlisted_cidr_still_rejects_addresses_outside_it(
     monkeypatch.setattr(ssrf, "_resolve", fake_resolve)
     with pytest.raises(SourceRejected):
         await ssrf.assert_allowed_url("http://nas.lan/x", allowlist=["192.168.0.0/24"])
+
+
+# --- resolve_allowed contract + connection pinning (DNS-rebinding defence) ---
+
+
+async def test_resolve_allowed_returns_none_for_an_allowlisted_hostname() -> None:
+    assert await ssrf.resolve_allowed("http://nas.lan/x", allowlist=["nas.lan"]) is None
+
+
+async def test_resolve_allowed_returns_the_checked_addresses(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_resolve(_host: str) -> list[str]:
+        return ["93.184.216.34", "93.184.216.35"]
+
+    monkeypatch.setattr(ssrf, "_resolve", fake_resolve)
+    assert await ssrf.resolve_allowed("https://ok.example.com/x") == [
+        "93.184.216.34",
+        "93.184.216.35",
+    ]
+
+
+async def test_resolve_allowed_returns_a_public_ip_literal() -> None:
+    assert await ssrf.resolve_allowed("https://93.184.216.34/") == ["93.184.216.34"]
+
+
+async def test_pinned_backend_connects_to_the_pinned_ip_not_the_hostname() -> None:
+    """The core rebinding defence: httpcore hands the backend the URL's
+    hostname; the backend must connect to the IP we already validated."""
+    seen: list[tuple[str, int]] = []
+
+    class _FakeInner:
+        async def connect_tcp(self, host: str, port: int, **_kw: object) -> str:
+            seen.append((host, port))
+            return "stream"
+
+        async def sleep(self, _s: float) -> None: ...  # delegated attr, unused here
+
+    backend = ssrf._PinnedBackend(_FakeInner())
+
+    token = ssrf._pin_ctx.set("93.184.216.34")
+    try:
+        assert await backend.connect_tcp("rebind.evil.example", 443) == "stream"
+    finally:
+        ssrf._pin_ctx.reset(token)
+    assert seen == [("93.184.216.34", 443)]  # not the (re-resolvable) hostname
+
+
+async def test_pinned_backend_passes_through_when_unpinned() -> None:
+    seen: list[str] = []
+
+    class _FakeInner:
+        async def connect_tcp(self, host: str, _port: int, **_kw: object) -> None:
+            seen.append(host)
+
+    await ssrf._PinnedBackend(_FakeInner()).connect_tcp("host.example", 80)
+    assert seen == ["host.example"]
