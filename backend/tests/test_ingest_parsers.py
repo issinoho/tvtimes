@@ -79,10 +79,21 @@ def test_stalker_creds_from_config_appends_portal_php() -> None:
 
 def test_redactors() -> None:
     assert redact_mac("00:1A:79:AA:BB:CC") == "00:1A:**:**:**:**"
-    masked = redact_resource_url("http://h/live/user/secretpass/5.ts?password=hunter2")
+    masked = redact_resource_url("http://h/live/xtreamuser/secretpass/5.ts?password=hunter2")
     assert "secretpass" not in masked
+    assert "xtreamuser" not in masked  # the username path segment is masked too
     assert "hunter2" not in masked
     assert redact_resource_url("http://user:pw@h/x").count("pw") == 0
+
+
+def test_redactors_cover_extra_query_creds() -> None:
+    # tvtimes' own play links use ?ticket=<jwt>; also auth / access_token / sig
+    masked = redact_resource_url(
+        "https://h/exports/play/c/stream?ticket=eyJhbGciOiJFZERTQSJ9.body.sig"
+        "&access_token=SEKRET123&auth=abcdef&type=m3u"
+    )
+    assert "body.sig" not in masked and "SEKRET123" not in masked and "abcdef" not in masked
+    assert "type=m3u" in masked  # non-credential params are untouched
 
 
 def test_source_config_summary_hides_credentials() -> None:

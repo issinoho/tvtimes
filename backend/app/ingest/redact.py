@@ -6,19 +6,32 @@ from __future__ import annotations
 import re
 from urllib.parse import urlsplit
 
-_XTREAM_PATH_CREDS_RE = re.compile(r"(/(?:live|movie|series)/[^/]+/)([^/]+)(/)")
+# xtream stream URLs are /<type>/<username>/<password>/<id>.<ext> — mask both
+# the username and the password segments.
+_XTREAM_PATH_CREDS_RE = re.compile(r"(/(?:live|movie|series)/)([^/]+)(/)([^/]+)(/)")
+# Denylist of query params to mask, most-specific alternatives first so
+# e.g. ``access_token`` isn't shadowed by ``token``.
 _QUERY_CRED_RE = re.compile(
-    r"(?:^|[?&])(password|token|api_key|apikey|X-Plex-Token|mac)=([^&]+)", re.IGNORECASE
+    r"(?:^|[?&])("
+    r"access_token|refresh_token|client_secret|session_id|sessionid|"
+    r"password|passwd|pwd|username|token|api_key|api-key|apikey|secret|"
+    r"signature|auth|ticket|session|key|sig|mac|X-Plex-Token"
+    r")=([^&]+)",
+    re.IGNORECASE,
 )
 _USERINFO_RE = re.compile(r"://([^/:@\s]+):([^/@\s]+)@")
+
+
+def _mask_segment(value: str) -> str:
+    return value[:2] + "***" if len(value) > 2 else "***"
 
 
 def redact_resource_url(url: str) -> str:
     """Best-effort mask of credentials embedded in a resource URL."""
 
     def _mask_path(m: re.Match[str]) -> str:
-        pw = m.group(2)
-        return f"{m.group(1)}{pw[:2] + '***' if len(pw) > 2 else '***'}{m.group(3)}"
+        user, pw = m.group(2), m.group(4)
+        return f"{m.group(1)}{_mask_segment(user)}{m.group(3)}{_mask_segment(pw)}{m.group(5)}"
 
     url = _XTREAM_PATH_CREDS_RE.sub(_mask_path, url, count=1)
     url = _USERINFO_RE.sub(lambda m: f"://{m.group(1)}:***@", url)
