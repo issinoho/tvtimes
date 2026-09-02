@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import pytest
 from app.config import Settings
+from cryptography.fernet import Fernet
+
+_REAL_KEY = Fernet.generate_key().decode()
 
 
 def _prod(**overrides: object) -> Settings:
     base: dict[str, object] = {
         "env": "prod",
         "jwt_private_key_pem": "-----BEGIN PRIVATE KEY-----\nx\n-----END PRIVATE KEY-----",
-        "encryption_key": "a-real-looking-key",
+        "encryption_key": _REAL_KEY,
         "public_origin": "https://tvtimes.issinoho.com",
     }
     base.update(overrides)
@@ -27,6 +30,15 @@ def test_production_rejects_missing_jwt_key() -> None:
 def test_production_rejects_default_encryption_key() -> None:
     with pytest.raises(RuntimeError, match="ENCRYPTION_KEY"):
         _prod(encryption_key="dev-insecure-key-abc").assert_production_ready()
+
+
+def test_production_rejects_a_passphrase_encryption_key() -> None:
+    # An operator who sets TVTIMES_ENCRYPTION_KEY to a memorable string (not a
+    # real Fernet key) gets a brute-forceable at-rest key — refuse to boot.
+    with pytest.raises(RuntimeError, match="ENCRYPTION_KEY"):
+        _prod(encryption_key="correct-horse-battery-staple").assert_production_ready()
+    with pytest.raises(RuntimeError, match="ENCRYPTION_KEY"):
+        _prod(encryption_key="a-real-looking-key").assert_production_ready()
 
 
 def test_production_warns_but_allows_http_origin(capsys: pytest.CaptureFixture[str]) -> None:

@@ -59,7 +59,8 @@ _CSP = "; ".join(
     )
 )
 # Swagger UI / ReDoc pull their assets from a CDN, so the strict script-src
-# would break them; they're dev tooling (see the "disable /docs in prod" issue).
+# would break them. They're dev tooling and are switched off entirely in prod
+# (see create_app), so this exemption only ever applies outside prod.
 _CSP_EXEMPT_PREFIXES = ("/docs", "/redoc", "/openapi.json")
 
 
@@ -121,13 +122,17 @@ def _install_error_handlers(app: FastAPI) -> None:
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    # No interactive docs / schema in prod — they disclose the whole API
+    # surface for no operator benefit (the SPA is the only client).
+    _docs = not settings.is_prod
     app = FastAPI(
         title="tvtimes API",
         version=__version__,
         description="Multi-tenant TV schedule (EPG) service.",
         lifespan=lifespan,
-        docs_url="/docs",
-        openapi_url="/openapi.json",
+        docs_url="/docs" if _docs else None,
+        redoc_url="/redoc" if _docs else None,
+        openapi_url="/openapi.json" if _docs else None,
     )
     app.state.limiter = limiter
 

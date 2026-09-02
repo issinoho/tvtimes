@@ -43,7 +43,9 @@ async def _to_out(session: SessionDep, item: WatchlistItem) -> WatchlistItemOut:
 
     if channel_id is not None and start is not None and stop is not None:
         channel = await session.get(Channel, channel_id)
-        if channel is not None:
+        # channel_id comes from the user's own item or a tenant-scoped
+        # next_airing(); the tenant check is belt-and-braces.
+        if channel is not None and channel.tenant_id == item.tenant_id:
             local_start, local_stop, tz = await epg_svc.local_times(session, channel, start, stop)
             out.channel_id = channel.id
             out.channel_name = channel.name
