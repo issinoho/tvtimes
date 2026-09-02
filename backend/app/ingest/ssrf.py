@@ -29,6 +29,9 @@ import httpx
 from app.config import get_settings
 from app.ingest.errors import SourceInvalid, SourceRejected, SourceUnreachable
 from app.ingest.redact import redact_resource_url
+from app.logging import get_logger
+
+_log = get_logger("ingest.ssrf")
 
 _ALLOWED_SCHEMES = {"http", "https"}
 _MAX_REDIRECTS = 5
@@ -118,8 +121,11 @@ async def resolve_allowed(url: str, *, allowlist: list[str] | None = None) -> li
         if allow_nets and any(ip in net for net in allow_nets):
             continue  # explicitly allow-listed range (e.g. your LAN)
         if not _ip_is_public(ip):
+            # The *which* private IP stays server-side — echoing it back turns
+            # "add source" into an internal DNS-resolution oracle for a tenant.
+            _log.warning("ssrf.rejected_non_public", host=host, resolved=addr)
             raise SourceRejected(
-                f"{host!r} resolves to a non-public address ({addr}); refusing to fetch it. "
+                f"{host!r} resolves to a non-public address; refusing to fetch it. "
                 "Add it to TVTIMES_FETCH_ALLOWLIST (a host, IP, or CIDR) to permit it."
             )
     return addresses

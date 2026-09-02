@@ -38,8 +38,11 @@ async def test_hostname_resolving_to_private_is_rejected(monkeypatch: pytest.Mon
         return ["93.184.216.34", "10.1.2.3"]
 
     monkeypatch.setattr(ssrf, "_resolve", fake_resolve)
-    with pytest.raises(SourceRejected):
+    with pytest.raises(SourceRejected) as excinfo:
         await ssrf.assert_allowed_url("http://sneaky.example.com/x")
+    # the resolved private IP must not leak back to the caller (it would make
+    # "add source" an internal DNS-resolution oracle) — #89
+    assert "10.1.2.3" not in str(excinfo.value)
 
 
 async def test_hostname_resolving_to_public_is_allowed(monkeypatch: pytest.MonkeyPatch) -> None:
