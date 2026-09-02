@@ -196,7 +196,10 @@ tv.example.com {
 }
 ```
 
-The app already trusts `X-Forwarded-Proto` / `X-Forwarded-For`.
+Set `TVTIMES_TRUSTED_PROXIES` to your proxy's address so the rate limiter and
+audit log see the real client IP — `X-Forwarded-For` is ignored from anywhere
+else. A same-host proxy is `127.0.0.1`; the compose network is `172.16.0.0/12`.
+Security response headers (CSP, HSTS on HTTPS, …) are sent by the app.
 
 ### HDHomeRun
 
