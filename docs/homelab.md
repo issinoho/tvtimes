@@ -157,6 +157,14 @@ In **Jellyfin** → *Live TV* → add an **M3U Tuner** with the playlist URL, th
 guide") and TiviMate (add playlist → *Xtream/M3U* → external EPG) work the same
 way.
 
+For [tvdinner](https://github.com/issinoho/tvdinner) there's a third row on that
+panel — **Open in tvdinner** — carrying a single `tvtimess://tv.example.com?token=…`
+URL that stands in for both feeds. Click it (once tvdinner has run
+`tvdinner default-handler`) and it opens straight there; or copy it and run
+`tvdinner 'tvtimess://…'`. tvdinner expands it back into the same playlist +
+guide pair, so its own program guide, recording and scheduling all work against
+your merged line-up.
+
 Notes:
 
 - Anyone with a link can read your line-up and stream through it — treat the

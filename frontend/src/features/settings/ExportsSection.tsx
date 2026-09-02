@@ -6,6 +6,26 @@ import styles from '@/features/settings/settings.module.css';
 
 type Links = { playlist_url: string; epg_url: string };
 
+/**
+ * The same account as a single `tvtimes://` source URL for tvdinner, derived
+ * from the playlist link so it carries the same freshly-minted token. tvdinner
+ * expands it back into this pair of export feeds itself — see its README.
+ * `tvtimess://` for an https deployment, mirroring its xtream/plex schemes.
+ */
+function tvdinnerUrl(playlistUrl: string): string | null {
+  try {
+    const url = new URL(playlistUrl);
+    const token = url.searchParams.get('token');
+    if (!token) return null;
+    const scheme = url.protocol === 'https:' ? 'tvtimess' : 'tvtimes';
+    // keep a sub-path deployment's base (…/tv/api/exports/playlist.m3u → /tv)
+    const basePath = url.pathname.replace(/\/api\/exports\/playlist\.m3u$/, '');
+    return `${scheme}://${url.host}${basePath}?token=${encodeURIComponent(token)}`;
+  } catch {
+    return null;
+  }
+}
+
 function CopyRow({ label, value }: { label: string; value: string }) {
   const [copied, setCopied] = useState(false);
   async function copy() {
@@ -34,6 +54,7 @@ export function ExportsSection() {
   const [links, setLinks] = useState<Links | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const tvdinnerLink = links ? tvdinnerUrl(links.playlist_url) : null;
 
   async function generate() {
     setBusy(true);
@@ -72,14 +93,33 @@ export function ExportsSection() {
       <p className={styles.hint}>
         Serve your whole line-up — every enabled source, de-duplicated and with the guide times
         already corrected for each channel&rsquo;s timezone — as a single M3U playlist and XMLTV
-        guide. Point Jellyfin, Plex, Emby, TiviMate or Threadfin at the two URLs below. Anyone with
-        a link can read your line-up and stream through it, so treat them as secrets.
+        guide. Point Jellyfin, Plex, Emby, TiviMate or Threadfin at the two URLs below, or hand the
+        whole line-up to{' '}
+        <a
+          href="https://github.com/issinoho/tvdinner"
+          target="_blank"
+          rel="noreferrer noopener"
+          className="linkish"
+        >
+          tvdinner
+        </a>{' '}
+        in one click. Anyone with a link can read your line-up and stream through it, so treat them
+        as secrets.
       </p>
 
       {links ? (
         <>
           <CopyRow label="M3U playlist" value={links.playlist_url} />
           <CopyRow label="XMLTV guide" value={links.epg_url} />
+          {tvdinnerLink ? (
+            <div className={styles.feedRow}>
+              <span className={styles.feedLabel}>tvdinner</span>
+              <code className={styles.secret}>{tvdinnerLink}</code>
+              <a className={styles.btn} href={tvdinnerLink}>
+                Open in tvdinner
+              </a>
+            </div>
+          ) : null}
           <p className={styles.ok}>
             Copy these now — the token is shown once. Rotate any time to get fresh links (the old
             ones stop working).
