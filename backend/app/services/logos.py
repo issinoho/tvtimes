@@ -31,9 +31,8 @@ def _sniff(body: bytes) -> str | None:
         return "image/gif"
     if body[:4] == b"RIFF" and body[8:12] == b"WEBP":
         return "image/webp"
-    head = body[:256].lstrip().lower()
-    if head.startswith(b"<?xml") or head.startswith(b"<svg"):
-        return "image/svg+xml"
+    # SVG is deliberately *not* accepted: it's served from our own origin, so a
+    # channel whose tvg-logo points at a script-bearing SVG would be stored XSS.
     return None
 
 

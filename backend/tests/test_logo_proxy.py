@@ -99,3 +99,27 @@ async def test_logo_404_when_channel_has_none(
 async def test_logo_404_for_unknown_channel(app_client: AsyncClient) -> None:
     r = await app_client.get(f"/api/channels/{uuid.uuid4()}/logo")
     assert r.status_code == 404
+
+
+@respx.mock
+async def test_svg_logo_is_rejected_not_served_from_our_origin(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A script-bearing SVG served as image/svg+xml from our origin would be
+    # stored XSS — the proxy must not accept it.
+    respx.get("http://192.168.0.218:5523/logos/x.png").mock(
+        return_value=Response(
+            200,
+            content=b'<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>',
+            headers={"content-type": "image/svg+xml"},
+        )
+    )
+    channel_id = await _channel_with_logo(app_client, captured_emails, monkeypatch)
+    r = await app_client.get(f"/api/channels/{channel_id}/logo")
+    assert r.status_code == 404
+
+
+def test_sniff_never_returns_svg() -> None:
+    assert logos._sniff(b'<?xml version="1.0"?><svg onload="alert(1)"/>') is None
+    assert logos._sniff(b"<svg/>") is None
+    assert logos._sniff(b"\x89PNG\r\n\x1a\n" + b"\x00" * 40) == "image/png"
