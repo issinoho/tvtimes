@@ -14,7 +14,11 @@ from app.auth.ratelimit import limiter
 from app.config import get_settings
 from app.models.epg import EpgSource, Programme
 from app.models.source import Channel, Source
-from app.queue import enqueue_activity_notification, enqueue_epg_refresh
+from app.queue import (
+    enqueue_activity_notification,
+    enqueue_epg_refresh,
+    enqueue_programme_enrich,
+)
 from app.schemas.auth import MessageOut
 from app.schemas.epg import (
     ChannelPatchIn,
@@ -188,6 +192,10 @@ async def create_play_link(
     if now_on is not None:
         push_title, push_body = now_on.title, label
         push_image = await tmdb_svc.art_for(session, now_on)
+        if push_image is None:
+            # not in the enrichment cache yet — warm it so a later play (or the
+            # hero / guide) has the artwork. No-op without a TMDB token.
+            await enqueue_programme_enrich(user.tenant_id, now_on.id)
     else:
         push_title, push_body, push_image = "Playing now", label, None
     await enqueue_activity_notification(user.tenant_id, "play", push_title, push_body, push_image)

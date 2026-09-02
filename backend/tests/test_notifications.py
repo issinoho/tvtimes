@@ -37,8 +37,11 @@ def apprise_calls(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[Calls, Stat
             "title": kwargs.get("title"),
             "body": kwargs.get("body"),
         }
-        if kwargs.get("attach"):  # only when set, so plain calls keep a 3-key dict
+        # only when set, so plain calls keep a 3-key dict
+        if kwargs.get("attach"):
             call["attach"] = kwargs["attach"]
+        if kwargs.get("body_format"):
+            call["format"] = str(kwargs["body_format"])
         calls.append(call)
         result = state["result"]
         if isinstance(result, Exception):
@@ -66,6 +69,14 @@ def test_parse_target_rejects_junk() -> None:
 
 def test_describe_target_never_raises() -> None:
     assert notify.describe_target("not a url at all") == ("unknown", "")
+
+
+def test_markdown_client_forces_markdown_format() -> None:
+    import apprise
+
+    ap = notify._markdown_client([GOTIFY, NTFY])
+    assert len(ap) == 2
+    assert {p.notify_format for p in ap} == {apprise.NotifyFormat.MARKDOWN}
 
 
 # --- service: dispatch fan-out ---------------------------------------------
@@ -292,10 +303,20 @@ async def test_worker_activity_notification_forwards_image(
     tenant_id = await _seed_activity_targets(notify_on_play=True)
     art = "https://image.tmdb.org/t/p/w500/abc.jpg"
 
+    # GOTIFY + NTFY are enabled. ntfy takes the real attachment; Gotify (which
+    # drops Apprise attachments) gets the image embedded as inline markdown.
     await activity_notification({}, str(tenant_id), "play", "The Thing", "TCM", art)
-    assert calls == [{"servers": 2, "title": "The Thing", "body": "TCM", "attach": art}]
+    assert calls == [
+        {"servers": 1, "title": "The Thing", "body": "TCM", "attach": art},
+        {
+            "servers": 1,
+            "title": "The Thing",
+            "body": f"TCM\n\n![poster]({art})",
+            "format": "NotifyFormat.MARKDOWN",
+        },
+    ]
 
-    # empty image_url -> no attachment key
+    # empty image_url -> one plain call to every target, no attachment
     calls.clear()
     await activity_notification({}, str(tenant_id), "play", "The Thing", "TCM", "")
     assert calls == [{"servers": 2, "title": "The Thing", "body": "TCM"}]

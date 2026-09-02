@@ -131,6 +131,48 @@ def _client(urls: list[str]) -> apprise.Apprise:
     return ap
 
 
+# Gotify's Apprise plugin has ``attachment_support = False`` — it silently drops
+# an ``attach=``. Its web UI (and its Android app, given the markdown display
+# hint) render an inline markdown image, so those targets get the artwork
+# embedded in the body instead.
+_GOTIFY_SCHEMES = ("gotify://", "gotifys://")
+
+
+def _markdown_client(urls: list[str]) -> apprise.Apprise:
+    """Like :func:`_client`, but forces every plugin to Markdown format so
+    Apprise keeps a markdown body intact (rather than down-converting it to the
+    plugin's default text) and Gotify emits its ``text/markdown`` display hint."""
+    ap = _client(urls)
+    for plugin in ap:
+        plugin.notify_format = apprise.NotifyFormat.MARKDOWN
+    return ap
+
+
+async def _fire(
+    ap: apprise.Apprise,
+    *,
+    title: str,
+    body: str,
+    attach: str | None,
+    body_format: str | None,
+    tenant_id: uuid.UUID,
+    kind: str,
+) -> int:
+    if not len(ap):
+        return 0
+    try:
+        ok = await ap.async_notify(title=title, body=body, attach=attach, body_format=body_format)
+    except Exception as exc:
+        _log.error(
+            "notify.dispatch_failed",
+            tenant_id=str(tenant_id),
+            notify_event=kind,
+            error=f"{type(exc).__name__}: {exc}",
+        )
+        return 0
+    return len(ap) if ok else 0
+
+
 async def _deliver(
     tenant_id: uuid.UUID,
     targets: list[NotificationTarget],
@@ -153,31 +195,46 @@ async def _deliver(
             urls.append(decrypt(t.url_encrypted))
         except ValueError as exc:  # corrupt row / rotated key
             _log.warning("notify.undecryptable_target", target_id=str(t.id), error=str(exc))
-    ap = _client(urls)
-    if not len(ap):
+    if not urls:
         return 0
 
-    try:
-        ok = await ap.async_notify(
+    if notification.attach:
+        gotify = [u for u in urls if u.strip().lower().startswith(_GOTIFY_SCHEMES)]
+        rest = [u for u in urls if u not in gotify]
+        delivered = await _fire(
+            _client(rest),
             title=notification.title,
             body=notification.body,
             attach=notification.attach,
+            body_format=None,
+            tenant_id=tenant_id,
+            kind=kind,
         )
-    except Exception as exc:
-        _log.error(
-            "notify.dispatch_failed",
-            tenant_id=str(tenant_id),
-            notify_event=kind,
-            error=f"{type(exc).__name__}: {exc}",
+        delivered += await _fire(
+            _markdown_client(gotify),
+            title=notification.title,
+            body=f"{notification.body}\n\n![poster]({notification.attach})",
+            attach=None,
+            body_format=apprise.NotifyFormat.MARKDOWN,
+            tenant_id=tenant_id,
+            kind=kind,
         )
-        return 0
+    else:
+        delivered = await _fire(
+            _client(urls),
+            title=notification.title,
+            body=notification.body,
+            attach=None,
+            body_format=None,
+            tenant_id=tenant_id,
+            kind=kind,
+        )
 
-    delivered = len(ap) if ok else 0
     _log.info(
         "notify.dispatch",
         tenant_id=str(tenant_id),
         notify_event=kind,
-        targets=len(ap),
+        targets=len(urls),
         delivered=delivered,
     )
     return delivered
