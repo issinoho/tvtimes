@@ -68,8 +68,11 @@ case "${1:-web}" in
     web)
         echo "tvtimes: applying database migrations"
         alembic upgrade head
-        exec uvicorn app.main:app --host 0.0.0.0 --port "${TVTIMES_PORT:-8000}" \
-            --proxy-headers --forwarded-allow-ips '*'
+        # No --proxy-headers: tvtimes resolves the client IP itself and only
+        # trusts X-Forwarded-For from TVTIMES_TRUSTED_PROXIES. Letting uvicorn
+        # rewrite request.client from XFF sent by anyone (which
+        # --forwarded-allow-ips '*' did) let a direct client spoof its address.
+        exec uvicorn app.main:app --host 0.0.0.0 --port "${TVTIMES_PORT:-8000}"
         ;;
     worker)
         exec arq app.worker.WorkerSettings

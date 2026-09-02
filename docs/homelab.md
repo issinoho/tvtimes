@@ -73,6 +73,11 @@ proxy and send everything to the app container. Set in `.env`:
 ```sh
 TVTIMES_PUBLIC_ORIGIN=https://tv.example.com
 TVTIMES_WEBAUTHN_RP_ID=tv.example.com
+# The proxy's address as the app container sees it — so tvtimes trusts the
+# X-Forwarded-For it sets. Without this, rate limits and the audit log see the
+# proxy's IP for every request. The compose default network is 172.16.0.0/12;
+# a same-host proxy is 127.0.0.1.
+TVTIMES_TRUSTED_PROXIES=172.16.0.0/12
 ```
 
 Caddy:
@@ -83,8 +88,14 @@ tv.example.com {
 }
 ```
 
-Nginx: proxy `/` to `127.0.0.1:8888` with `proxy_set_header X-Forwarded-Proto
-$scheme;` and `X-Forwarded-For`. The app already trusts forwarded headers.
+Nginx: proxy `/` to `127.0.0.1:8888` with `proxy_set_header X-Forwarded-For
+$proxy_add_x_forwarded_for;`.
+
+**`X-Forwarded-For` is trusted only from `TVTIMES_TRUSTED_PROXIES`.** A request
+that arrives directly (no proxy configured, or from an address not in that
+list) is attributed to its real TCP peer and its `X-Forwarded-For` is ignored,
+so it can't spoof its IP to get around a login/registration rate limit or write
+a fake address into the audit log.
 
 ## HDHomeRun tuners
 

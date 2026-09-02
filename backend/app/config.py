@@ -44,6 +44,14 @@ class Settings(BaseSettings):
     ratelimit_storage_uri: str = "memory://"
     ratelimit_enabled: bool = True
 
+    # Comma-separated proxy IPs / CIDRs whose ``X-Forwarded-For`` we trust.
+    # Empty (the default) means tvtimes is reached directly, so XFF is ignored
+    # entirely and a client can't spoof its address to dodge rate limits or
+    # poison the audit log. Set this to your reverse proxy's address *as the
+    # container sees it* when you run one (e.g. 172.16.0.0/12 for the Docker
+    # bridge, or 127.0.0.1 for a same-host proxy).
+    trusted_proxies: str = ""
+
     # Secrets
     encryption_key: str = "dev-insecure-key-change-me-0000000000000000000"
     jwt_private_key_pem: str = ""
@@ -95,6 +103,11 @@ class Settings(BaseSettings):
     @property
     def fetch_allowlist_entries(self) -> list[str]:
         return [e.strip() for e in self.fetch_allowlist.split(",") if e.strip()]
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def trusted_proxy_entries(self) -> list[str]:
+        return [e.strip() for e in self.trusted_proxies.split(",") if e.strip()]
 
     def assert_production_ready(self) -> None:
         """At startup: hard-fail if real secrets are missing; warn about a
