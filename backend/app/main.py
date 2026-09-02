@@ -11,6 +11,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi.errors import RateLimitExceeded
+from starlette.datastructures import MutableHeaders
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app import __version__
 from app.api.routers import api_router
@@ -34,6 +36,65 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     finally:
         await dispose_engine()
         log.info("shutdown")
+
+
+# Same-origin SPA + JSON API, no third-party scripts. The only cross-origin
+# loads are TMDB artwork (<img> from image.tmdb.org); channel logos are proxied
+# through our own origin. 'unsafe-inline' for style covers React's inline
+# style={} attributes and any runtime-injected <style>.
+_CSP = "; ".join(
+    (
+        "default-src 'self'",
+        "script-src 'self'",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' data: https://image.tmdb.org",
+        "font-src 'self'",
+        "connect-src 'self'",
+        "manifest-src 'self'",
+        "worker-src 'self'",
+        "frame-ancestors 'none'",
+        "base-uri 'none'",
+        "object-src 'none'",
+        "form-action 'self'",
+    )
+)
+# Swagger UI / ReDoc pull their assets from a CDN, so the strict script-src
+# would break them; they're dev tooling (see the "disable /docs in prod" issue).
+_CSP_EXEMPT_PREFIXES = ("/docs", "/redoc", "/openapi.json")
+
+
+class SecurityHeadersMiddleware:
+    """Adds the response headers a self-hosted auth'd app should always send:
+    CSP, anti-clickjacking, nosniff, a conservative Referrer-Policy, COOP, and
+    HSTS on an https prod deployment."""
+
+    def __init__(self, app: ASGIApp, *, hsts: bool) -> None:
+        self.app = app
+        self._hsts = hsts
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        path: str = scope.get("path", "")
+        csp_exempt = path.startswith(_CSP_EXEMPT_PREFIXES)
+
+        async def send_with_headers(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                headers = MutableHeaders(scope=message)
+                headers.setdefault("x-content-type-options", "nosniff")
+                headers.setdefault("x-frame-options", "DENY")
+                headers.setdefault("referrer-policy", "strict-origin-when-cross-origin")
+                headers.setdefault("cross-origin-opener-policy", "same-origin")
+                if not csp_exempt:
+                    headers.setdefault("content-security-policy", _CSP)
+                if self._hsts:
+                    headers.setdefault(
+                        "strict-transport-security", "max-age=63072000; includeSubDomains"
+                    )
+            await send(message)
+
+        await self.app(scope, receive, send_with_headers)
 
 
 def _install_error_handlers(app: FastAPI) -> None:
@@ -69,6 +130,11 @@ def create_app() -> FastAPI:
         openapi_url="/openapi.json",
     )
     app.state.limiter = limiter
+
+    app.add_middleware(
+        SecurityHeadersMiddleware,
+        hsts=settings.is_prod and settings.public_origin.startswith("https://"),
+    )
 
     # In prod the SPA and API share an origin (served under /api) so CORS is a
     # dev-only convenience for the Vite dev server.
