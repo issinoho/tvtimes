@@ -13,6 +13,8 @@ from app.auth.crypto import encrypt
 from app.db import get_sessionmaker
 from app.models.epg import EpgSource, Programme
 from app.models.source import Channel, Source, SourceKind, SourceStatus
+from app.models.tmdb import MediaType, TmdbEnrichment
+from app.services.tmdb import cache_key
 from httpx import AsyncClient
 
 from tests.conftest import auth_header, login, register_and_verify
@@ -59,16 +61,38 @@ async def _seed_channel(tenant_id: uuid.UUID) -> tuple[str, str]:
         )
         session.add_all([epg, ch])
         await session.flush()
+        now = datetime.now(UTC)
         prog = Programme(
             tenant_id=tenant_id,
             channel_id=ch.id,
             epg_source_id=epg.id,
-            start_utc=datetime.now(UTC) + timedelta(days=1),
-            stop_utc=datetime.now(UTC) + timedelta(days=1, hours=1),
+            start_utc=now + timedelta(days=1),
+            stop_utc=now + timedelta(days=1, hours=1),
             title="Later Film",
             is_movie=True,
         )
-        session.add(prog)
+        # what's on the channel right now, plus a TMDB poster for it
+        now_on = Programme(
+            tenant_id=tenant_id,
+            channel_id=ch.id,
+            epg_source_id=epg.id,
+            start_utc=now - timedelta(minutes=20),
+            stop_utc=now + timedelta(minutes=40),
+            title="The Thing",
+            year="1982",
+            is_movie=True,
+        )
+        key, year_key = cache_key("The Thing", "1982")
+        art = TmdbEnrichment(
+            media_type=MediaType.movie,
+            query_key=key,
+            query_year=year_key,
+            fetched_at=now,
+            negative=False,
+            tmdb_id=1091,
+            poster_url="https://image.tmdb.org/t/p/w500/the-thing.jpg",
+        )
+        session.add_all([prog, now_on, art])
         await session.commit()
         return str(ch.id), str(prog.id)
 
@@ -150,7 +174,7 @@ async def test_watchlist_actions_enqueue_pushes(
     cats = [j[2] for j in _activity_jobs(enqueued)]
     assert cats == ["reminder_set", "title_watch_set", "watchlist_remove"]
     # every job carries the tenant id and a title/body
-    for _job, tid, _cat, title, body in _activity_jobs(enqueued):
+    for _job, tid, _cat, title, body, *_rest in _activity_jobs(enqueued):
         assert tid == me["tenant_id"]
         assert title and body
 
@@ -167,5 +191,9 @@ async def test_play_link_enqueues_push(
     assert resp.status_code == 200, resp.text
 
     jobs = _activity_jobs(enqueued)
-    assert [j[2] for j in jobs] == ["play"]
-    assert "BBC One" in jobs[0][4]
+    assert len(jobs) == 1
+    _job, _tid, category, title, body, image_url = jobs[0]
+    assert category == "play"
+    assert title == "The Thing"  # what's on the channel now, not "Playing now"
+    assert "BBC One" in body
+    assert image_url == "https://image.tmdb.org/t/p/w500/the-thing.jpg"

@@ -37,6 +37,7 @@ from app.services import epg as svc
 from app.services import exports as exports_svc
 from app.services import logos as logo_svc
 from app.services import sources as src_svc
+from app.services import tmdb as tmdb_svc
 
 router = APIRouter(tags=["epg"])
 
@@ -183,7 +184,13 @@ async def create_play_link(
 
     ticket = tokens.issue_play_token(channel.id, user.tenant_id)
     label = f"{channel.number} · {channel.name}" if channel.number else channel.name
-    await enqueue_activity_notification(user.tenant_id, "play", "Playing now", label)
+    now_on = await svc.current_programme(session, channel)
+    if now_on is not None:
+        push_title, push_body = now_on.title, label
+        push_image = await tmdb_svc.art_for(session, now_on)
+    else:
+        push_title, push_body, push_image = "Playing now", label, None
+    await enqueue_activity_notification(user.tenant_id, "play", push_title, push_body, push_image)
     root = f"{get_settings().public_origin.rstrip('/')}/api/exports/play/{channel.id}"
     return PlayLinkOut(
         m3u_url=f"{root}/playlist.m3u?ticket={ticket}",

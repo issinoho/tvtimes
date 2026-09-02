@@ -103,7 +103,12 @@ async def enrich_programme(_ctx: dict[str, Any], tenant_id: str, programme_id: s
 
 
 async def activity_notification(
-    _ctx: dict[str, Any], tenant_id: str, category: str, title: str, body: str
+    _ctx: dict[str, Any],
+    tenant_id: str,
+    category: str,
+    title: str,
+    body: str,
+    image_url: str = "",
 ) -> None:
     """Deliver a queued user-action push (enqueued by ``app.queue``). The
     per-tenant opt-in is re-checked here — the flag is the source of truth, not
@@ -119,7 +124,7 @@ async def activity_notification(
             session,
             tenant,
             category,  # type: ignore[arg-type]  # narrowed by the get_args guard above
-            notify_svc.Notification(title=title, body=body),
+            notify_svc.Notification(title=title, body=body, attach=image_url or None),
         )
 
 
