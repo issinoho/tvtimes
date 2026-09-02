@@ -64,7 +64,7 @@ x-app: &app
     - .env          # everything in .env reaches the container; the values below still win
   environment:
     TVTIMES_ENV: prod
-    TVTIMES_DATABASE_URL: postgresql+asyncpg://tvtimes:${POSTGRES_PASSWORD:-tvtimes}@db:5432/tvtimes
+    TVTIMES_DATABASE_URL: postgresql+asyncpg://tvtimes:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/tvtimes
     TVTIMES_REDIS_URL: redis://redis:6379/0
     TVTIMES_RATELIMIT_STORAGE_URI: redis://redis:6379/1
     TVTIMES_PUBLIC_ORIGIN: ${TVTIMES_PUBLIC_ORIGIN:?set TVTIMES_PUBLIC_ORIGIN in .env}
@@ -109,7 +109,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: tvtimes
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tvtimes}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: tvtimes
     volumes:
       - pgdata:/var/lib/postgresql/data

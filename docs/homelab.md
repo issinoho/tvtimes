@@ -18,7 +18,7 @@ Edit `.env`. For a first run on your LAN you only need:
 ```sh
 TVTIMES_PUBLIC_ORIGIN=http://192.168.1.10:8888   # the address you'll open in a browser
 TVTIMES_WEBAUTHN_RP_ID=localhost                  # keep as localhost for a bare-IP setup
-POSTGRES_PASSWORD=pick-something
+POSTGRES_PASSWORD=          # required; e.g. `openssl rand -hex 24`
 ```
 
 `TVTIMES_PUBLIC_ORIGIN` must match exactly what the browser shows — scheme,

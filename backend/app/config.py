@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import functools
 import sys
 from typing import Literal
@@ -10,6 +11,16 @@ from pydantic import Field, computed_field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Environment = Literal["dev", "test", "prod"]
+
+
+def _is_fernet_key(value: str) -> bool:
+    """True only for a real ``Fernet.generate_key()`` value — urlsafe-base64
+    decoding to exactly 32 bytes. Anything else is passphrase-derived and
+    brute-forceable (see ``app.auth.crypto._derive_key``)."""
+    try:
+        return len(base64.urlsafe_b64decode(value.encode("utf-8"))) == 32
+    except (ValueError, TypeError):
+        return False
 
 
 class Settings(BaseSettings):
@@ -122,6 +133,12 @@ class Settings(BaseSettings):
             problems.append("TVTIMES_JWT_PRIVATE_KEY_PEM is required in prod")
         if self.encryption_key.startswith("dev-insecure-key"):
             problems.append("TVTIMES_ENCRYPTION_KEY still holds the insecure default")
+        elif not _is_fernet_key(self.encryption_key):
+            problems.append(
+                "TVTIMES_ENCRYPTION_KEY must be a generated 32-byte urlsafe-base64 key "
+                '(python -c "from cryptography.fernet import Fernet; '
+                'print(Fernet.generate_key().decode())"), not a passphrase'
+            )
         if problems:
             raise RuntimeError("insecure production config: " + "; ".join(problems))
         if not self.public_origin.startswith("https://"):
