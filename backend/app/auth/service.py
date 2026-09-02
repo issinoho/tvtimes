@@ -46,6 +46,10 @@ _CHALLENGE_TTL = timedelta(minutes=5)
 _LOCK_THRESHOLD = 5
 _LOCK_BASE = timedelta(seconds=30)
 _LOCK_MAX = timedelta(minutes=30)
+# A refresh token presented again this soon after it was rotated is a browser
+# with several tabs (or two devices) double-spending it in one burst — benign.
+# A genuine stolen-token replay turns up much later; that still burns the chain.
+_REFRESH_REPLAY_GRACE = timedelta(seconds=30)
 
 
 @dataclass(frozen=True, slots=True)
@@ -354,22 +358,67 @@ async def issue_session(
     )
 
 
+async def _live_chain_tip(
+    session: AsyncSession, start: AuthSession, *, now: datetime
+) -> AuthSession | None:
+    """Walk the rotation chain from ``start`` to its newest un-rotated,
+    unrevoked, unexpired descendant, locking each hop. ``None`` if the chain
+    dead-ends (e.g. its head was revoked)."""
+    tip = start
+    for _ in range(32):
+        if tip.rotated_at is None:
+            return tip if (tip.revoked_at is None and tip.expires_at > now) else None
+        nxt = await session.scalar(
+            select(AuthSession)
+            .where(AuthSession.parent_id == tip.id, AuthSession.revoked_at.is_(None))
+            .order_by(AuthSession.created_at.desc())
+            .limit(1)
+            .with_for_update()
+        )
+        if nxt is None:
+            return None
+        tip = nxt
+    return None
+
+
 async def rotate_session(
     session: AsyncSession, *, raw_refresh: str, meta: ClientMeta | None = None
 ) -> IssuedSession:
     token_hash = tokens.hash_refresh_token(raw_refresh)
-    row = await session.scalar(select(AuthSession).where(AuthSession.token_hash == token_hash))
+    row = await session.scalar(
+        select(AuthSession).where(AuthSession.token_hash == token_hash).with_for_update()
+    )
     if row is None or row.revoked_at is not None:
         raise TokenInvalid()
 
     if row.rotated_at is not None:
-        # This token was already exchanged — a replay. Burn the whole chain.
-        await _revoke_user_sessions(session, row.user_id)
-        user = await session.get(User, row.user_id)
-        await _audit(session, "refresh_reuse_detected", user=user, meta=meta)
-        raise TokenInvalid("Session invalidated. Please sign in again.")
-
-    if row.expires_at <= _now():
+        if _now() - row.rotated_at > _REFRESH_REPLAY_GRACE:
+            # Exchanged long enough ago that a concurrent-tab race is
+            # implausible — a genuine replay. Burn the whole chain.
+            await _revoke_user_sessions(session, row.user_id)
+            user = await session.get(User, row.user_id)
+            await _audit(session, "refresh_reuse_detected", user=user, meta=meta)
+            raise TokenInvalid("Session invalidated. Please sign in again.")
+        # Benign double-spend from parallel tabs/devices. Continue the chain
+        # from its current live tip rather than tearing it down, and prune any
+        # sibling fork a previous race left so the sessions list stays
+        # single-headed.
+        now = _now()
+        tip = await _live_chain_tip(session, row, now=now)
+        if tip is None:
+            raise TokenInvalid("Session invalidated. Please sign in again.")
+        forks = await session.scalars(
+            select(AuthSession).where(
+                AuthSession.parent_id == tip.parent_id,
+                AuthSession.id != tip.id,
+                AuthSession.rotated_at.is_(None),
+                AuthSession.revoked_at.is_(None),
+            )
+        )
+        for fork in forks:
+            fork.revoked_at = now
+        row = tip
+    elif row.expires_at <= _now():
         raise TokenInvalid()
 
     user = await session.get(User, row.user_id)
