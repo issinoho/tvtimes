@@ -9,6 +9,8 @@ Jobs:
     replace programmes, then queue a TMDB enrichment pass
   - ``enrich_epg(tenant_id)`` — warm the TMDB cache for the coming week
   - ``enrich_programme(tenant_id, programme_id)`` — on-demand single enrichment
+  - ``activity_notification(tenant_id, category, title, body)`` — push a queued
+    user-action notification (Remind Me / Watch title / Play / watchlist removal)
   - ``sweep`` (cron, every 15 min) — enqueue refreshes that are due
   - ``reminders`` (cron, every 5 min) — email + push watchlist reminders
   - ``source_alerts`` (cron, every 15 min) — email + push a tenant when a
@@ -20,7 +22,7 @@ from __future__ import annotations
 import uuid
 from collections import defaultdict
 from datetime import UTC, datetime
-from typing import Any, ClassVar
+from typing import Any, ClassVar, get_args
 
 from arq import cron
 from arq.connections import RedisSettings
@@ -98,6 +100,27 @@ async def enrich_programme(_ctx: dict[str, Any], tenant_id: str, programme_id: s
     async with get_sessionmaker()() as session:
         await tmdb_svc.enrich_programme(session, uuid.UUID(tenant_id), uuid.UUID(programme_id))
         await session.commit()
+
+
+async def activity_notification(
+    _ctx: dict[str, Any], tenant_id: str, category: str, title: str, body: str
+) -> None:
+    """Deliver a queued user-action push (enqueued by ``app.queue``). The
+    per-tenant opt-in is re-checked here — the flag is the source of truth, not
+    whatever was true when the job was enqueued."""
+    if category not in get_args(notify_svc.ActivityCategory):
+        _log.warning("worker.activity_notification.bad_category", category=category)
+        return
+    async with get_sessionmaker()() as session:
+        tenant = await session.get(Tenant, uuid.UUID(tenant_id))
+        if tenant is None:
+            return
+        await notify_svc.notify_activity(
+            session,
+            tenant,
+            category,  # type: ignore[arg-type]  # narrowed by the get_args guard above
+            notify_svc.Notification(title=title, body=body),
+        )
 
 
 async def sweep(ctx: dict[str, Any]) -> None:
@@ -225,6 +248,7 @@ class WorkerSettings:
         refresh_epg_source,
         enrich_epg,
         enrich_programme,
+        activity_notification,
     ]
     cron_jobs: ClassVar[list[Any]] = [
         cron(sweep, minute=set(range(0, 60, 15))),

@@ -122,3 +122,8 @@ class MeOut(BaseModel):
     tmdb_connected: bool = False
     export_token_set_at: datetime | None = None
     source_alerts_enabled: bool = True
+    # Per-tenant push opt-ins for user actions (push only, never email).
+    notify_on_reminder_set: bool = False
+    notify_on_title_watch_set: bool = False
+    notify_on_play: bool = False
+    notify_on_watchlist_remove: bool = False

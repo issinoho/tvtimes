@@ -187,6 +187,101 @@ async def test_dispatch_skips_undecryptable_row(
     assert calls == []  # nothing addable -> async_notify never called
 
 
+# --- service: activity notifications --------------------------------------
+
+
+async def _seed_activity_targets(**flags: bool) -> uuid.UUID:
+    """Two enabled targets (one with send_reminders off) + one disabled."""
+    async with get_sessionmaker()() as session:
+        tenant = Tenant(name="T", default_timezone="UTC", **flags)
+        session.add(tenant)
+        await session.flush()
+        session.add_all(
+            [
+                NotificationTarget(
+                    tenant_id=tenant.id, label="Gotify", url_encrypted=encrypt(GOTIFY)
+                ),
+                NotificationTarget(
+                    tenant_id=tenant.id,
+                    label="ntfy (alerts only)",
+                    url_encrypted=encrypt(NTFY),
+                    send_reminders=False,
+                ),
+                NotificationTarget(
+                    tenant_id=tenant.id,
+                    label="disabled",
+                    url_encrypted=encrypt(GOTIFY_2),
+                    enabled=False,
+                ),
+            ]
+        )
+        await session.commit()
+        return tenant.id
+
+
+async def test_notify_activity_is_a_noop_when_category_off(
+    db_schema: None, apprise_calls: tuple[Calls, State]
+) -> None:
+    calls, _ = apprise_calls
+    tenant_id = await _seed_activity_targets(notify_on_play=False)
+    async with get_sessionmaker()() as session:
+        tenant = await session.get(Tenant, tenant_id)
+        assert tenant is not None
+        n = await notify.notify_activity(
+            session, tenant, "play", notify.Notification("Playing", "BBC One")
+        )
+    assert n == 0
+    assert calls == []
+
+
+async def test_notify_activity_fans_to_every_enabled_target(
+    db_schema: None, apprise_calls: tuple[Calls, State]
+) -> None:
+    calls, _ = apprise_calls
+    tenant_id = await _seed_activity_targets(notify_on_play=True)
+    async with get_sessionmaker()() as session:
+        tenant = await session.get(Tenant, tenant_id)
+        assert tenant is not None
+        n = await notify.notify_activity(
+            session, tenant, "play", notify.Notification("Playing", "BBC One")
+        )
+    # both enabled targets, regardless of their per-target send_* flags; the
+    # disabled row stays out
+    assert n == 2
+    assert calls == [{"servers": 2, "title": "Playing", "body": "BBC One"}]
+
+
+async def test_notify_activity_is_fail_open(
+    db_schema: None, apprise_calls: tuple[Calls, State]
+) -> None:
+    _, state = apprise_calls
+    state["result"] = RuntimeError("boom")
+    tenant_id = await _seed_activity_targets(notify_on_watchlist_remove=True)
+    async with get_sessionmaker()() as session:
+        tenant = await session.get(Tenant, tenant_id)
+        assert tenant is not None
+        n = await notify.notify_activity(
+            session, tenant, "watchlist_remove", notify.Notification("x", "y")
+        )
+    assert n == 0  # swallowed, not raised
+
+
+async def test_worker_activity_notification_job(
+    db_schema: None, apprise_calls: tuple[Calls, State]
+) -> None:
+    from app.worker import activity_notification
+
+    calls, _ = apprise_calls
+    tenant_id = await _seed_activity_targets(notify_on_reminder_set=True)
+
+    await activity_notification({}, str(tenant_id), "reminder_set", "Reminder set", "Later Film")
+    assert calls == [{"servers": 2, "title": "Reminder set", "body": "Later Film"}]
+
+    calls.clear()
+    await activity_notification({}, str(tenant_id), "not-a-category", "x", "y")
+    assert calls == []  # unknown category is ignored
+
+
 # --- API -------------------------------------------------------------------
 
 

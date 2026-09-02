@@ -236,6 +236,16 @@ target is logged and skipped, never blocking the others or the email path.
 Targets are outbound-only and *not* subject to the SSRF guard, so a
 LAN address like `gotify://192.168.1.10/…` is fine.
 
+### Activity notifications
+
+**Settings → Activity notifications** adds four push-only opt-ins that fire when
+someone on the account acts: a **reminder is set** on a programme, a **title is
+added** to the watchlist, a **channel is played**, or a **watchlist entry is
+removed**. Each is a separate account-wide toggle, off by default. Unlike the
+per-target flags above these ignore the per-target toggles — when a category is
+on it fans out to *every* enabled target. There is no email for these, and the
+push is queued so it never adds latency to the click that triggered it.
+
 ## Troubleshooting
 
 - **"insecure production config" on start** — you set your own

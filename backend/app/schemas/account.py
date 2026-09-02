@@ -19,3 +19,13 @@ class ExportTokenOut(BaseModel):
 
 class SourceAlertsIn(BaseModel):
     enabled: bool
+
+
+class ActivityNotificationsIn(BaseModel):
+    """Per-tenant push opt-ins for user actions. Patch semantics — an omitted
+    field is left unchanged. Push only; these never send email."""
+
+    reminder_set: bool | None = None
+    title_watch_set: bool | None = None
+    play: bool | None = None
+    watchlist_remove: bool | None = None

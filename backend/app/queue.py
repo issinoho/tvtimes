@@ -51,3 +51,13 @@ async def enqueue_epg_refresh(epg_source_id: uuid.UUID) -> None:
 
 async def enqueue_programme_enrich(tenant_id: uuid.UUID, programme_id: uuid.UUID) -> None:
     await _enqueue("enrich_programme", str(tenant_id), str(programme_id))
+
+
+async def enqueue_activity_notification(
+    tenant_id: uuid.UUID, category: str, title: str, body: str
+) -> None:
+    """Push a user-action notification (Remind Me / Watch title / Play / removal)
+    to the tenant's targets. Done off the request path — the Apprise round-trip
+    shouldn't add latency to the click that triggered it. The worker re-checks
+    the per-tenant opt-in, so a stale enqueue is harmless."""
+    await _enqueue("activity_notification", str(tenant_id), category, title, body)

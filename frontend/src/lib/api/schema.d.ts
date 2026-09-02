@@ -282,6 +282,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/account/activity-notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Activity Notifications
+         * @description Toggle the per-tenant push opt-ins for user actions. Patch semantics —
+         *     only the fields present in the body change. Push only; no email.
+         */
+        put: operations["set_activity_notifications_api_account_activity_notifications_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/account/timezone": {
         parameters: {
             query?: never;
@@ -938,6 +959,21 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * ActivityNotificationsIn
+         * @description Per-tenant push opt-ins for user actions. Patch semantics — an omitted
+         *     field is left unchanged. Push only; these never send email.
+         */
+        ActivityNotificationsIn: {
+            /** Reminder Set */
+            reminder_set?: boolean | null;
+            /** Title Watch Set */
+            title_watch_set?: boolean | null;
+            /** Play */
+            play?: boolean | null;
+            /** Watchlist Remove */
+            watchlist_remove?: boolean | null;
+        };
         /** CastMember */
         CastMember: {
             /** Name */
@@ -1403,6 +1439,26 @@ export interface components {
              * @default true
              */
             source_alerts_enabled: boolean;
+            /**
+             * Notify On Reminder Set
+             * @default false
+             */
+            notify_on_reminder_set: boolean;
+            /**
+             * Notify On Title Watch Set
+             * @default false
+             */
+            notify_on_title_watch_set: boolean;
+            /**
+             * Notify On Play
+             * @default false
+             */
+            notify_on_play: boolean;
+            /**
+             * Notify On Watchlist Remove
+             * @default false
+             */
+            notify_on_watchlist_remove: boolean;
         };
         /** MessageOut */
         MessageOut: {
@@ -2515,6 +2571,41 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["SourceAlertsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_activity_notifications_api_account_activity_notifications_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActivityNotificationsIn"];
             };
         };
         responses: {

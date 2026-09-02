@@ -14,7 +14,7 @@ from app.auth.ratelimit import limiter
 from app.config import get_settings
 from app.models.epg import EpgSource, Programme
 from app.models.source import Channel, Source
-from app.queue import enqueue_epg_refresh
+from app.queue import enqueue_activity_notification, enqueue_epg_refresh
 from app.schemas.auth import MessageOut
 from app.schemas.epg import (
     ChannelPatchIn,
@@ -182,6 +182,8 @@ async def create_play_link(
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, str(exc)) from exc
 
     ticket = tokens.issue_play_token(channel.id, user.tenant_id)
+    label = f"{channel.number} · {channel.name}" if channel.number else channel.name
+    await enqueue_activity_notification(user.tenant_id, "play", "Playing now", label)
     root = f"{get_settings().public_origin.rstrip('/')}/api/exports/play/{channel.id}"
     return PlayLinkOut(
         m3u_url=f"{root}/playlist.m3u?ticket={ticket}",
