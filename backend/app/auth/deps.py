@@ -9,15 +9,14 @@ from fastapi import Depends, Header, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import tokens
+from app.auth.ratelimit import client_ip
 from app.auth.service import ClientMeta
 from app.db import get_session
 from app.models.user import User
 
 
 def client_meta(request: Request) -> ClientMeta:
-    fwd = request.headers.get("x-forwarded-for")
-    ip = fwd.split(",")[0].strip() if fwd else (request.client.host if request.client else None)
-    return ClientMeta(ip=ip, user_agent=request.headers.get("user-agent"))
+    return ClientMeta(ip=client_ip(request), user_agent=request.headers.get("user-agent"))
 
 
 async def access_claims(
