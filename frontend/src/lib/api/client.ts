@@ -36,18 +36,32 @@ function readCookie(name: string): string | null {
   return match ? decodeURIComponent(match[1]) : null;
 }
 
-/** POST /auth/refresh outside the middleware (so it can't recurse). */
+let refreshInFlight: Promise<boolean> | null = null;
+
+/**
+ * POST /auth/refresh outside the middleware (so it can't recurse). Single-flight:
+ * a page with several queries all 401-ing at once must fire exactly one refresh —
+ * a parallel burst rotates the token against itself and, past the server's grace
+ * window, looks like token theft and signs every tab out.
+ */
 async function refreshAccessToken(): Promise<boolean> {
-  const csrf = readCookie('tvtimes_csrf');
-  if (!csrf) return false;
-  const res = await fetch(`${ORIGIN}/api/auth/refresh`, {
-    method: 'POST',
-    headers: { 'X-CSRF-Token': csrf },
-  });
-  if (!res.ok) return false;
-  const body = (await res.json()) as { access_token: string };
-  accessToken = body.access_token;
-  return true;
+  refreshInFlight ??= (async () => {
+    try {
+      const csrf = readCookie('tvtimes_csrf');
+      if (!csrf) return false;
+      const res = await fetch(`${ORIGIN}/api/auth/refresh`, {
+        method: 'POST',
+        headers: { 'X-CSRF-Token': csrf },
+      });
+      if (!res.ok) return false;
+      const body = (await res.json()) as { access_token: string };
+      accessToken = body.access_token;
+      return true;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+  return refreshInFlight;
 }
 
 const authMiddleware: Middleware = {

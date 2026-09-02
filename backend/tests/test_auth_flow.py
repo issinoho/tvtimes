@@ -1,6 +1,12 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
+from app.auth import tokens
+from app.db import get_sessionmaker
+from app.models.session import AuthSession
 from httpx import AsyncClient
+from sqlalchemy import select
 
 from tests.conftest import (
     DEFAULT_PASSWORD,
@@ -148,7 +154,7 @@ async def test_account_lockout_after_repeated_failures(
     assert ok.status_code == 200
 
 
-async def test_refresh_rotates_and_detects_reuse(
+async def test_refresh_rotates_the_token(
     app_client: AsyncClient, captured_emails: list[dict[str, str]]
 ) -> None:
     await register_and_verify(app_client, captured_emails)
@@ -157,17 +163,76 @@ async def test_refresh_rotates_and_detects_reuse(
     first_refresh = app_client.cookies["tvtimes_refresh"]
     r1 = await app_client.post("/api/auth/refresh", headers=csrf_header(app_client))
     assert r1.status_code == 200
-    rotated_refresh = app_client.cookies["tvtimes_refresh"]
-    assert rotated_refresh != first_refresh
+    assert app_client.cookies["tvtimes_refresh"] != first_refresh
 
-    # Replay the original (now-rotated) token: must fail and burn the chain.
-    app_client.cookies.set("tvtimes_refresh", first_refresh)
+
+def _put_refresh_cookie(client: AsyncClient, value: str) -> None:
+    # Drop the server-set cookie first so we don't end up with two
+    # `tvtimes_refresh` entries (server Path=/api/auth + ours).
+    client.cookies.delete("tvtimes_refresh")
+    client.cookies.set("tvtimes_refresh", value)
+
+
+async def test_concurrent_replay_within_grace_keeps_one_session(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    """A browser with several tabs spends the same refresh token twice in quick
+    succession. That must not be mistaken for theft: the second call still
+    succeeds, the chain lives, and the sessions list stays single-headed."""
+    await register_and_verify(app_client, captured_emails)
+    await login(app_client)
+
+    first_refresh = app_client.cookies["tvtimes_refresh"]
+    r1 = await app_client.post("/api/auth/refresh", headers=csrf_header(app_client))
+    assert r1.status_code == 200
+
+    # the "other tab" replays the token that was just rotated
+    _put_refresh_cookie(app_client, first_refresh)
     replay = await app_client.post("/api/auth/refresh", headers=csrf_header(app_client))
-    assert replay.status_code == 401
+    assert replay.status_code == 200  # benign race, not treated as theft
 
-    app_client.cookies.set("tvtimes_refresh", rotated_refresh)
-    after = await app_client.post("/api/auth/refresh", headers=csrf_header(app_client))
-    assert after.status_code == 401  # whole chain revoked
+    # still one login, not the pile of re-auths a chain-burn would cause
+    listed = await app_client.get(
+        "/api/account/sessions",
+        headers=auth_header(replay.json()["access_token"]),
+    )
+    assert len(listed.json()) == 1
+
+
+async def test_stale_replay_still_burns_the_chain(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    await register_and_verify(app_client, captured_emails)
+    await login(app_client)
+
+    first_refresh = app_client.cookies["tvtimes_refresh"]
+    assert (
+        await app_client.post("/api/auth/refresh", headers=csrf_header(app_client))
+    ).status_code == 200
+    rotated_refresh = app_client.cookies["tvtimes_refresh"]
+
+    # Age the rotation past the grace window — now the original token coming
+    # back is a genuine replay (a stolen token used much later).
+    async with get_sessionmaker()() as db:
+        row = await db.scalar(
+            select(AuthSession).where(
+                AuthSession.token_hash == tokens.hash_refresh_token(first_refresh)
+            )
+        )
+        assert row is not None
+        row.rotated_at = datetime.now(UTC) - timedelta(minutes=5)
+        await db.commit()
+
+    _put_refresh_cookie(app_client, first_refresh)
+    assert (
+        await app_client.post("/api/auth/refresh", headers=csrf_header(app_client))
+    ).status_code == 401
+
+    # the whole chain is revoked, including the legitimately-rotated token
+    _put_refresh_cookie(app_client, rotated_refresh)
+    assert (
+        await app_client.post("/api/auth/refresh", headers=csrf_header(app_client))
+    ).status_code == 401
 
 
 async def test_repeated_refresh_stays_one_session(
