@@ -220,10 +220,14 @@ async def password_login(
         await _audit(session, "login_failed", meta=meta, email=email, reason="no_user")
         raise InvalidCredentials()
 
-    if user.locked_until is not None and user.locked_until > _now():
-        raise AccountLocked()
-
+    # The password is checked *before* the lock, so the real owner is never
+    # denied service by someone spraying wrong guesses at their (known) email —
+    # a correct password (like a passkey) always clears the lock. A wrong guess
+    # against a locked account still gets the generic AccountLocked, so an
+    # attacker sees no oracle and stays throttled.
     if not passwords.verify_password(user.password.hash, password):
+        if user.locked_until is not None and user.locked_until > _now():
+            raise AccountLocked()
         await _register_failed_login(session, user, meta)
         raise InvalidCredentials()
 
@@ -243,13 +247,19 @@ async def password_login(
     return await issue_session(session, user, meta, method="password")
 
 
-async def _register_failed_login(
-    session: AsyncSession, user: User, meta: ClientMeta | None
-) -> None:
+def _bump_lockout(user: User) -> None:
+    """Count a failed factor and, past the threshold, set an exponential-backoff
+    lock. Shared by the password and MFA steps."""
     user.failed_login_count += 1
     if user.failed_login_count >= _LOCK_THRESHOLD:
         backoff = min(_LOCK_BASE * (2 ** (user.failed_login_count - _LOCK_THRESHOLD)), _LOCK_MAX)
         user.locked_until = _now() + backoff
+
+
+async def _register_failed_login(
+    session: AsyncSession, user: User, meta: ClientMeta | None
+) -> None:
+    _bump_lockout(user)
     await _audit(
         session,
         "login_failed",
@@ -275,23 +285,33 @@ async def complete_mfa_login(
     if user is None or user.totp is None or user.totp.confirmed_at is None:
         raise TokenInvalid()
 
-    # A lockout raised after the password step still applies here.
-    if user.locked_until is not None and user.locked_until > _now():
-        raise AccountLocked()
-
     secret = decrypt(user.totp.secret_encrypted)
-    if totp.verify_code(secret, code):
-        await _audit(session, "mfa_ok", user=user, meta=meta, factor="totp")
-        return await issue_session(session, user, meta, method="password+totp")
-
-    matched, remaining = totp.consume_recovery_code(user.totp.recovery_codes, code)
-    if matched:
+    factor = "totp"
+    if not totp.verify_code(secret, code):
+        matched, remaining = totp.consume_recovery_code(user.totp.recovery_codes, code)
+        if not matched:
+            # Same throttle as the password step — a wrong second factor counts,
+            # and once locked, further MFA attempts get AccountLocked (which
+            # effectively burns the mfa_token too). Checked after the code so a
+            # correct one is never blocked (mirrors password_login).
+            if user.locked_until is not None and user.locked_until > _now():
+                raise AccountLocked()
+            _bump_lockout(user)
+            await _audit(
+                session,
+                "mfa_failed",
+                user=user,
+                meta=meta,
+                failed_count=user.failed_login_count,
+            )
+            raise InvalidCredentials("That code is not valid.")
         user.totp.recovery_codes = remaining
-        await _audit(session, "mfa_ok", user=user, meta=meta, factor="recovery")
-        return await issue_session(session, user, meta, method="password+recovery")
+        factor = "recovery"
 
-    await _audit(session, "mfa_failed", user=user, meta=meta)
-    raise InvalidCredentials("That code is not valid.")
+    user.failed_login_count = 0
+    user.locked_until = None
+    await _audit(session, "mfa_ok", user=user, meta=meta, factor=factor)
+    return await issue_session(session, user, meta, method=f"password+{factor}")
 
 
 # --- session issuance & rotation -----------------------------------------------

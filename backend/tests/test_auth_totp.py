@@ -96,25 +96,53 @@ async def test_lockout_blocks_the_mfa_step_too(
     token = await login(app_client)
     await _enrol_totp(app_client, token)
 
-    # Get a valid mfa_token from a good password step...
+    # Hold an mfa_token from a good password step, then lock the account with
+    # bad password guesses. A wrong code at the MFA step now gets AccountLocked.
     resp = await app_client.post(
         "/api/auth/login", json={"email": "sam@example.com", "password": DEFAULT_PASSWORD}
     )
     mfa_token = resp.json()["mfa_token"]
-
-    # ...then trip the lockout with bad password attempts.
     for _ in range(5):
         await app_client.post(
             "/api/auth/login", json={"email": "sam@example.com", "password": "wrong wrong"}
         )
 
-    import pyotp as _pyotp
-
     resp = await app_client.post(
         "/api/auth/login/mfa",
-        json={"mfa_token": mfa_token, "code": _pyotp.TOTP("A" * 16).now()},
+        json={"mfa_token": mfa_token, "code": "000000"},
     )
     assert resp.status_code == 423
+
+
+async def test_mfa_failures_trip_the_lockout(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    await register_and_verify(app_client, captured_emails)
+    token = await login(app_client)
+    secret, _ = await _enrol_totp(app_client, token)
+    mfa_token = (
+        await app_client.post(
+            "/api/auth/login", json={"email": "sam@example.com", "password": DEFAULT_PASSWORD}
+        )
+    ).json()["mfa_token"]
+
+    # Wrong second-factor codes count toward the lock, same as bad passwords.
+    for _ in range(5):
+        r = await app_client.post(
+            "/api/auth/login/mfa", json={"mfa_token": mfa_token, "code": "000000"}
+        )
+        assert r.status_code in (401, 423)
+    # Now even another wrong code is a hard lock, not a plain 401.
+    r = await app_client.post(
+        "/api/auth/login/mfa", json={"mfa_token": mfa_token, "code": "111111"}
+    )
+    assert r.status_code == 423
+    # ...but a correct code still lets the owner through (never DoS'd).
+    good = await app_client.post(
+        "/api/auth/login/mfa",
+        json={"mfa_token": mfa_token, "code": pyotp.TOTP(secret).now()},
+    )
+    assert good.status_code == 200
 
 
 async def test_me_reports_totp_enabled(

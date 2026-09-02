@@ -17,6 +17,7 @@ from app.auth.cookies import (
 from app.auth.deps import ClientMetaDep, SessionDep
 from app.auth.ratelimit import (
     LOGIN_LIMIT,
+    MFA_LIMIT,
     REGISTER_LIMIT,
     VERIFY_LIMIT,
     WEBAUTHN_LIMIT,
@@ -94,7 +95,7 @@ async def login(
 
 
 @router.post("/login/mfa", response_model=TokenOut)
-@limiter.limit(LOGIN_LIMIT)
+@limiter.limit(MFA_LIMIT)
 async def login_mfa(
     request: Request,
     body: MfaIn,
