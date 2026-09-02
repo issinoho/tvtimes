@@ -34,4 +34,14 @@ class Tenant(PkUuidMixin, TimestampMixin, Base):
     # recovers (app.worker.source_alerts). On by default.
     source_alerts_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
+    # Push a notification when someone on the account takes an action. Each
+    # category is an independent per-tenant opt-in (off by default); when on it
+    # fans out to *every* enabled notification target, ignoring the per-target
+    # send_* flags (those only gate source alerts / reminders). Push only — these
+    # never send email. See app.services.notify.notify_activity.
+    notify_on_reminder_set: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    notify_on_title_watch_set: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    notify_on_play: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    notify_on_watchlist_remove: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
     users: Mapped[list[User]] = relationship(back_populates="tenant", cascade="all, delete-orphan")

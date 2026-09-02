@@ -105,13 +105,15 @@ async def test_add_is_idempotent(db_schema: None) -> None:
     ids = await _seed()
     async with get_sessionmaker()() as session:
         user = await _user(session, ids["user"])
-        a = await svc.add_programme(session, user, programme_id=ids["p1"])
-        b = await svc.add_programme(session, user, programme_id=ids["p1"])
-        t1 = await svc.add_title(session, user, title="  Interstellar ")
-        t2 = await svc.add_title(session, user, title="interstellar")
+        a, a_created = await svc.add_programme(session, user, programme_id=ids["p1"])
+        b, b_created = await svc.add_programme(session, user, programme_id=ids["p1"])
+        t1, t1_created = await svc.add_title(session, user, title="  Interstellar ")
+        t2, t2_created = await svc.add_title(session, user, title="interstellar")
         await session.commit()
     assert a.id == b.id
+    assert (a_created, b_created) == (True, False)
     assert t1.id == t2.id
+    assert (t1_created, t2_created) == (True, False)
     assert t1.title_norm == "interstellar"
 
 
@@ -127,7 +129,7 @@ async def test_remove_checks_owner(db_schema: None) -> None:
     ids = await _seed()
     async with get_sessionmaker()() as session:
         user = await _user(session, ids["user"])
-        item = await svc.add_title(session, user, title="Interstellar")
+        item, _ = await svc.add_title(session, user, title="Interstellar")
         await session.commit()
         item_id = item.id
     async with get_sessionmaker()() as session:

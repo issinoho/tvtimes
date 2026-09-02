@@ -20,7 +20,13 @@ from app.auth.deps import (
 from app.auth.ratelimit import WEBAUTHN_LIMIT, limiter
 from app.config import get_settings
 from app.models.credentials import WebAuthnCredential
-from app.schemas.account import ExportTokenOut, SourceAlertsIn, TimezoneIn, TmdbTokenIn
+from app.schemas.account import (
+    ActivityNotificationsIn,
+    ExportTokenOut,
+    SourceAlertsIn,
+    TimezoneIn,
+    TmdbTokenIn,
+)
 from app.schemas.auth import (
     MeOut,
     MessageOut,
@@ -58,6 +64,10 @@ async def me(user: CurrentUser, session: SessionDep) -> MeOut:
         tmdb_connected=bool(user.tenant.tmdb_token_encrypted),
         export_token_set_at=user.tenant.export_token_set_at,
         source_alerts_enabled=user.tenant.source_alerts_enabled,
+        notify_on_reminder_set=user.tenant.notify_on_reminder_set,
+        notify_on_title_watch_set=user.tenant.notify_on_title_watch_set,
+        notify_on_play=user.tenant.notify_on_play,
+        notify_on_watchlist_remove=user.tenant.notify_on_watchlist_remove,
     )
 
 
@@ -108,6 +118,26 @@ async def set_source_alerts(
     return MessageOut(
         message="Source alert emails on." if body.enabled else "Source alert emails off."
     )
+
+
+@router.put("/activity-notifications", response_model=MessageOut)
+async def set_activity_notifications(
+    body: ActivityNotificationsIn, user: VerifiedUser, session: SessionDep
+) -> MessageOut:
+    """Toggle the per-tenant push opt-ins for user actions. Patch semantics —
+    only the fields present in the body change. Push only; no email."""
+    await session.refresh(user, ["tenant"])
+    fields = {
+        "reminder_set": "notify_on_reminder_set",
+        "title_watch_set": "notify_on_title_watch_set",
+        "play": "notify_on_play",
+        "watchlist_remove": "notify_on_watchlist_remove",
+    }
+    for name, column in fields.items():
+        value = getattr(body, name)
+        if value is not None:
+            setattr(user.tenant, column, value)
+    return MessageOut(message="Notification preferences updated.")
 
 
 @router.put("/timezone", response_model=MessageOut)

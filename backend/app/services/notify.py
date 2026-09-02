@@ -27,10 +27,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.crypto import decrypt
 from app.logging import get_logger
 from app.models.notification import NotificationTarget
+from app.models.tenant import Tenant
 
 _log = get_logger("services.notify")
 
 Event = Literal["source_alerts", "reminders"]
+
+# Per-tenant activity opt-ins (app.models.tenant.Tenant). Unlike ``Event`` these
+# are not gated per target: when the tenant flag is on, the notification fans
+# out to *every* enabled target. Push only — no email path.
+ActivityCategory = Literal["reminder_set", "title_watch_set", "play", "watchlist_remove"]
+
+_ACTIVITY_TENANT_FLAG: dict[ActivityCategory, str] = {
+    "reminder_set": "notify_on_reminder_set",
+    "title_watch_set": "notify_on_title_watch_set",
+    "play": "notify_on_play",
+    "watchlist_remove": "notify_on_watchlist_remove",
+}
 
 
 @dataclass(slots=True)
@@ -90,6 +103,20 @@ async def _targets(
     return list(rows)
 
 
+async def _enabled_targets(session: AsyncSession, tenant_id: uuid.UUID) -> list[NotificationTarget]:
+    """Every enabled target for the tenant, regardless of its per-target
+    ``send_*`` flags — activity notifications are gated at the tenant level."""
+    rows = await session.scalars(
+        select(NotificationTarget)
+        .where(
+            NotificationTarget.tenant_id == tenant_id,
+            NotificationTarget.enabled.is_(True),
+        )
+        .order_by(NotificationTarget.created_at)
+    )
+    return list(rows)
+
+
 def _client(urls: list[str]) -> apprise.Apprise:
     ap = apprise.Apprise()
     for url in urls:
@@ -100,19 +127,19 @@ def _client(urls: list[str]) -> apprise.Apprise:
     return ap
 
 
-async def dispatch(
-    session: AsyncSession,
+async def _deliver(
     tenant_id: uuid.UUID,
+    targets: list[NotificationTarget],
     notification: Notification,
     *,
-    event: Event,
+    kind: str,
 ) -> int:
-    """Fan ``notification`` out to the tenant's enabled targets for ``event``.
+    """Decrypt ``targets``' URLs and hand the notification to Apprise.
 
     Returns the number of targets Apprise accepted it for. Fail-open: any
-    failure logs and returns ``0`` rather than raising.
+    failure logs and returns ``0`` rather than raising. ``kind`` is only a log
+    label (the ``Event`` name or the ``ActivityCategory``).
     """
-    targets = await _targets(session, tenant_id, event)
     if not targets:
         return 0
 
@@ -132,7 +159,7 @@ async def dispatch(
         _log.error(
             "notify.dispatch_failed",
             tenant_id=str(tenant_id),
-            notify_event=event,
+            notify_event=kind,
             error=f"{type(exc).__name__}: {exc}",
         )
         return 0
@@ -141,11 +168,45 @@ async def dispatch(
     _log.info(
         "notify.dispatch",
         tenant_id=str(tenant_id),
-        notify_event=event,
+        notify_event=kind,
         targets=len(ap),
         delivered=delivered,
     )
     return delivered
+
+
+async def dispatch(
+    session: AsyncSession,
+    tenant_id: uuid.UUID,
+    notification: Notification,
+    *,
+    event: Event,
+) -> int:
+    """Fan ``notification`` out to the tenant's enabled targets for ``event``.
+
+    Returns the number of targets Apprise accepted it for. Fail-open: any
+    failure logs and returns ``0`` rather than raising.
+    """
+    targets = await _targets(session, tenant_id, event)
+    return await _deliver(tenant_id, targets, notification, kind=event)
+
+
+async def notify_activity(
+    session: AsyncSession,
+    tenant: Tenant,
+    category: ActivityCategory,
+    notification: Notification,
+) -> int:
+    """Push an activity notification if ``tenant`` has opted into ``category``.
+
+    Gated by the per-tenant flag; when on it fans out to *every* enabled target
+    (the per-target ``send_*`` flags don't apply). Returns 0 when the category
+    is off or nothing was delivered. Fail-open, like :func:`dispatch`.
+    """
+    if not getattr(tenant, _ACTIVITY_TENANT_FLAG[category]):
+        return 0
+    targets = await _enabled_targets(session, tenant.id)
+    return await _deliver(tenant.id, targets, notification, kind=category)
 
 
 async def send_test(target: NotificationTarget) -> bool:

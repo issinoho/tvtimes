@@ -53,7 +53,9 @@ async def list_items(session: AsyncSession, user: User) -> list[WatchlistItem]:
 
 async def add_programme(
     session: AsyncSession, user: User, *, programme_id: uuid.UUID, lead_minutes: int = 15
-) -> WatchlistItem:
+) -> tuple[WatchlistItem, bool]:
+    """Returns ``(item, created)`` — ``created`` is ``False`` when the airing was
+    already on the user's watchlist (the call is idempotent)."""
     programme = await session.get(Programme, programme_id)
     if programme is None or programme.tenant_id != user.tenant_id:
         raise WatchlistError("Unknown programme")
@@ -66,7 +68,7 @@ async def add_programme(
         )
     )
     if existing is not None:
-        return existing
+        return existing, False
     item = WatchlistItem(
         tenant_id=user.tenant_id,
         user_id=user.id,
@@ -79,12 +81,14 @@ async def add_programme(
     )
     session.add(item)
     await session.flush()
-    return item
+    return item, True
 
 
 async def add_title(
     session: AsyncSession, user: User, *, title: str, lead_minutes: int = 15
-) -> WatchlistItem:
+) -> tuple[WatchlistItem, bool]:
+    """Returns ``(item, created)`` — ``created`` is ``False`` when the title was
+    already tracked (the call is idempotent)."""
     display = title.strip()
     norm = normalize_title(display)
     if not norm:
@@ -97,7 +101,7 @@ async def add_title(
         )
     )
     if existing is not None:
-        return existing
+        return existing, False
     item = WatchlistItem(
         tenant_id=user.tenant_id,
         user_id=user.id,
@@ -108,14 +112,17 @@ async def add_title(
     )
     session.add(item)
     await session.flush()
-    return item
+    return item, True
 
 
-async def remove(session: AsyncSession, user: User, item_id: uuid.UUID) -> None:
+async def remove(session: AsyncSession, user: User, item_id: uuid.UUID) -> WatchlistItem:
+    """Delete the item and return it (detached but attributes still readable, so
+    the caller can describe what was removed)."""
     item = await session.get(WatchlistItem, item_id)
     if item is None or item.user_id != user.id:
         raise WatchlistError("Unknown watchlist item")
     await session.delete(item)
+    return item
 
 
 def _clamp_lead(minutes: int) -> int:

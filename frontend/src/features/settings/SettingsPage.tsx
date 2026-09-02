@@ -1,3 +1,4 @@
+import { ActivityNotificationsSection } from '@/features/settings/ActivityNotificationsSection';
 import { ConnectorsSection } from '@/features/settings/ConnectorsSection';
 import { ExportsSection } from '@/features/settings/ExportsSection';
 import { NotificationsSection } from '@/features/settings/NotificationsSection';
@@ -37,6 +38,7 @@ export function SettingsPage() {
       <ExportsSection />
       <SourceAlertsSection />
       <NotificationsSection />
+      <ActivityNotificationsSection />
 
       {version ? (
         <p className={styles.version}>
