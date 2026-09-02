@@ -38,15 +38,18 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && gosu nobody true
 
-# Runtime dependencies (mirrors backend/pyproject.toml [project.dependencies],
-# minus the dev extras). Its own layer so it caches across app-code changes.
-RUN uv pip install --system \
-        "fastapi>=0.115" "uvicorn[standard]>=0.32" "pydantic>=2.9" "pydantic-settings>=2.6" \
-        "sqlalchemy[asyncio]>=2.0.36" "alembic>=1.14" "asyncpg>=0.30" "aiosqlite>=0.20" \
-        "greenlet>=3.1" "structlog>=24.4" "httpx>=0.28" "python-multipart>=0.0.12" \
-        "email-validator>=2.2" "webauthn>=2.2" "argon2-cffi>=23.1" "pyotp>=2.9" \
-        "pyjwt[crypto]>=2.10" "cryptography>=44" "slowapi>=0.1.9" "arq>=0.26" "redis>=5.2" \
-        "apprise>=1.9" "defusedxml>=0.7"
+# Runtime dependencies, resolved straight from backend/pyproject.toml + uv.lock
+# so those are the single source of truth (no hand-kept list to drift, as it
+# did when defusedxml was added). --frozen fails the build loudly if the lock
+# is stale rather than silently installing something else; --no-emit-project
+# skips the app package itself (its source is COPYed below); --no-deps on the
+# install trusts the already-transitive export. Its own layer, so it caches
+# across app-code changes.
+COPY backend/pyproject.toml backend/uv.lock ./
+RUN uv export --frozen --no-dev --no-emit-project --no-hashes \
+        --format requirements-txt -o /tmp/requirements.txt \
+    && uv pip install --system --no-deps -r /tmp/requirements.txt \
+    && rm /tmp/requirements.txt
 
 COPY backend/ ./
 COPY --from=web /web/dist ./web
