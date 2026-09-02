@@ -1,0 +1,112 @@
+# Dependabot keeps the six dependency surfaces in this repo current.
+#
+# Minor and patch bumps are grouped into one PR per ecosystem per week, so a
+# quiet week is a handful of PRs rather than dozens. Anything major is left
+# ungrouped and arrives on its own, because that's the one that needs reading.
+#
+# CI (.github/workflows/ci.yml) gates all of them: backend/connector/frontend
+# suites plus the `image` job, which builds the all-in-one image and runs the
+# entrypoint smoke test — so a bad base-image or lockfile bump fails loudly
+# rather than shipping.
+version: 2
+
+updates:
+  # --- CI itself -------------------------------------------------------------
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: Europe/London
+    groups:
+      github-actions:
+        patterns: ["*"]
+
+  # --- Python ----------------------------------------------------------------
+  # Both are uv projects with a committed uv.lock. Since #107 the image installs
+  # from backend/uv.lock rather than a hand-kept list, so a bump here really is
+  # what ends up in the container.
+  - package-ecosystem: uv
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: Europe/London
+    open-pull-requests-limit: 5
+    groups:
+      backend:
+        update-types: [minor, patch]
+
+  - package-ecosystem: uv
+    directory: /connector
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: Europe/London
+    open-pull-requests-limit: 3
+    groups:
+      connector:
+        update-types: [minor, patch]
+
+  # --- Frontend --------------------------------------------------------------
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: Europe/London
+    open-pull-requests-limit: 5
+    groups:
+      frontend:
+        update-types: [minor, patch]
+
+  # --- Base images -----------------------------------------------------------
+  # The four Dockerfiles: the all-in-one image at the root (node + python + the
+  # uv binary it copies in), plus the per-service dev ones.
+  - package-ecosystem: docker
+    directories:
+      - /
+      - /backend
+      - /frontend
+      - /connector
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: Europe/London
+    groups:
+      base-images:
+        update-types: [minor, patch]
+    ignore:
+      # A language-runtime major (node 22 -> 24, python 3 -> 4) is a deliberate
+      # decision tied to `requires-python` and the CI matrix, not something to
+      # take from a bot. Minor/patch — where the security fixes live — flow.
+      - dependency-name: node
+        update-types: [version-update:semver-major]
+      - dependency-name: python
+        update-types: [version-update:semver-major]
+
+  # --- Compose service images ------------------------------------------------
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: Europe/London
+    groups:
+      compose-images:
+        update-types: [minor, patch]
+    ignore:
+      # A Postgres major is a dump/restore, not a `docker compose pull` — the
+      # data directory format changes and an unattended bump would leave a
+      # self-hoster's stack refusing to start. Redis majors likewise want a
+      # deliberate read of the release notes.
+      - dependency-name: postgres
+        update-types: [version-update:semver-major]
+      - dependency-name: redis
+        update-types: [version-update:semver-major]
