@@ -39,7 +39,7 @@ def _activity_jobs(jobs: Jobs) -> list[tuple[str, ...]]:
     return [j for j in jobs if j[0] == "activity_notification"]
 
 
-async def _seed_channel(tenant_id: uuid.UUID) -> tuple[str, str]:
+async def _seed_channel(tenant_id: uuid.UUID, *, enrich: bool = True) -> tuple[str, str]:
     async with get_sessionmaker()() as session:
         src = Source(
             tenant_id=tenant_id,
@@ -82,17 +82,20 @@ async def _seed_channel(tenant_id: uuid.UUID) -> tuple[str, str]:
             year="1982",
             is_movie=True,
         )
-        key, year_key = cache_key("The Thing", "1982")
-        art = TmdbEnrichment(
-            media_type=MediaType.movie,
-            query_key=key,
-            query_year=year_key,
-            fetched_at=now,
-            negative=False,
-            tmdb_id=1091,
-            poster_url="https://image.tmdb.org/t/p/w500/the-thing.jpg",
-        )
-        session.add_all([prog, now_on, art])
+        session.add_all([prog, now_on])
+        if enrich:
+            key, year_key = cache_key("The Thing", "1982")
+            session.add(
+                TmdbEnrichment(
+                    media_type=MediaType.movie,
+                    query_key=key,
+                    query_year=year_key,
+                    fetched_at=now,
+                    negative=False,
+                    tmdb_id=1091,
+                    poster_url="https://image.tmdb.org/t/p/w500/the-thing.jpg",
+                )
+            )
         await session.commit()
         return str(ch.id), str(prog.id)
 
@@ -197,3 +200,21 @@ async def test_play_link_enqueues_push(
     assert title == "The Thing"  # what's on the channel now, not "Playing now"
     assert "BBC One" in body
     assert image_url == "https://image.tmdb.org/t/p/w500/the-thing.jpg"
+    # the artwork was cached, so no enrichment job was queued
+    assert not [j for j in enqueued if j[0] == "enrich_programme"]
+
+
+async def test_play_link_warms_enrichment_when_art_missing(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]], enqueued: Jobs
+) -> None:
+    await register_and_verify(app_client, captured_emails)
+    h = auth_header(await login(app_client))
+    me = (await app_client.get("/api/account/me", headers=h)).json()
+    channel_id, _pid = await _seed_channel(uuid.UUID(me["tenant_id"]), enrich=False)
+
+    resp = await app_client.post(f"/api/channels/{channel_id}/play-link", headers=h)
+    assert resp.status_code == 200, resp.text
+
+    play = _activity_jobs(enqueued)[0]
+    assert play[3] == "The Thing" and play[5] == ""  # title, but no image
+    assert [j for j in enqueued if j[0] == "enrich_programme"]  # warm-up queued

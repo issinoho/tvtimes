@@ -247,9 +247,11 @@ on it fans out to *every* enabled target. There is no email for these, and the
 push is queued so it never adds latency to the click that triggered it.
 
 The **channel is played** push names whatever is on air at that moment (from the
-guide, clock-shift corrected) and attaches its TMDB poster where the enrichment
-cache has one and the notifier supports images (ntfy, Discord, Telegram,
-Pushover, …). With no guide data it falls back to just the channel name.
+guide, clock-shift corrected) and includes its TMDB poster where the enrichment
+cache has one: as a real attachment on notifiers that support one (ntfy, Discord,
+Telegram, Pushover, …), and as an inline markdown image on Gotify (which drops
+Apprise attachments but renders markdown). With no guide data it falls back to
+just the channel name.
 
 ## Troubleshooting
 
