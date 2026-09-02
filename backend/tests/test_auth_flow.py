@@ -133,12 +133,19 @@ async def test_account_lockout_after_repeated_failures(
         await app_client.post(
             "/api/auth/login", json={"email": "sam@example.com", "password": "wrong wrong"}
         )
-    # Correct password now, but the account is temporarily locked.
-    resp = await app_client.post(
+    # A further *wrong* guess now gets the generic lock response — the attacker
+    # is throttled and sees no oracle.
+    locked = await app_client.post(
+        "/api/auth/login", json={"email": "sam@example.com", "password": "still wrong"}
+    )
+    assert locked.status_code == 423
+    assert locked.json()["code"] == "account_locked"
+    # ...but the real password still lets the owner in: a known email plus bad
+    # guesses can't deny them service (#90).
+    ok = await app_client.post(
         "/api/auth/login", json={"email": "sam@example.com", "password": DEFAULT_PASSWORD}
     )
-    assert resp.status_code == 423
-    assert resp.json()["code"] == "account_locked"
+    assert ok.status_code == 200
 
 
 async def test_refresh_rotates_and_detects_reuse(

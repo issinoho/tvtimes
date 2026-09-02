@@ -71,6 +71,9 @@ limiter = Limiter(
 
 # Per-route limits (referenced from routers).
 LOGIN_LIMIT = "10/minute"
+# The second factor gets its own (tighter) budget so a 6-digit TOTP space
+# can't be walked even with a fresh mfa_token each minute.
+MFA_LIMIT = "6/minute"
 REGISTER_LIMIT = "5/minute"
 VERIFY_LIMIT = "20/minute"
 WEBAUTHN_LIMIT = "30/minute"
