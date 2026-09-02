@@ -165,6 +165,22 @@ URL that stands in for both feeds. Click it (once tvdinner has run
 guide pair, so its own program guide, recording and scheduling all work against
 your merged line-up.
 
+**Recording straight from your watchlist.** The same token also serves
+`/api/exports/watchlist.json` — every upcoming airing anyone on the account has
+watchlisted, with corrected times and the same `/stream/<id>` URLs the M3U uses.
+Run tvdinner with `--record-watchlist` and it polls that feed every 15 minutes,
+scheduling a recording for each one:
+
+```sh
+tvdinner 'tvtimess://tv.example.com?token=…' --record-watchlist
+```
+
+Press **Remind me** on your phone and the box at home records it. The watchlist
+is per user while the token is per account, so a shared household account
+records what *anyone* on it flagged, de-duplicated per broadcast.
+Un-watchlisting removes the pending recording again; anything scheduled by hand
+in tvdinner is left alone.
+
 Notes:
 
 - Anyone with a link can read your line-up and stream through it — treat the

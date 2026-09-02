@@ -61,6 +61,22 @@ async def epg_xml(request: Request, tenant: TenantDep, session: SessionDep) -> S
     )
 
 
+@router.get("/watchlist.json", include_in_schema=False)
+@limiter.limit(EXPORT_LIMIT)
+async def watchlist_json(
+    request: Request,
+    tenant: TenantDep,
+    session: SessionDep,
+    token: Annotated[str, Query()] = "",
+) -> list[dict[str, object]]:
+    """Every upcoming watchlisted airing on this account, flat enough for a
+    recorder to act on without understanding tvtimes — see
+    ``exports.render_watchlist``. Same per-tenant token as the playlist and
+    guide feeds; consumed by tvdinner's ``--record-watchlist``."""
+    base = get_settings().public_origin.rstrip("/")
+    return await svc.render_watchlist(session, tenant, base_url=base, token=token)
+
+
 @router.get("/stream/{channel_id}", include_in_schema=False)
 @limiter.limit(EXPORT_LIMIT)
 async def stream(

@@ -34,6 +34,7 @@ from app.logging import get_logger
 from app.models.epg import Programme
 from app.models.source import Channel, Source, SourceKind
 from app.models.tenant import Tenant
+from app.models.watchlist import WatchKind, WatchlistItem
 from app.services.epg import (
     MAX_CLOCK_SHIFT,
     WINDOW_FUTURE,
@@ -42,6 +43,7 @@ from app.services.epg import (
     resolve_display_tz,
 )
 from app.services.sources import decrypt_config
+from app.services.watchlist import normalize_title
 
 _log = get_logger("services.exports")
 
@@ -290,3 +292,94 @@ async def _render_xmltv(
             yield chunk
 
     yield "</tv>\n"
+
+
+# --- watchlist ------------------------------------------------------------------
+
+
+async def render_watchlist(
+    session: AsyncSession, tenant: Tenant, *, base_url: str, token: str
+) -> list[dict[str, object]]:
+    """Every upcoming airing anyone on this tenant has watchlisted, as flat
+    JSON a recorder can act on without understanding tvtimes at all — see
+    tvdinner's `--record-watchlist`.
+
+    The export token is *tenant*-scoped while the watchlist is per user, so
+    this is the union across the account's users, de-duplicated per airing:
+    a shared box records whatever anyone in the household flagged, and two
+    people watchlisting the same broadcast still yields one entry.
+
+    ``channel_url`` is the same ``/exports/stream/<id>?token=`` URL the M3U
+    carries, so a client can match an entry to a channel it already loaded by
+    URL equality (tvdinner keys channels by URL, never tvg-id). Times are
+    corrected UTC — the channel's clock-shift applied, exactly as
+    :func:`render_xmltv` writes them — so a scheduled recording lines up with
+    the exported guide rather than with raw feed time.
+    """
+    channels = {c.id: c for c in await _ordered_channels(session, tenant.id)}
+    if not channels:
+        return []
+    sources = await _sources_by_id(session, channels.values())
+    shifts = {
+        cid: timedelta(seconds=_shift_seconds(ch, sources.get(ch.source_id)))
+        for cid, ch in channels.items()
+    }
+
+    items = list(
+        await session.scalars(select(WatchlistItem).where(WatchlistItem.tenant_id == tenant.id))
+    )
+    if not items:
+        return []
+
+    now = datetime.now(UTC)
+    horizon = now + WINDOW_FUTURE
+    # (channel_id, raw start) -> entry. Keyed on the *raw* start so the same
+    # broadcast collapses whether it arrived via a programme snapshot or a
+    # title watch.
+    found: dict[tuple[uuid.UUID, datetime], dict[str, object]] = {}
+
+    def _add(channel_id: uuid.UUID, start_raw: datetime, stop_raw: datetime, title: str) -> None:
+        channel = channels.get(channel_id)
+        if channel is None:  # a channel that has since gone away, or a disabled source
+            return
+        shift = shifts[channel_id]
+        start, stop = start_raw + shift, stop_raw + shift
+        if stop <= now or start >= horizon:
+            return
+        found.setdefault(
+            (channel_id, start_raw),
+            {
+                "channel_id": str(channel_id),
+                "channel_name": channel.name,
+                "channel_url": f"{base_url}/api/exports/stream/{channel_id}?token={token}",
+                "title": title,
+                "start": start.isoformat(),
+                "stop": stop.isoformat(),
+            },
+        )
+
+    wanted_titles = {i.title_norm for i in items if i.kind == WatchKind.by_title and i.title_norm}
+    for item in items:
+        if item.kind != WatchKind.programme:
+            continue
+        if item.channel_id is None or item.start_utc is None or item.stop_utc is None:
+            continue
+        _add(item.channel_id, item.start_utc, item.stop_utc, item.title_display)
+
+    if wanted_titles:
+        # Widened by the max clock-shift for the same reason render_xmltv
+        # widens: a shifted channel's raw row can sit outside the window its
+        # corrected time falls in.
+        upcoming = await session.scalars(
+            select(Programme).where(
+                Programme.tenant_id == tenant.id,
+                Programme.channel_id.in_(list(channels)),
+                Programme.stop_utc > now - MAX_CLOCK_SHIFT,
+                Programme.start_utc < horizon + MAX_CLOCK_SHIFT,
+            )
+        )
+        for p in upcoming:
+            if normalize_title(p.title) in wanted_titles:
+                _add(p.channel_id, p.start_utc, p.stop_utc, p.title)
+
+    return sorted(found.values(), key=lambda e: (str(e["start"]), str(e["channel_name"])))

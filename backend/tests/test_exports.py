@@ -17,7 +17,10 @@ from app.db import get_sessionmaker
 from app.models.epg import EpgSource, Programme
 from app.models.source import Channel, Source, SourceKind, SourceStatus
 from app.models.tenant import Tenant
+from app.models.user import User
+from app.models.watchlist import WatchKind, WatchlistItem
 from app.services import exports as svc
+from app.services.watchlist import normalize_title
 from httpx import AsyncClient
 
 from tests.conftest import auth_header, login, register_and_verify
@@ -552,3 +555,149 @@ async def test_play_ticket_invalid_or_wrong_channel_401(
     # channel m3u's ticket used on the stalker channel's path
     resp = await app_client.get(f"/api/exports/play/{ids['stalker']}/stream", params=params)
     assert resp.status_code == 401
+
+
+# --- watchlist feed -----------------------------------------------------------
+
+
+async def _watchlist_user(tenant_id: uuid.UUID) -> uuid.UUID:
+    async with get_sessionmaker()() as session:
+        user = User(
+            tenant_id=tenant_id,
+            email=f"w{uuid.uuid4().hex[:8]}@example.com",
+            display_name="Watcher",
+            email_verified_at=datetime.now(UTC),
+        )
+        session.add(user)
+        await session.commit()
+        return user.id
+
+
+async def _add_watchlist(user_id: uuid.UUID, tenant_id: uuid.UUID, **fields: object) -> None:
+    async with get_sessionmaker()() as session:
+        session.add(WatchlistItem(tenant_id=tenant_id, user_id=user_id, **fields))
+        await session.commit()
+
+
+async def _render_watchlist(tenant_id: uuid.UUID) -> list[dict[str, object]]:
+    async with get_sessionmaker()() as session:
+        tenant = await session.get(Tenant, tenant_id)
+        assert tenant is not None
+        return await svc.render_watchlist(
+            session, tenant, base_url="https://tv.example.com", token="tok"
+        )
+
+
+async def test_render_watchlist_programme_item_carries_corrected_times(db_schema: None) -> None:
+    ids = await _seed()
+    user = await _watchlist_user(ids["tenant"])
+    await _add_watchlist(
+        user,
+        ids["tenant"],
+        kind=WatchKind.programme,
+        title_display="The Nine O'Clock News",
+        channel_id=ids["ch_m3u"],
+        start_utc=PROG_START,
+        stop_utc=PROG_START + timedelta(hours=1),
+    )
+
+    entries = await _render_watchlist(ids["tenant"])
+    assert len(entries) == 1
+    entry = entries[0]
+    assert entry["channel_id"] == str(ids["ch_m3u"])
+    assert entry["channel_name"] == "BBC One"
+    # the same /stream URL the M3U carries, so a client can match by URL
+    assert entry["channel_url"] == (
+        f"https://tv.example.com/api/exports/stream/{ids['ch_m3u']}?token=tok"
+    )
+    # ch_m3u has a 1h clock shift; the feed must agree with the exported guide
+    assert entry["start"] == (PROG_START + timedelta(hours=1)).isoformat()
+    assert entry["stop"] == (PROG_START + timedelta(hours=2)).isoformat()
+
+
+async def test_render_watchlist_title_watch_matches_upcoming_airings(db_schema: None) -> None:
+    ids = await _seed()
+    user = await _watchlist_user(ids["tenant"])
+    await _add_watchlist(
+        user,
+        ids["tenant"],
+        kind=WatchKind.by_title,
+        title_display="The Nine O'Clock News",
+        title_norm=normalize_title("the NINE o'clock news"),
+    )
+
+    entries = await _render_watchlist(ids["tenant"])
+    assert [e["title"] for e in entries] == ["The Nine O'Clock News"]
+    assert entries[0]["start"] == (PROG_START + timedelta(hours=1)).isoformat()
+
+
+async def test_render_watchlist_dedupes_one_airing_across_users_and_kinds(
+    db_schema: None,
+) -> None:
+    ids = await _seed()
+    one, two = await _watchlist_user(ids["tenant"]), await _watchlist_user(ids["tenant"])
+    # the same broadcast reached three ways: a snapshot each for two users in
+    # the household, plus a title watch that also matches it
+    for user in (one, two):
+        await _add_watchlist(
+            user,
+            ids["tenant"],
+            kind=WatchKind.programme,
+            title_display="The Nine O'Clock News",
+            channel_id=ids["ch_m3u"],
+            start_utc=PROG_START,
+            stop_utc=PROG_START + timedelta(hours=1),
+        )
+    await _add_watchlist(
+        one,
+        ids["tenant"],
+        kind=WatchKind.by_title,
+        title_display="The Nine O'Clock News",
+        title_norm=normalize_title("The Nine O'Clock News"),
+    )
+
+    assert len(await _render_watchlist(ids["tenant"])) == 1
+
+
+async def test_render_watchlist_skips_finished_airings_and_dead_channels(
+    db_schema: None,
+) -> None:
+    ids = await _seed()
+    user = await _watchlist_user(ids["tenant"])
+    past = datetime.now(UTC) - timedelta(days=2)
+    await _add_watchlist(
+        user,
+        ids["tenant"],
+        kind=WatchKind.programme,
+        title_display="Last Week's Film",
+        channel_id=ids["ch_m3u"],
+        start_utc=past,
+        stop_utc=past + timedelta(hours=1),
+    )
+    # a channel whose source is disabled never appears in the export at all
+    await _add_watchlist(
+        user,
+        ids["tenant"],
+        kind=WatchKind.programme,
+        title_display="On A Disabled Source",
+        channel_id=ids["ch_off"],
+        start_utc=PROG_START,
+        stop_utc=PROG_START + timedelta(hours=1),
+    )
+
+    assert await _render_watchlist(ids["tenant"]) == []
+
+
+async def test_watchlist_json_endpoint_is_token_gated(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    assert (await app_client.get("/api/exports/watchlist.json")).status_code == 401
+    assert (await app_client.get("/api/exports/watchlist.json?token=nope")).status_code == 401
+
+    await register_and_verify(app_client, captured_emails)
+    h = auth_header(await login(app_client))
+    token = (await app_client.post("/api/account/export-token", headers=h)).json()["token"]
+
+    resp = await app_client.get(f"/api/exports/watchlist.json?token={token}")
+    assert resp.status_code == 200
+    assert resp.json() == []  # nothing watchlisted yet, but the feed is live
