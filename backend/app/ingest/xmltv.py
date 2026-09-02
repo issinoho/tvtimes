@@ -1,6 +1,11 @@
 """XMLTV parsing and the timezone/clock-shift helpers, ported from
 ``tvdinner.epg``. Streaming ``iterparse`` keeps memory flat on the very large
-feeds (hundreds of MB) some providers serve."""
+feeds (hundreds of MB) some providers serve.
+
+The feed is fully attacker-controlled (any tenant's EPG URL), so parsing goes
+through ``defusedxml``: an external DTD reference (``<!DOCTYPE tv SYSTEM
+"xmltv.dtd">``, which real XMLTV carries) is allowed but never fetched, while
+inline entity definitions — billion-laughs, XXE — are refused outright."""
 
 from __future__ import annotations
 
@@ -11,6 +16,8 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta, timezone
 from io import BytesIO, StringIO
 from xml.etree import ElementTree
+
+from defusedxml.ElementTree import iterparse as _safe_iterparse
 
 from app.ingest.errors import SourceRejected
 
@@ -174,7 +181,7 @@ def parse_xmltv(data: bytes | str, wanted_channel_ids: set[str] | None = None) -
     guide = ParsedGuide()
     resolved_wanted: set[str] = set()
 
-    context = iter(ElementTree.iterparse(source, events=("start", "end")))
+    context = iter(_safe_iterparse(source, events=("start", "end")))
     _, root = next(context)
 
     for event, elem in context:

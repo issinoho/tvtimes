@@ -30,6 +30,7 @@ dependencies = [
     "redis>=5.2",
     # push notifications (Gotify / ntfy / Discord / … via one URL scheme)
     "apprise>=1.9",
+    "defusedxml>=0.7",
 ]
 
 [project.optional-dependencies]
@@ -86,5 +87,5 @@ disallow_untyped_decorators = false
 exclude = ["alembic/"]
 
 [[tool.mypy.overrides]]
-module = ["webauthn.*", "arq.*", "soft_webauthn.*", "slowapi.*", "apprise.*"]
+module = ["webauthn.*", "arq.*", "soft_webauthn.*", "slowapi.*", "apprise.*", "defusedxml.*"]
 ignore_missing_imports = true
