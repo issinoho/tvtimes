@@ -4,13 +4,18 @@ feeds (hundreds of MB) some providers serve."""
 
 from __future__ import annotations
 
-import gzip
 import re
 import unicodedata
+import zlib
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta, timezone
 from io import BytesIO, StringIO
 from xml.etree import ElementTree
+
+from app.ingest.errors import SourceRejected
+
+# Fallback ceiling on gunzip output when a caller doesn't pass its own.
+_MAX_DECOMPRESSED_BYTES = 256 * 1024 * 1024
 
 _XMLTV_TIME_RE = re.compile(
     r"^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})\s*(?:([+-]\d{2})(\d{2}))?$"
@@ -121,13 +126,26 @@ class ParsedGuide:
     programmes: list[XmltvProgramme] = field(default_factory=list)
 
 
-def maybe_decompress(data: bytes) -> bytes:
-    if data[:2] == b"\x1f\x8b":
-        try:
-            return gzip.decompress(data)
-        except OSError:
-            return data
-    return data
+def maybe_decompress(data: bytes, *, max_bytes: int | None = None) -> bytes:
+    """Transparently gunzip a gzip body, capping the *output* at ``max_bytes``
+    (default 256 MiB). A small, highly-compressed payload therefore can't
+    expand into a memory-exhaustion bomb. Non-gzip input, or a body whose magic
+    bytes lie, is returned unchanged."""
+    if data[:2] != b"\x1f\x8b":
+        return data
+    limit = _MAX_DECOMPRESSED_BYTES if max_bytes is None else max_bytes
+    dec = zlib.decompressobj(wbits=31)  # 31 -> gzip framing
+    try:
+        out = dec.decompress(data, limit + 1)
+        while dec.unconsumed_tail and len(out) <= limit:
+            out += dec.decompress(dec.unconsumed_tail, limit + 1 - len(out))
+    except zlib.error:
+        return data  # magic bytes matched but it isn't valid gzip
+    if len(out) > limit:
+        raise SourceRejected(
+            f"The gzip response expands past the {limit // (1024 * 1024)} MiB limit."
+        )
+    return out + dec.flush()
 
 
 def _text(elem: ElementTree.Element | None) -> str | None:

@@ -75,9 +75,11 @@ class Settings(BaseSettings):
     s3_access_key: str = ""
     s3_secret_key: str = ""
 
-    # Outbound fetch / SSRF guard
+    # Outbound fetch / SSRF guard. fetch_max_bytes caps both the downloaded
+    # body and, for a gzip response, its decompressed size — so it also bounds
+    # a decompression bomb. 256 MiB is well above the largest real XMLTV feeds.
     fetch_timeout_seconds: float = 20.0
-    fetch_max_bytes: int = 500 * 1024 * 1024
+    fetch_max_bytes: int = 256 * 1024 * 1024
     fetch_allowlist: str = Field(
         default="",
         description="Comma-separated hostnames/CIDRs allowed past the private-range block.",

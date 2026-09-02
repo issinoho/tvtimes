@@ -258,7 +258,7 @@ async def fetch_bytes(
                     body = await _read_bytes_capped(response, max_bytes)
                     return BytesResult(
                         200,
-                        maybe_decompress(body),
+                        maybe_decompress(body, max_bytes=max_bytes),
                         response.headers.get("etag"),
                         response.headers.get("last-modified"),
                     )

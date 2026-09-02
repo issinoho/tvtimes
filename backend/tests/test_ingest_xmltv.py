@@ -4,6 +4,7 @@ import gzip
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from app.ingest.errors import SourceRejected
 from app.ingest.xmltv import (
     is_movie,
     maybe_decompress,
@@ -103,6 +104,19 @@ def test_maybe_decompress_roundtrip() -> None:
     raw = b"<tv></tv>"
     assert maybe_decompress(gzip.compress(raw)) == raw
     assert maybe_decompress(raw) == raw
+
+
+def test_maybe_decompress_caps_output_at_max_bytes() -> None:
+    bomb = gzip.compress(b"\x00" * 4096)  # a few dozen bytes -> 4 KiB
+    assert len(bomb) < 100
+    assert maybe_decompress(bomb, max_bytes=4096) == b"\x00" * 4096  # exactly at the cap
+    with pytest.raises(SourceRejected):
+        maybe_decompress(bomb, max_bytes=1024)  # over the cap
+
+
+def test_maybe_decompress_bad_gzip_after_magic_is_returned_raw() -> None:
+    junk = b"\x1f\x8b" + b"not actually gzip"
+    assert maybe_decompress(junk) == junk
 
 
 def test_is_movie() -> None:
