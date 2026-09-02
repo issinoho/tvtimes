@@ -13,6 +13,7 @@ from app.ingest.xmltv import (
     parse_xmltv,
     parse_xmltv_time,
 )
+from defusedxml import EntitiesForbidden
 
 SAMPLE = """<?xml version="1.0" encoding="UTF-8"?>
 <tv>
@@ -62,6 +63,29 @@ def test_parse_xmltv_channels_and_programmes() -> None:
 def test_parse_xmltv_wanted_filter() -> None:
     guide = parse_xmltv(SAMPLE, wanted_channel_ids={"bbc1.uk"})
     assert [p.channel_id for p in guide.programmes] == ["bbc1.uk"]
+
+
+def test_parse_xmltv_allows_a_plain_external_doctype() -> None:
+    # Real XMLTV carries this; it must parse (the DTD is never fetched).
+    xml = (
+        '<?xml version="1.0"?>\n<!DOCTYPE tv SYSTEM "xmltv.dtd">\n'
+        '<tv><channel id="c1"><display-name>One</display-name></channel></tv>'
+    )
+    assert "c1" in parse_xmltv(xml).channels
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        # billion laughs
+        '<?xml version="1.0"?><!DOCTYPE t [<!ENTITY a "x"><!ENTITY b "&a;&a;&a;">]><tv>&b;</tv>',
+        # XXE file read
+        '<?xml version="1.0"?><!DOCTYPE t [<!ENTITY x SYSTEM "file:///etc/passwd">]><tv>&x;</tv>',
+    ],
+)
+def test_parse_xmltv_refuses_inline_entities(payload: str) -> None:
+    with pytest.raises(EntitiesForbidden):
+        parse_xmltv(payload)
 
 
 @pytest.mark.parametrize(
