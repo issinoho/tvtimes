@@ -46,7 +46,9 @@ Migrations run automatically on start. `--force-recreate` ensures the running
 containers move onto the freshly pulled image (a bare `up -d` sometimes reports
 "Running" and does nothing). A browser tab that's already open shows a "new
 version available — Reload" prompt. Pin a version in `.env`
-(`TVTIMES_IMAGE=issinoho1969/tvtimes:v1.2.0`) to upgrade deliberately.
+(`TVTIMES_IMAGE=issinoho1969/tvtimes:0.1.53`) to upgrade deliberately — note the
+image tag has **no leading `v`**, unlike the git tag it's built from. `0.1`
+tracks the newest patch on that line.
 
 ## Data & backups
 
