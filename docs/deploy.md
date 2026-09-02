@@ -12,8 +12,8 @@ no CORS and the refresh cookie is first-party.
 
 | | command | notes |
 |---|---|---|
-| Web/API | `entrypoint web` | runs `alembic upgrade head`, then `uvicorn` with `--proxy-headers`. Stateless; scale horizontally behind a load balancer. |
-| Worker | `entrypoint worker` | `arq app.worker.WorkerSettings`. One is enough — refreshes sources/EPG, warms the TMDB cache, sends watchlist reminders (`reminders`, every 5 min) and source-health alerts (`source_alerts`, every 15 min). |
+| Web/API | `entrypoint web` | runs `alembic upgrade head`, then `uvicorn` (no `--proxy-headers` — the app resolves the client IP itself; see *Edge / reverse proxy*). Stateless; scale horizontally behind a load balancer. |
+| Worker | `entrypoint worker` | `arq app.worker.WorkerSettings`. One is enough — refreshes sources/EPG, warms the TMDB cache, sends watchlist reminders (`reminders`, every 5 min) and source-health alerts (`source_alerts`, every 15 min), and delivers queued push notifications (`activity_notification`). |
 | Postgres 16 | — | the only stateful store |
 | Redis 7 | — | arq queue + rate-limit storage |
 
@@ -53,14 +53,19 @@ Full list with defaults: [`.env.example`](../.env.example).
 
 ## Edge / reverse proxy
 
-- Terminate TLS at the proxy and forward `X-Forwarded-Proto` / `X-Forwarded-For`
-  (uvicorn runs with `--proxy-headers --forwarded-allow-ips '*'`; the rate
-  limiter and audit log read the client IP).
+- Terminate TLS at the proxy and forward `X-Forwarded-Proto` / `X-Forwarded-For`.
+  The app reads the client IP itself (for the rate limiter and audit log) and
+  **only trusts `X-Forwarded-For` from `TVTIMES_TRUSTED_PROXIES`** — a
+  comma-separated list of proxy IPs / CIDRs. Leave it empty and every request is
+  treated as direct (XFF ignored), so set it whenever a proxy is in front: the
+  compose network is `172.16.0.0/12`, a same-host proxy is `127.0.0.1`.
 - Proxy **all** paths to the container — the SPA and API are one origin.
-- Recommended headers: HSTS; CSP with `connect-src 'self'`, `script-src 'self'`,
-  `img-src 'self' data: https://image.tmdb.org`. Channel logos are proxied
-  through this origin (`/api/channels/{id}/logo`), so only TMDB art is
-  cross-origin; the iptv-org logo CDN is fetched server-side only.
+- Security response headers (CSP, `X-Content-Type-Options`, `Referrer-Policy`,
+  `X-Frame-Options`, and HSTS on an `https://` `TVTIMES_PUBLIC_ORIGIN` in
+  `env=prod`) are sent by the app — the proxy doesn't need to add them. The CSP
+  allows `img-src … https://image.tmdb.org`; channel logos are proxied through
+  this origin (`/api/channels/{id}/logo`) and the iptv-org logo CDN is fetched
+  server-side only.
 - The refresh cookie is `HttpOnly; Secure; SameSite=Lax`, path `/api/auth`.
 
 ## Export feeds
