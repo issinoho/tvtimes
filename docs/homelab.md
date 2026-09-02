@@ -246,6 +246,11 @@ per-target flags above these ignore the per-target toggles — when a category i
 on it fans out to *every* enabled target. There is no email for these, and the
 push is queued so it never adds latency to the click that triggered it.
 
+The **channel is played** push names whatever is on air at that moment (from the
+guide, clock-shift corrected) and attaches its TMDB poster where the enrichment
+cache has one and the notifier supports images (ntfy, Discord, Telegram,
+Pushover, …). With no guide data it falls back to just the channel name.
+
 ## Troubleshooting
 
 - **"insecure production config" on start** — you set your own

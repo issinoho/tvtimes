@@ -54,10 +54,15 @@ async def enqueue_programme_enrich(tenant_id: uuid.UUID, programme_id: uuid.UUID
 
 
 async def enqueue_activity_notification(
-    tenant_id: uuid.UUID, category: str, title: str, body: str
+    tenant_id: uuid.UUID,
+    category: str,
+    title: str,
+    body: str,
+    image_url: str | None = None,
 ) -> None:
     """Push a user-action notification (Remind Me / Watch title / Play / removal)
     to the tenant's targets. Done off the request path — the Apprise round-trip
     shouldn't add latency to the click that triggered it. The worker re-checks
-    the per-tenant opt-in, so a stale enqueue is harmless."""
-    await _enqueue("activity_notification", str(tenant_id), category, title, body)
+    the per-tenant opt-in, so a stale enqueue is harmless. ``image_url`` is an
+    optional poster/artwork URL attached where the notifier supports it."""
+    await _enqueue("activity_notification", str(tenant_id), category, title, body, image_url or "")

@@ -50,6 +50,10 @@ _ACTIVITY_TENANT_FLAG: dict[ActivityCategory, str] = {
 class Notification:
     title: str
     body: str
+    # Optional image URL to attach. Apprise downloads it and forwards it to
+    # services that support attachments (ntfy, Discord, Telegram, Pushover, …);
+    # others ignore it. Only ever a stable, public URL we built ourselves.
+    attach: str | None = None
 
 
 class InvalidTargetUrl(ValueError):
@@ -154,7 +158,11 @@ async def _deliver(
         return 0
 
     try:
-        ok = await ap.async_notify(title=notification.title, body=notification.body)
+        ok = await ap.async_notify(
+            title=notification.title,
+            body=notification.body,
+            attach=notification.attach,
+        )
     except Exception as exc:
         _log.error(
             "notify.dispatch_failed",

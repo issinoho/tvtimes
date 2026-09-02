@@ -32,13 +32,14 @@ def apprise_calls(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[Calls, Stat
     state: State = {"result": True}
 
     async def _async_notify(self: apprise.Apprise, *args: object, **kwargs: object) -> object:
-        calls.append(
-            {
-                "servers": len(self),
-                "title": kwargs.get("title"),
-                "body": kwargs.get("body"),
-            }
-        )
+        call: dict[str, object] = {
+            "servers": len(self),
+            "title": kwargs.get("title"),
+            "body": kwargs.get("body"),
+        }
+        if kwargs.get("attach"):  # only when set, so plain calls keep a 3-key dict
+            call["attach"] = kwargs["attach"]
+        calls.append(call)
         result = state["result"]
         if isinstance(result, Exception):
             raise result
@@ -280,6 +281,24 @@ async def test_worker_activity_notification_job(
     calls.clear()
     await activity_notification({}, str(tenant_id), "not-a-category", "x", "y")
     assert calls == []  # unknown category is ignored
+
+
+async def test_worker_activity_notification_forwards_image(
+    db_schema: None, apprise_calls: tuple[Calls, State]
+) -> None:
+    from app.worker import activity_notification
+
+    calls, _ = apprise_calls
+    tenant_id = await _seed_activity_targets(notify_on_play=True)
+    art = "https://image.tmdb.org/t/p/w500/abc.jpg"
+
+    await activity_notification({}, str(tenant_id), "play", "The Thing", "TCM", art)
+    assert calls == [{"servers": 2, "title": "The Thing", "body": "TCM", "attach": art}]
+
+    # empty image_url -> no attachment key
+    calls.clear()
+    await activity_notification({}, str(tenant_id), "play", "The Thing", "TCM", "")
+    assert calls == [{"servers": 2, "title": "The Thing", "body": "TCM"}]
 
 
 # --- API -------------------------------------------------------------------

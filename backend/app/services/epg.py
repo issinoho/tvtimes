@@ -296,6 +296,27 @@ async def local_times(
     return (start_utc + shift).astimezone(tz), (stop_utc + shift).astimezone(tz), tz_name
 
 
+async def current_programme(
+    session: AsyncSession, channel: Channel, *, now: datetime | None = None
+) -> Programme | None:
+    """The programme airing on ``channel`` at ``now`` (its clock-shift applied),
+    or None when nothing is scheduled for this moment."""
+    now = now or _now()
+    source = await session.get(Source, channel.source_id)
+    ref = now - timedelta(seconds=_shift_seconds(channel, source))
+    row: Programme | None = await session.scalar(
+        select(Programme)
+        .where(
+            Programme.channel_id == channel.id,
+            Programme.start_utc <= ref,
+            Programme.stop_utc > ref,
+        )
+        .order_by(Programme.start_utc.desc())
+        .limit(1)
+    )
+    return row
+
+
 async def channel_schedule(
     session: AsyncSession,
     channel: Channel,

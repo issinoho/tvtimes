@@ -12,6 +12,7 @@ from app.models.source import Channel, Source, SourceKind, SourceStatus
 from app.models.tenant import Tenant
 from app.models.tmdb import MediaType, TmdbEnrichment
 from app.services import epg as svc
+from app.services import tmdb as tmdb_svc
 from httpx import AsyncClient
 
 from tests.conftest import auth_header, login, register_and_verify
@@ -84,11 +85,17 @@ async def _seed() -> dict[str, uuid.UUID]:
                     query_key=normalize_name(title)[:300],
                     query_year="2014",
                     rating=rating,
+                    poster_url=f"https://image.tmdb.org/t/p/w500/{title}.jpg",
                     fetched_at=NOW,
                 )
             )
         await session.commit()
-        return {"tenant": tenant.id, "alpha": alpha.id, "beta": beta.id}
+        return {
+            "tenant": tenant.id,
+            "alpha": alpha.id,
+            "beta": beta.id,
+            "epg": epg.id,
+        }
 
 
 async def test_now_next_current_and_upcoming(db_schema: None) -> None:
@@ -107,6 +114,56 @@ async def test_now_next_current_and_upcoming(db_schema: None) -> None:
     beta = by_name["Beta"]
     assert beta.current is None
     assert beta.upcoming is not None and beta.upcoming[0].title == "Whiplash"
+
+
+async def test_current_programme_returns_whats_on_now(db_schema: None) -> None:
+    ids = await _seed()
+    async with get_sessionmaker()() as session:
+        alpha = await session.get(Channel, ids["alpha"])
+        beta = await session.get(Channel, ids["beta"])
+        assert alpha is not None and beta is not None
+        on_now = await svc.current_programme(session, alpha, now=NOW)
+        gap = await svc.current_programme(session, beta, now=NOW)
+    assert on_now is not None and on_now.title == "Evening News"
+    assert gap is None  # Beta has nothing scheduled at NOW
+
+
+async def test_current_programme_respects_clock_shift(db_schema: None) -> None:
+    ids = await _seed()
+    async with get_sessionmaker()() as session:
+        alpha = await session.get(Channel, ids["alpha"])
+        assert alpha is not None
+        alpha.clock_shift_seconds = 7200  # this channel's guide runs 2h ahead
+        await session.flush()
+        # "Evening News" airs NOW-30m..NOW+30m raw; +2h shift puts its wall-clock
+        # slot at NOW+1h30m..NOW+2h30m — so nothing is "on now" at NOW ...
+        assert await svc.current_programme(session, alpha, now=NOW) is None
+        # ... but it is at NOW+2h
+        later = await svc.current_programme(session, alpha, now=NOW + timedelta(hours=2))
+    assert later is not None and later.title == "Evening News"
+
+
+async def test_art_for_returns_poster_then_none(db_schema: None) -> None:
+    await _seed()
+
+    def _prog(title: str, year: str) -> Programme:
+        return Programme(
+            tenant_id=uuid.uuid4(),
+            channel_id=uuid.uuid4(),
+            epg_source_id=uuid.uuid4(),
+            start_utc=NOW,
+            stop_utc=NOW + timedelta(hours=1),
+            title=title,
+            year=year,
+            is_movie=True,
+        )
+
+    async with get_sessionmaker()() as session:
+        assert (
+            await tmdb_svc.art_for(session, _prog("Interstellar", "2014"))
+            == "https://image.tmdb.org/t/p/w500/Interstellar.jpg"
+        )
+        assert await tmdb_svc.art_for(session, _prog("Nonesuch", "2000")) is None
 
 
 async def test_highlights_soon_and_top_rated(db_schema: None) -> None:

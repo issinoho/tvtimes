@@ -217,6 +217,20 @@ async def enrich_epg_window(session: AsyncSession, tenant_id: uuid.UUID, token: 
 # --- hero --------------------------------------------------------------------
 
 
+async def art_for(session: AsyncSession, programme: Programme) -> str | None:
+    """A poster (else backdrop) URL for ``programme`` from the enrichment cache,
+    or None if it was never enriched or matched nothing. Always a stable
+    ``https://image.tmdb.org`` URL — safe to hand to a notifier as an
+    attachment. No freshness check (a slightly stale image URL is fine) and it
+    never triggers a fetch."""
+    media = MediaType.movie if programme.is_movie else MediaType.tv
+    key, year_key = cache_key(programme.title, programme.year)
+    row = await _lookup(session, media, key, year_key)
+    if row is None or row.negative:
+        return None
+    return row.poster_url or row.backdrop_url
+
+
 @dataclass(slots=True)
 class Hero:
     programme: Programme
