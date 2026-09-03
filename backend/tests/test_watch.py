@@ -235,3 +235,58 @@ async def test_watch_events_endpoint_stores_and_reports_counts(
         events = list(await session.scalars(select(WatchEvent)))
     assert len(events) == 1
     assert events[0].title == "The News" and events[0].device == "living room"
+
+
+def _watch_on(
+    ids: dict[str, uuid.UUID], start: datetime, minutes: int, device: str | None
+) -> svc.ReportedWatch:
+    return svc.ReportedWatch(
+        channel_id=ids["channel"],
+        started_at=start,
+        ended_at=start + timedelta(minutes=minutes),
+        device=device,
+    )
+
+
+async def _devices(ids: dict[str, uuid.UUID]) -> list[svc.ReportingDevice]:
+    async with get_sessionmaker()() as session:
+        return await svc.reporting_devices(session, ids["tenant"])
+
+
+async def test_reporting_devices_lists_each_player_most_recent_first(
+    db_schema: None,
+) -> None:
+    ids = await _seed()
+    start = PROG_START + SHIFT
+    await _report(
+        ids,
+        _watch_on(ids, start, 30, "bedroom"),
+        _watch_on(ids, start + timedelta(hours=2), 30, "living room"),
+        _watch_on(ids, start + timedelta(hours=4), 30, "living room"),
+    )
+    devices = await _devices(ids)
+    assert [d.name for d in devices] == ["living room", "bedroom"]
+    assert [d.events for d in devices] == [2, 1]
+    assert devices[0].last_reported_at == start + timedelta(hours=4, minutes=30)
+
+
+async def test_reporting_devices_groups_unlabelled_reports_under_one_entry(
+    db_schema: None,
+) -> None:
+    # Two unlabelled players are indistinguishable; claiming otherwise
+    # would be a guess. Pre-1.40 tvdinner reports land here.
+    ids = await _seed()
+    start = PROG_START + SHIFT
+    await _report(
+        ids,
+        _watch_on(ids, start, 30, None),
+        _watch_on(ids, start + timedelta(hours=2), 30, None),
+    )
+    devices = await _devices(ids)
+    assert [(d.name, d.events) for d in devices] == [(None, 2)]
+
+
+async def test_reporting_devices_is_empty_before_anything_reports(
+    db_schema: None,
+) -> None:
+    assert await _devices(await _seed()) == []

@@ -29,6 +29,10 @@ class Tenant(PkUuidMixin, TimestampMixin, Base):
     # players). The raw token is shown once on creation and never stored.
     export_token_hash: Mapped[str | None] = mapped_column(String(64), unique=True, index=True)
     export_token_set_at: Mapped[datetime | None] = mapped_column(TZDateTime)
+    # Last time any export feed was fetched with this token. Bumped at most
+    # once a minute (see app.services.exports.touch_export_token) so a player
+    # polling hard doesn't turn every read into a write.
+    export_token_last_used_at: Mapped[datetime | None] = mapped_column(TZDateTime)
 
     # Email the tenant's verified users when a source breaks / goes stale /
     # recovers (app.worker.source_alerts). On by default.

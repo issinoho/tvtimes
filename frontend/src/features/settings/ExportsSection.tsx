@@ -1,3 +1,4 @@
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { api, ApiError, unwrap } from '@/lib/api/client';
@@ -26,6 +27,17 @@ function tvdinnerUrl(playlistUrl: string): string | null {
   }
 }
 
+function timeAgo(iso: string): string {
+  const seconds = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
+  if (seconds < 90) return 'just now';
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes} minutes ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return hours === 1 ? 'an hour ago' : `${hours} hours ago`;
+  const days = Math.round(hours / 24);
+  return days === 1 ? 'yesterday' : `${days} days ago`;
+}
+
 function CopyRow({ label, value }: { label: string; value: string }) {
   const [copied, setCopied] = useState(false);
   async function copy() {
@@ -50,11 +62,18 @@ function CopyRow({ label, value }: { label: string; value: string }) {
 
 export function ExportsSection() {
   const { user, refreshMe } = useAuth();
+  const qc = useQueryClient();
   const enabled = Boolean(user?.export_token_set_at);
   const [links, setLinks] = useState<Links | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const tvdinnerLink = links ? tvdinnerUrl(links.playlist_url) : null;
+
+  const { data: activity } = useQuery({
+    queryKey: ['export-activity'],
+    queryFn: async () => unwrap(await api.GET('/api/account/export-activity')),
+    enabled,
+  });
 
   async function generate() {
     setBusy(true);
@@ -63,6 +82,7 @@ export function ExportsSection() {
       const res = unwrap(await api.POST('/api/account/export-token'));
       setLinks({ playlist_url: res.playlist_url, epg_url: res.epg_url });
       await refreshMe();
+      await qc.invalidateQueries({ queryKey: ['export-activity'] });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not generate feed links.');
     } finally {
@@ -77,6 +97,7 @@ export function ExportsSection() {
       unwrap(await api.DELETE('/api/account/export-token'));
       setLinks(null);
       await refreshMe();
+      await qc.invalidateQueries({ queryKey: ['export-activity'] });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not disable the feeds.');
     } finally {
@@ -130,6 +151,45 @@ export function ExportsSection() {
           Feeds are enabled. The URLs are only shown once, when generated — rotate below if you need
           them again.
         </p>
+      ) : null}
+
+      {enabled && activity ? (
+        <>
+          <p className={styles.hint}>
+            {activity.last_used_at
+              ? `Feeds last fetched ${timeAgo(activity.last_used_at)}.`
+              : 'These feeds have never been fetched.'}
+          </p>
+          {activity.devices.length > 0 ? (
+            <>
+              <p className={styles.hint}>
+                Players reporting what they watch (via tvdinner&rsquo;s{' '}
+                <code>--report-watch-state</code>):
+              </p>
+              <ul className={styles.list}>
+                {activity.devices.map((d) => (
+                  <li key={d.name ?? '__unlabelled__'} className={styles.item}>
+                    <span>
+                      {d.name ?? 'Unlabelled player'}
+                      <span className={styles.meta}>
+                        {' '}
+                        · last reported {timeAgo(d.last_reported_at)} · {d.events}{' '}
+                        {d.events === 1 ? 'viewing' : 'viewings'}
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              {activity.devices.some((d) => d.name === null) ? (
+                <p className={styles.hint}>
+                  An unlabelled player is one running without <code>--device-name</code>, or a
+                  tvdinner older than 1.40. Several of them group together here — they can&rsquo;t
+                  be told apart.
+                </p>
+              ) : null}
+            </>
+          ) : null}
+        </>
       ) : null}
 
       <div className={styles.actions}>

@@ -227,6 +227,13 @@ Notes:
 
 - Anyone with a link can read your line-up and stream through it — treat the
   URLs as passwords. Rotating invalidates the previous token.
+- **Settings → Export feeds** shows when the feeds were last fetched, and lists
+  the players reporting watch state back (by `--device-name`, or grouped as
+  "Unlabelled player" for one running without it). That's the only place a
+  paired player is visible: an export token never creates an entry on the
+  Sessions screen, and a watchlist or favourites poll is a plain read. Use it to
+  tell whether a box is still talking to you, or whether a token you'd forgotten
+  about is still in use.
 - Channels are keyed by their tvtimes id, so an East/West pair that shares a
   tvg-id upstream still links to the right guide data downstream.
 - Playback is proxied per channel through `/api/exports/stream/<id>` — the URL

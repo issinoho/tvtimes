@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 
@@ -29,3 +31,21 @@ class ActivityNotificationsIn(BaseModel):
     title_watch_set: bool | None = None
     play: bool | None = None
     watchlist_remove: bool | None = None
+
+
+class ReportingDeviceOut(BaseModel):
+    """One player that has reported watch state. `name` is null for a
+    reporter that sent no device label."""
+
+    name: str | None = None
+    last_reported_at: datetime
+    events: int
+
+
+class ExportActivityOut(BaseModel):
+    """What's actually using the export feeds — the answer to "is the
+    living-room box still talking to me?", which nothing else surfaced."""
+
+    token_set_at: datetime | None = None
+    last_used_at: datetime | None = None
+    devices: list[ReportingDeviceOut] = []
