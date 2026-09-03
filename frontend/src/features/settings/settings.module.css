@@ -89,7 +89,7 @@
   font-weight: 600;
 }
 .btn.danger {
-  color: #ffcaca;
+  color: var(--callout-error-fg);
   border-color: color-mix(in srgb, var(--genre-news) 45%, transparent);
 }
 .btn:disabled {
@@ -198,12 +198,12 @@
 }
 
 .error {
-  color: #ffbcbc;
+  color: var(--callout-error-fg);
   font-size: 0.85rem;
   margin: 0.5rem 0 0;
 }
 .ok {
-  color: #b9f5d3;
+  color: var(--callout-success-fg);
   font-size: 0.85rem;
   margin: 0.5rem 0 0;
 }

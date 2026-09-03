@@ -41,6 +41,7 @@
   /* Callout foregrounds — light tints on the dark ground. */
   --callout-error-fg: #ffd7d7;
   --callout-success-fg: #d7ffe9;
+  --callout-warn-fg: #ffe2ad;
 
   --radius: 12px;
   --radius-sm: 8px;
@@ -68,6 +69,7 @@
   /* Saturated darks so callout text reads on the pale tint over white. */
   --callout-error-fg: #a3161b;
   --callout-success-fg: #0a6b45;
+  --callout-warn-fg: #845107;
 
   --wash:
     radial-gradient(1200px 800px at 15% -10%, rgba(109, 40, 217, 0.14), transparent 60%),
@@ -87,6 +89,7 @@
     --line: #e4dcf0;
     --callout-error-fg: #a3161b;
     --callout-success-fg: #0a6b45;
+    --callout-warn-fg: #845107;
     --wash:
       radial-gradient(1200px 800px at 15% -10%, rgba(109, 40, 217, 0.14), transparent 60%),
       radial-gradient(1000px 700px at 110% 10%, rgba(200, 30, 99, 0.12), transparent 55%);
