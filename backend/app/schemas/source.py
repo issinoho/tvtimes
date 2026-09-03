@@ -128,6 +128,9 @@ class ChannelOut(BaseModel):
     group_title: str | None
     number: int | None
     is_hd: bool
+    # Set by hand when this channel can't find its own guide data.
+    epg_override_id: str | None = None
+    programme_count: int = 0
 
 
 class ChannelPage(BaseModel):

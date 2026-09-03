@@ -134,11 +134,24 @@ async def _channel_index(session: AsyncSession, tenant_id: uuid.UUID) -> dict[st
     """Map XMLTV channel keys -> our channel ids. Keys: raw tvg-id, the
     ``@feed``-stripped tvg-id, and normalised display / tvg names. A key can
     fan out to several channels (e.g. an East and West feed that share a
-    tvg-id) — each then gets its own copy of the programmes."""
+    tvg-id) — each then gets its own copy of the programmes.
+
+    ``epg_override_id`` replaces all of that for a channel: it is the only key
+    that channel is indexed under. Pointing two channels at the same override
+    is how an HD variant borrows the guide of the SD one it duplicates."""
     index: dict[str, list[uuid.UUID]] = {}
     rows = await session.scalars(select(Channel).where(Channel.tenant_id == tenant_id))
     for ch in rows:
         keys: list[str] = []
+        if ch.epg_override_id:
+            # Deliberate and exclusive: someone set this because the automatic
+            # keys matched the wrong guide entry, or none at all. Keeping the
+            # name keys alongside it would let the thing they overrode win
+            # again on a feed that happens to carry both.
+            key = ch.epg_override_id.strip().lower()
+            if key:
+                index.setdefault(key, []).append(ch.id)
+                continue
         if ch.ext_id:
             # tvg-id / XMLTV id casing is wildly inconsistent between feeds
             # (``TCM.us`` vs ``tcm.us``) — match case-insensitively.

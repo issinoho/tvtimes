@@ -273,3 +273,30 @@
   color: var(--text-dim);
   font-size: 0.85rem;
 }
+
+/* Guide-key cell on the channel table: an input that reads as text until
+   you touch it, so a table of 300 channels isn't a wall of boxes. */
+.guideKey input {
+  font: inherit;
+  font-size: 0.8rem;
+  width: 9rem;
+  padding: 0.25rem 0.4rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text);
+}
+.guideKey input::placeholder {
+  color: var(--text-dim);
+}
+.guideKey input:hover:not(:disabled) {
+  border-color: var(--line);
+}
+.guideKey input:focus {
+  outline: none;
+  border-color: var(--brand-pink);
+  background: var(--bg);
+}
+.noGuide {
+  color: var(--callout-warn-fg);
+}

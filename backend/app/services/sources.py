@@ -21,7 +21,7 @@ from app.ingest.models import Channel as ParsedChannel
 from app.ingest.models import Playlist
 from app.ingest.ssrf import assert_allowed_url
 from app.logging import get_logger
-from app.models.epg import EpgSource, EpgStatus
+from app.models.epg import EpgSource, EpgStatus, Programme
 from app.models.source import Channel, Source, SourceKind, SourceStatus
 
 _CONFIG_URL_FIELD = {
@@ -202,6 +202,14 @@ async def set_channel_clock_shift(
     channel.clock_shift_seconds = clock_shift_seconds
 
 
+async def set_channel_epg_override(
+    session: AsyncSession, channel: Channel, *, epg_override_id: str
+) -> None:
+    """Match this channel on ``epg_override_id`` instead of its own tvg-id and
+    names. Blank restores automatic matching."""
+    channel.epg_override_id = epg_override_id.strip() or None
+
+
 # --- refresh ---------------------------------------------------------------
 
 
@@ -336,6 +344,25 @@ async def list_channels(
     rows = await session.scalars(stmt)
     total = await session.scalar(count_stmt) or 0
     return list(rows), total
+
+
+async def programme_counts(
+    session: AsyncSession, channel_ids: Sequence[uuid.UUID]
+) -> dict[uuid.UUID, int]:
+    """How many programmes each channel currently has.
+
+    Shown on the channel list because a count of zero is how you spot a
+    channel whose guide data never matched -- which is otherwise invisible
+    until you look at the grid and find an empty row."""
+    if not channel_ids:
+        return {}
+    rows = await session.execute(
+        select(Programme.channel_id, func.count(Programme.id))
+        .where(Programme.channel_id.in_(channel_ids))
+        .group_by(Programme.channel_id)
+    )
+    counts: dict[uuid.UUID, int] = dict(rows.all())  # type: ignore[arg-type]
+    return {cid: counts.get(cid, 0) for cid in channel_ids}
 
 
 # --- health -----------------------------------------------------------------

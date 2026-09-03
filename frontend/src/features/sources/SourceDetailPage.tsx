@@ -8,11 +8,49 @@ import {
   useDeleteSource,
   usePatchSource,
   useRefreshSource,
+  useSetChannelEpgOverride,
   useSource,
 } from '@/features/sources/api';
 import styles from '@/features/sources/sources.module.css';
+import type { components } from '@/lib/api/schema';
+
+type Channel = components['schemas']['ChannelOut'];
 
 const PAGE = 50;
+
+/**
+ * The guide key a channel is matched on, editable in place.
+ *
+ * Only earns its keep for a channel showing 0 programmes: it means the
+ * channel's own tvg-id and names found nothing in the guide, and this is the
+ * only way to say what to look for instead.
+ */
+function GuideKeyCell({ channel, sourceId }: { channel: Channel; sourceId: string }) {
+  const [value, setValue] = useState(channel.epg_override_id ?? '');
+  const mutation = useSetChannelEpgOverride(sourceId);
+  const saved = channel.epg_override_id ?? '';
+
+  return (
+    <form
+      className={styles.guideKey}
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (value.trim() !== saved) mutation.mutate({ channelId: channel.id, value });
+      }}
+    >
+      <input
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={() => {
+          if (value.trim() !== saved) mutation.mutate({ channelId: channel.id, value });
+        }}
+        placeholder={channel.ext_id ?? '—'}
+        aria-label={`Guide key for ${channel.name}`}
+        disabled={mutation.isPending}
+      />
+    </form>
+  );
+}
 
 export function SourceDetailPage() {
   const { sourceId = '' } = useParams();
@@ -113,6 +151,8 @@ export function SourceDetailPage() {
               <th>Name</th>
               <th>Group</th>
               <th>No.</th>
+              <th>Guide</th>
+              <th>Guide key</th>
             </tr>
           </thead>
           <tbody>
@@ -127,6 +167,12 @@ export function SourceDetailPage() {
                 </td>
                 <td>{c.group_title ?? '—'}</td>
                 <td>{c.number ?? '—'}</td>
+                <td className={c.programme_count === 0 ? styles.noGuide : undefined}>
+                  {c.programme_count === 0 ? 'none' : c.programme_count}
+                </td>
+                <td>
+                  <GuideKeyCell channel={c} sourceId={sourceId} />
+                </td>
               </tr>
             ))}
           </tbody>

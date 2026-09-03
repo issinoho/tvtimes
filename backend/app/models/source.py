@@ -104,6 +104,13 @@ class Channel(PkUuidMixin, TimestampMixin, Base):
     # Fernet-encrypted: a playable URL (m3u/xtream) or the Stalker "cmd" token.
     stream_ref_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
 
+    # Set by hand when automatic matching can't link a channel to its guide:
+    # the key to look this channel up by instead of ext_id / the names. A
+    # tuner that numbers BBC One Scotland HD 101 while the guide carries it
+    # as 1 has no other way to meet. Survives a channel refresh, which
+    # overwrites everything the source owns above.
+    epg_override_id: Mapped[str | None] = mapped_column(String(256))
+
     # Per-channel clock correction, on top of the source's shift.
     clock_shift_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     last_seen_at: Mapped[datetime | None] = mapped_column(TZDateTime)

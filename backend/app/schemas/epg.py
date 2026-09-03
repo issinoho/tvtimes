@@ -104,14 +104,21 @@ class HighlightsOut(BaseModel):
 
 
 class ChannelPatchIn(BaseModel):
+    """Patch semantics: an omitted field is left alone."""
+
     # Added to every programme time for this channel - e.g. +10800 to line a
     # US-West feed up with an East-coast EPG. Clamped to +/- 24h.
-    clock_shift_seconds: int = Field(ge=-86_400, le=86_400)
+    clock_shift_seconds: int | None = Field(default=None, ge=-86_400, le=86_400)
+    # The guide key to match this channel on, when the automatic ones don't.
+    # Empty string clears it and restores automatic matching -- None means
+    # "not supplied", which is how an empty text input has to reach us.
+    epg_override_id: str | None = Field(default=None, max_length=256)
 
 
-class ChannelShiftOut(BaseModel):
+class ChannelPatchOut(BaseModel):
     id: uuid.UUID
     clock_shift_seconds: int
+    epg_override_id: str | None = None
 
 
 class PlayLinkOut(BaseModel):
