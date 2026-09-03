@@ -36,6 +36,12 @@ npm run gen:api      # regenerate src/lib/api/schema.d.ts (needs the API running
 docker compose -f docker-compose.dev.yml up --build
 ```
 
+`npm run test:browser` runs the layout suite (`*.browser.test.tsx`) in a real
+Chromium via Vitest browser mode — overlap, scroll position and contrast, none
+of which jsdom can see. It needs `npx playwright install chromium` once. CI runs
+it as its own step; `npm test` stays jsdom-only and needs no browser.
+
+
 CI pins **newer** ruff/mypy than an old local pin may resolve — if `ruff format
 --check` passes locally but fails CI, run `uvx ruff@<ci-version> format .`
 (the version prints in the failed job log).

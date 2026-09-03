@@ -102,6 +102,12 @@ jobs:
       - run: npm run format:check
       - run: npm run typecheck
       - run: npm test
+      # Layout assertions in a real browser -- overlap, scroll position and
+      # contrast, none of which jsdom can see. Separate step so a failure
+      # reads as "layout regressed", not "a test broke".
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium --with-deps
+      - run: npm run test:browser
       - run: npm run build
 
   image:
