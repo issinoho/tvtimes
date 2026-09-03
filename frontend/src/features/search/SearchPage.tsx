@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 import { useProgrammeSearch, type SearchChannel, type Programme } from '@/features/guide/api';
 import { ChannelLogo } from '@/features/guide/ChannelLogo';
@@ -16,9 +17,22 @@ function useDebounced<T>(value: T, ms: number): T {
 }
 
 export function SearchPage() {
-  const [text, setText] = useState('');
+  // `?q=` seeds the box, so anything can hand a title over — tvdinner's "look
+  // this up in tvtimes" keybinding does. Read once, as the initial value:
+  // making it controlled would fight the user's own typing on every keystroke.
+  const [params, setParams] = useSearchParams();
+  const [text, setText] = useState(() => params.get('q') ?? '');
   const [moviesOnly, setMoviesOnly] = useState(false);
   const [open, setOpen] = useState<{ channel: SearchChannel; programme: Programme } | null>(null);
+
+  // Drop it from the URL once consumed, so a reload or a back-nav doesn't
+  // resurrect a search the user has since typed past.
+  useEffect(() => {
+    if (!params.has('q')) return;
+    const next = new URLSearchParams(params);
+    next.delete('q');
+    setParams(next, { replace: true });
+  }, [params, setParams]);
 
   const query = useDebounced(text.trim(), 250);
   const { data, isFetching, isError } = useProgrammeSearch(query, moviesOnly);

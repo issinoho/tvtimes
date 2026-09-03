@@ -95,6 +95,21 @@ class WatchEventsIn(BaseModel):
     events: list[WatchEventIn] = Field(default_factory=list, max_length=500)
 
 
+@router.get("/favourites.json", include_in_schema=False)
+@limiter.limit(EXPORT_LIMIT)
+async def favourites_json(
+    request: Request,
+    tenant: TenantDep,
+    session: SessionDep,
+    token: Annotated[str, Query()] = "",
+) -> list[dict[str, object]]:
+    """Channels anyone on this account has favourited, so a player can show the
+    same stars — see ``exports.render_favourites``. Consumed by tvdinner's
+    ``--sync-favourites``."""
+    base = get_settings().public_origin.rstrip("/")
+    return await svc.render_favourites(session, tenant, base_url=base, token=token)
+
+
 @router.post("/watch-events", include_in_schema=False)
 @limiter.limit(EXPORT_LIMIT)
 async def watch_events(

@@ -32,6 +32,7 @@ from app.auth.crypto import decrypt
 from app.ingest.xtream import XtreamCreds, build_live_url
 from app.logging import get_logger
 from app.models.epg import Programme
+from app.models.favourite import FavouriteChannel
 from app.models.source import Channel, Source, SourceKind
 from app.models.tenant import Tenant
 from app.models.watchlist import WatchKind, WatchlistItem
@@ -383,3 +384,38 @@ async def render_watchlist(
                 _add(p.channel_id, p.start_utc, p.stop_utc, p.title)
 
     return sorted(found.values(), key=lambda e: (str(e["start"]), str(e["channel_name"])))
+
+
+# --- favourites -----------------------------------------------------------------
+
+
+async def render_favourites(
+    session: AsyncSession, tenant: Tenant, *, base_url: str, token: str
+) -> list[dict[str, object]]:
+    """Every channel anyone on this tenant has favourited.
+
+    Union across the account's users for the same reason the watchlist feed is
+    (the token is per tenant, favourites are per user), de-duplicated per
+    channel. ``channel_name`` is the name as the M3U exports it, since a
+    consumer may key favourites by display name rather than by id — tvdinner
+    does. Ordered like the playlist, so a client rendering them gets the
+    Sources-screen order for free.
+    """
+    channels = {c.id: c for c in await _ordered_channels(session, tenant.id)}
+    if not channels:
+        return []
+
+    favourited = set(
+        await session.scalars(
+            select(FavouriteChannel.channel_id).where(FavouriteChannel.tenant_id == tenant.id)
+        )
+    )
+    return [
+        {
+            "channel_id": str(cid),
+            "channel_name": channel.name,
+            "channel_url": f"{base_url}/api/exports/stream/{cid}?token={token}",
+        }
+        for cid, channel in channels.items()
+        if cid in favourited
+    ]

@@ -204,6 +204,25 @@ pollute your own watched badges — it already exposes the whole line-up and
 streams through it. If that's not a trade you want, leave
 `--report-watch-state` off and nothing is ever written.
 
+**Sharing favourites.** `/api/exports/favourites.json` lists the channels anyone
+on the account has starred. `tvdinner --sync-favourites` picks those up at
+startup, so a star set here shows in its guide too. It's additive and one-way:
+un-starring here won't un-star it there, because tvdinner records favourites by
+name with no note of where each came from — quietly deleting one you'd set
+locally is the worse failure.
+
+**Jumping back the other way.** Pressing `T` in tvdinner opens tvtimes for
+whatever's on the current channel. It lands on `/search?q=<title>` rather than
+the exact guide cell — the grid is virtualised, so pointing at one cell would
+need scroll-to-row support, and arriving from a player what you want is to find
+the thing by name. Any app can use the same URL; the search box picks `q` up as
+its starting text and then drops it from the address bar, so a reload or a
+bookmark doesn't re-run a search you've since typed over.
+
+The full pairing story — all five capabilities, why each is shaped the way it
+is, and what the token reaches — is on the wiki:
+[Pairing with tvdinner](https://github.com/issinoho/tvtimes/wiki/Pairing-With-tvdinner).
+
 Notes:
 
 - Anyone with a link can read your line-up and stream through it — treat the

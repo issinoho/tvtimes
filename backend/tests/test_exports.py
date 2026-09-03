@@ -15,6 +15,7 @@ from app.auth import tokens
 from app.auth.crypto import encrypt
 from app.db import get_sessionmaker
 from app.models.epg import EpgSource, Programme
+from app.models.favourite import FavouriteChannel
 from app.models.source import Channel, Source, SourceKind, SourceStatus
 from app.models.tenant import Tenant
 from app.models.user import User
@@ -701,3 +702,69 @@ async def test_watchlist_json_endpoint_is_token_gated(
     resp = await app_client.get(f"/api/exports/watchlist.json?token={token}")
     assert resp.status_code == 200
     assert resp.json() == []  # nothing watchlisted yet, but the feed is live
+
+
+# --- favourites feed ------------------------------------------------------------
+
+
+async def _favourite(user_id: uuid.UUID, tenant_id: uuid.UUID, channel_id: uuid.UUID) -> None:
+    async with get_sessionmaker()() as session:
+        session.add(FavouriteChannel(tenant_id=tenant_id, user_id=user_id, channel_id=channel_id))
+        await session.commit()
+
+
+async def _render_favourites(tenant_id: uuid.UUID) -> list[dict[str, object]]:
+    async with get_sessionmaker()() as session:
+        tenant = await session.get(Tenant, tenant_id)
+        assert tenant is not None
+        return await svc.render_favourites(
+            session, tenant, base_url="https://tv.example.com", token="tok"
+        )
+
+
+async def test_render_favourites_carries_name_and_stream_url(db_schema: None) -> None:
+    ids = await _seed()
+    user = await _watchlist_user(ids["tenant"])
+    await _favourite(user, ids["tenant"], ids["ch_m3u"])
+
+    entries = await _render_favourites(ids["tenant"])
+    assert len(entries) == 1
+    # the name is what a display-name-keyed client (tvdinner) matches on
+    assert entries[0]["channel_name"] == "BBC One"
+    assert entries[0]["channel_id"] == str(ids["ch_m3u"])
+    assert entries[0]["channel_url"] == (
+        f"https://tv.example.com/api/exports/stream/{ids['ch_m3u']}?token=tok"
+    )
+
+
+async def test_render_favourites_unions_the_household_without_duplicating(
+    db_schema: None,
+) -> None:
+    ids = await _seed()
+    one, two = await _watchlist_user(ids["tenant"]), await _watchlist_user(ids["tenant"])
+    await _favourite(one, ids["tenant"], ids["ch_m3u"])
+    await _favourite(two, ids["tenant"], ids["ch_m3u"])  # same channel, other person
+    await _favourite(two, ids["tenant"], ids["ch_xtream"])
+
+    entries = await _render_favourites(ids["tenant"])
+    assert [e["channel_name"] for e in entries] == ["BBC One", "Sky Sports"]
+
+
+async def test_render_favourites_omits_channels_on_a_disabled_source(db_schema: None) -> None:
+    ids = await _seed()
+    user = await _watchlist_user(ids["tenant"])
+    await _favourite(user, ids["tenant"], ids["ch_off"])
+    assert await _render_favourites(ids["tenant"]) == []
+
+
+async def test_favourites_endpoint_is_token_gated(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    anon = await app_client.get("/api/exports/favourites.json")
+    assert anon.status_code == 401
+
+    await register_and_verify(app_client, captured_emails)
+    h = auth_header(await login(app_client))
+    token = (await app_client.post("/api/account/export-token", headers=h)).json()["token"]
+    resp = await app_client.get(f"/api/exports/favourites.json?token={token}")
+    assert resp.status_code == 200 and resp.json() == []
