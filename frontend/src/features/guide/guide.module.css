@@ -212,6 +212,18 @@
   max-width: 100%;
   will-change: transform;
 }
+/* Already watched — reported by a player (see the watch-events export feed).
+   Dimmed rather than hidden: it still has to be readable while scanning the
+   grid, it just shouldn't compete with what you haven't seen. */
+.cell[data-watched='true'] .cellTitle,
+.cell[data-watched='true'] .cellMeta {
+  opacity: 0.62;
+}
+.watchedMark {
+  margin-right: 0.25rem;
+  color: var(--ok, #5fd39b);
+  font-weight: 700;
+}
 .cellTitle {
   display: block;
   font-size: 0.8rem;

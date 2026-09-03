@@ -249,14 +249,24 @@ export function GuideGrid({ channels, windowStart, onOpen }: Props) {
                       }}
                       data-cell
                       data-now={live}
+                      data-watched={p.watched}
                       data-focused={focus?.row === vr.index && focus?.col === col}
                       aria-selected={focus?.row === vr.index && focus?.col === col}
                       onClick={() => onOpen(ch, p)}
-                      aria-label={`${ch.name}, ${at}, ${p.title}${live ? ', on now' : ''}`}
+                      aria-label={`${ch.name}, ${at}, ${p.title}${live ? ', on now' : ''}${
+                        p.watched ? ', watched' : ''
+                      }`}
                       title={p.title}
                     >
                       <span className={styles.cellInner}>
-                        <span className={styles.cellTitle}>{p.title}</span>
+                        <span className={styles.cellTitle}>
+                          {p.watched ? (
+                            <span className={styles.watchedMark} aria-hidden>
+                              ✓
+                            </span>
+                          ) : null}
+                          {p.title}
+                        </span>
                         <span className={styles.cellMeta}>
                           {at}
                           {p.is_movie && p.year ? ` · ${p.year}` : ''}
