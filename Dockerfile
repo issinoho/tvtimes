@@ -18,7 +18,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # --- stage 2: python runtime --------------------------------------------------
-FROM python:3.14-slim AS runtime
+FROM python:3.12-slim AS runtime
 # Release tag, passed by .github/workflows/release.yml; "dev" for a plain build.
 ARG TVTIMES_VERSION=dev
 ENV PYTHONUNBUFFERED=1 \
