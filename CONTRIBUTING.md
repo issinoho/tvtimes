@@ -37,6 +37,12 @@ npm run lint && npm run typecheck && npm test && npm run build
 npm run gen:api                      # if you changed an API schema; commit schema.d.ts
 ```
 
+`npm run test:browser` runs the layout suite (`*.browser.test.tsx`) in a real
+Chromium via Vitest browser mode — overlap, scroll position and contrast, none
+of which jsdom can see. It needs `npx playwright install chromium` once. CI runs
+it as its own step; `npm test` stays jsdom-only and needs no browser.
+
+
 CI runs the same four jobs (backend / connector / frontend / image) and pins a
 newer ruff/mypy than an old local install may resolve — if `ruff format --check`
 passes locally but fails CI, run `uvx ruff@<ci-version> format .` (the version
