@@ -183,6 +183,27 @@ records what *anyone* on it flagged, de-duplicated per broadcast.
 Un-watchlisting removes the pending recording again; anything scheduled by hand
 in tvdinner is left alone.
 
+**Seeing what you've watched.** Run tvdinner with `--report-watch-state` and it
+posts what you actually watched back every 15 minutes, to
+`/api/exports/watch-events`; the guide grid then dims and ticks those
+programmes:
+
+```sh
+tvdinner 'tvtimess://tv.example.com?token=…' --report-watch-state --device-name 'living room'
+```
+
+What's sent is plain start/stop **intervals**, not "programme X was watched" —
+tvtimes derives which programmes those cover by overlapping them against its own
+guide. So a guide refresh, or correcting a channel's clock offset, updates the
+answer with nothing re-reported. A programme counts as watched once half of it,
+or 30 minutes, is covered; flicking past doesn't.
+
+This is the **one thing the export token can write**. It can only append
+intervals for channels already on your account, so a leaked token can at worst
+pollute your own watched badges — it already exposes the whole line-up and
+streams through it. If that's not a trade you want, leave
+`--report-watch-state` off and nothing is ever written.
+
 Notes:
 
 - Anyone with a link can read your line-up and stream through it — treat the
