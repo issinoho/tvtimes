@@ -82,13 +82,21 @@ updates:
       base-images:
         update-types: [minor, patch]
     ignore:
-      # A language-runtime major (node 22 -> 24, python 3 -> 4) is a deliberate
-      # decision tied to `requires-python` and the CI matrix, not something to
-      # take from a bot. Minor/patch — where the security fixes live — flow.
+      # Never let a bot move the language line. `python:3.12-slim` and
+      # `node:22-slim` are rolling tags — Docker rebuilds them for security
+      # fixes, and that reaches us on the next build with no PR needed. What a
+      # bump here *does* change is the interpreter/runtime version, and that
+      # has to move in lockstep with the CI job (`uv python install 3.12`),
+      # mypy's `python_version` and `requires-python` — otherwise the suite
+      # tests one interpreter while the image ships another.
+      #
+      # Minor is ignored as well as major, deliberately: python 3.12 -> 3.14 is
+      # a *minor* by semver, and a major-only ignore let exactly that
+      # divergence through in #115.
       - dependency-name: node
-        update-types: [version-update:semver-major]
+        update-types: [version-update:semver-major, version-update:semver-minor]
       - dependency-name: python
-        update-types: [version-update:semver-major]
+        update-types: [version-update:semver-major, version-update:semver-minor]
 
   # --- Compose service images ------------------------------------------------
   - package-ecosystem: docker-compose
