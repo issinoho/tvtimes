@@ -348,20 +348,33 @@
   background: var(--scrim);
   z-index: 60;
 }
+/* The shell doesn't scroll -- .sheetBody does. That's what keeps the Close
+   button, absolutely positioned against this box, pinned to the corner
+   instead of scrolling away with a long description. Flex column rather
+   than height:100% because on mobile this is a bottom sheet whose height
+   is content-driven up to max-height, where a percentage height wouldn't
+   resolve. */
 .sheet {
   position: fixed;
   z-index: 61;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: var(--bg-raised);
   border: 1px solid var(--line);
-  padding: 1.25rem;
-  overflow-x: hidden;
-  overflow-y: auto;
-  overflow-wrap: anywhere;
   top: 0;
   right: 0;
   bottom: 0;
   width: min(420px, 90vw);
   box-shadow: var(--shadow-hero);
+}
+.sheetBody {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  padding: 1.25rem;
 }
 @media (max-width: 760px) {
   .sheet {
@@ -457,6 +470,10 @@
      margins pull it into this corner -- so with both at z-index auto the
      artwork painted over the button *and* swallowed its clicks. */
   z-index: 1;
+  /* Now that the body scrolls under it, the button meets artwork at the top
+     and body text further down. The shadow separates it from both, so it
+     reads as floating rather than colliding. */
+  box-shadow: 0 2px 12px color-mix(in srgb, var(--bg) 75%, transparent);
 }
 .sheet .watchRow {
   display: flex;

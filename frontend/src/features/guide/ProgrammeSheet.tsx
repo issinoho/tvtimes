@@ -268,87 +268,89 @@ export function ProgrammeSheet({ channel, programme, onClose }: Props) {
           Close
         </button>
 
-        {e?.backdrop_url ? (
-          <div
-            className={styles.heroArt}
-            style={{ backgroundImage: `url(${e.backdrop_url})` }}
-            aria-hidden
-          >
-            {e.logo_url ? <img className={styles.heroLogo} src={e.logo_url} alt="" /> : null}
-          </div>
-        ) : null}
+        <div className={styles.sheetBody}>
+          {e?.backdrop_url ? (
+            <div
+              className={styles.heroArt}
+              style={{ backgroundImage: `url(${e.backdrop_url})` }}
+              aria-hidden
+            >
+              {e.logo_url ? <img className={styles.heroLogo} src={e.logo_url} alt="" /> : null}
+            </div>
+          ) : null}
 
-        <p className={styles.kv}>
-          {channel.name}
-          <FavStar channelId={channel.id} />
-        </p>
-        <h2>{programme.title}</h2>
-        {programme.sub_title ? <p className={styles.kv}>{programme.sub_title}</p> : null}
-        {e?.tagline ? <p className={styles.tagline}>{e.tagline}</p> : null}
-
-        <p className={styles.when}>
-          {fmt(start)} – {fmt(stop)}
-          {year ? ` · ${year}` : ''}
-          {e?.runtime ? ` · ${e.runtime} min` : ''}
-          {live ? ' · on now' : ''}
-        </p>
-        {live ? (
-          <div className={styles.progress}>
-            <span style={{ width: `${pct}%` }} />
-          </div>
-        ) : null}
-
-        <WatchControls channel={channel} programme={programme} />
-        <PlayControls channel={channel} />
-
-        {e?.rating != null ? (
-          <p className={styles.rating}>
-            ★ {e.rating.toFixed(1)}
-            <span className={styles.attribution}> · TMDB</span>
-          </p>
-        ) : null}
-
-        {genreList.length ? (
-          <div className={styles.chipRow}>
-            {genreList.map((c) => (
-              <span key={c} className={styles.gchip}>
-                {c}
-              </span>
-            ))}
-          </div>
-        ) : null}
-
-        {programme.episode_num ? (
-          <p className={styles.kv}>Episode {programme.episode_num}</p>
-        ) : null}
-        {e?.director ? <p className={styles.kv}>Directed by {e.director}</p> : null}
-        {e?.cast.length ? (
           <p className={styles.kv}>
-            {e.cast
-              .slice(0, 6)
-              .map((c) => c.name)
-              .join(', ')}
+            {channel.name}
+            <FavStar channelId={channel.id} />
           </p>
-        ) : null}
+          <h2>{programme.title}</h2>
+          {programme.sub_title ? <p className={styles.kv}>{programme.sub_title}</p> : null}
+          {e?.tagline ? <p className={styles.tagline}>{e.tagline}</p> : null}
 
-        {description ? (
-          <p className={styles.desc}>{description}</p>
-        ) : (
-          <p className={styles.kv}>No description in this guide.</p>
-        )}
-
-        <ChannelShiftControl channel={channel} />
-
-        {hero?.enriching ? (
-          <p className={styles.kv} style={{ marginTop: '1rem' }}>
-            Fetching artwork and details from TMDB…
+          <p className={styles.when}>
+            {fmt(start)} – {fmt(stop)}
+            {year ? ` · ${year}` : ''}
+            {e?.runtime ? ` · ${e.runtime} min` : ''}
+            {live ? ' · on now' : ''}
           </p>
-        ) : null}
-        {hero && !hero.tmdb_connected ? (
-          <p className={styles.kv} style={{ marginTop: '1rem' }}>
-            Add a TMDB key in Settings for backdrops, cast and ratings.
-          </p>
-        ) : null}
+          {live ? (
+            <div className={styles.progress}>
+              <span style={{ width: `${pct}%` }} />
+            </div>
+          ) : null}
+
+          <WatchControls channel={channel} programme={programme} />
+          <PlayControls channel={channel} />
+
+          {e?.rating != null ? (
+            <p className={styles.rating}>
+              ★ {e.rating.toFixed(1)}
+              <span className={styles.attribution}> · TMDB</span>
+            </p>
+          ) : null}
+
+          {genreList.length ? (
+            <div className={styles.chipRow}>
+              {genreList.map((c) => (
+                <span key={c} className={styles.gchip}>
+                  {c}
+                </span>
+              ))}
+            </div>
+          ) : null}
+
+          {programme.episode_num ? (
+            <p className={styles.kv}>Episode {programme.episode_num}</p>
+          ) : null}
+          {e?.director ? <p className={styles.kv}>Directed by {e.director}</p> : null}
+          {e?.cast.length ? (
+            <p className={styles.kv}>
+              {e.cast
+                .slice(0, 6)
+                .map((c) => c.name)
+                .join(', ')}
+            </p>
+          ) : null}
+
+          {description ? (
+            <p className={styles.desc}>{description}</p>
+          ) : (
+            <p className={styles.kv}>No description in this guide.</p>
+          )}
+
+          <ChannelShiftControl channel={channel} />
+
+          {hero?.enriching ? (
+            <p className={styles.kv} style={{ marginTop: '1rem' }}>
+              Fetching artwork and details from TMDB…
+            </p>
+          ) : null}
+          {hero && !hero.tmdb_connected ? (
+            <p className={styles.kv} style={{ marginTop: '1rem' }}>
+              Add a TMDB key in Settings for backdrops, cast and ratings.
+            </p>
+          ) : null}
+        </div>
       </aside>
     </>
   );

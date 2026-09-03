@@ -26,3 +26,19 @@ test('the hero artwork does not raise itself above the sheet chrome', () => {
   // put it back on top however high the button goes.
   expect(block('.heroArt')).not.toMatch(/z-index:/);
 });
+
+test('the sheet shell does not scroll, so the Close button stays put', () => {
+  // The button is absolutely positioned against .sheet. If .sheet is itself
+  // the scroll container the button scrolls away with the content -- on a long
+  // description its top went from 34px to -566px, off the viewport entirely.
+  // The scrolling moved to .sheetBody so the shell stays still.
+  const sheet = block('.sheet');
+  expect(sheet).not.toMatch(/overflow-y:\s*(auto|scroll)/);
+  expect(sheet).toMatch(/overflow:\s*hidden/);
+
+  const body = block('.sheetBody');
+  expect(body).toMatch(/overflow-y:\s*auto/);
+  // Flex child rather than height:100%: on mobile the sheet is a bottom sheet
+  // whose height is content-driven, where a percentage wouldn't resolve.
+  expect(body).toMatch(/min-height:\s*0/);
+});
