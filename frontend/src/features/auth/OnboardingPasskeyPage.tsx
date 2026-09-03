@@ -23,7 +23,7 @@ export function OnboardingPasskeyPage() {
     try {
       await registerPasskey('This device');
       await refreshMe();
-      navigate('/', { replace: true });
+      await navigate('/', { replace: true });
     } catch (err) {
       setError(`${describePasskeyError(err)} You can also add one later in Settings.`);
     } finally {
@@ -33,7 +33,7 @@ export function OnboardingPasskeyPage() {
 
   function skip() {
     sessionStorage.setItem(SKIP_PASSKEY_KEY, '1');
-    navigate('/', { replace: true });
+    void navigate('/', { replace: true });
   }
 
   return (
