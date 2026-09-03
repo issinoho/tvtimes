@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>tvtimes Export API</title>
+<meta name="description" content="OpenAPI reference for the tvtimes export API — the playlist, guide, watchlist, favourites and watch-state feeds any player or tuner can read." />
+<link rel="icon" href="../logo.svg" type="image/svg+xml" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --ground: #0b0713;
+    --raised: #150c24;
+    --line: #2c2140;
+    --ink: #f4eeff;
+    --ink-dim: #a99fc4;
+    --violet: #7c3aed;
+    --magenta: #db2777;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--ground); }
+  body { font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; }
+
+  .topbar {
+    position: sticky; top: 0; z-index: 100;
+    display: flex; align-items: center; gap: 16px;
+    padding: 12px 22px;
+    background: rgba(11, 7, 19, 0.92);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+  }
+  .topbar a.home {
+    display: flex; align-items: center; gap: 9px;
+    font-family: "Space Grotesk", Inter, sans-serif;
+    font-weight: 700; font-size: 16px; letter-spacing: -0.01em;
+    color: var(--ink); text-decoration: none;
+  }
+  .topbar img { width: 24px; height: 24px; }
+  .topbar .tag {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 11px; color: var(--ink-dim);
+    border: 1px solid var(--line); border-radius: 999px;
+    padding: 3px 9px;
+  }
+  .topbar nav { margin-left: auto; display: flex; gap: 18px; }
+  .topbar nav a {
+    font-size: 13px; color: var(--ink-dim); text-decoration: none;
+  }
+  .topbar nav a:hover { color: var(--ink); }
+
+  /* Redoc renders its own shell; these fill the gaps its theme can't reach. */
+  #redoc { background: var(--ground); }
+  .redoc-wrap { min-height: 60vh; }
+  .fallback {
+    max-width: 640px; margin: 12vh auto; padding: 0 24px;
+    color: var(--ink-dim); font-size: 15px; line-height: 1.65;
+  }
+  .fallback h1 {
+    font-family: "Space Grotesk", Inter, sans-serif;
+    color: var(--ink); font-size: 22px; margin: 0 0 12px;
+  }
+  .fallback code {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 13px; color: var(--ink);
+    background: var(--raised); border: 1px solid var(--line);
+    border-radius: 6px; padding: 2px 6px;
+  }
+  .fallback a { color: #c4b5fd; }
+  @media (max-width: 560px) {
+    .topbar .tag { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <a class="home" href="../"><img src="../logo.svg" alt="" /> tvtimes</a>
+  <span class="tag">Export API</span>
+  <nav>
+    <a href="openapi.json">openapi.json</a>
+    <a href="https://github.com/issinoho/tvtimes/wiki/Export-Feeds">Guide</a>
+    <a href="https://github.com/issinoho/tvtimes">GitHub</a>
+  </nav>
+</header>
+
+<div class="redoc-wrap"><div id="redoc"></div></div>
+
+<noscript>
+  <div class="fallback">
+    <h1>This reference needs JavaScript</h1>
+    <p>
+      The rendered documentation is generated in the browser. The underlying
+      document is a plain OpenAPI 3.1 file you can read or feed to any other
+      tool: <a href="openapi.json"><code>openapi.json</code></a>.
+    </p>
+  </div>
+</noscript>
+
+<script src="https://cdn.jsdelivr.net/npm/redoc@2.5.3/bundles/redoc.standalone.js"></script>
+<script>
+  (function () {
+    var mount = document.getElementById('redoc');
+
+    function failed(message) {
+      mount.innerHTML =
+        '<div class="fallback"><h1>Couldn\'t render the reference</h1><p>' +
+        message +
+        ' The document itself is a plain OpenAPI 3.1 file: ' +
+        '<a href="openapi.json"><code>openapi.json</code></a>.</p></div>';
+    }
+
+    // Redoc comes from a CDN, so a blocked or offline load has to degrade to
+    // something better than a blank page — the spec is still readable raw.
+    if (typeof Redoc === 'undefined') {
+      failed('The renderer could not be loaded.');
+      return;
+    }
+
+    Redoc.init(
+      'openapi.json',
+      {
+        hideDownloadButton: false,
+        expandResponses: '200',
+        requiredPropsFirst: true,
+        sortTagsAlphabetically: false,
+        theme: {
+          colors: {
+            primary: { main: '#a78bfa' },
+            success: { main: '#10b981' },
+            error: { main: '#ef4444' },
+            text: { primary: '#f4eeff', secondary: '#a99fc4' },
+            http: {
+              get: '#0ea5e9',
+              post: '#10b981',
+            },
+          },
+          typography: {
+            fontSize: '15px',
+            fontFamily: 'Inter, system-ui, sans-serif',
+            headings: { fontFamily: '"Space Grotesk", Inter, sans-serif', fontWeight: '700' },
+            code: { fontFamily: '"JetBrains Mono", ui-monospace, monospace', fontSize: '13px' },
+          },
+          sidebar: {
+            backgroundColor: '#150c24',
+            textColor: '#f4eeff',
+            activeTextColor: '#c4b5fd',
+          },
+          rightPanel: { backgroundColor: '#100a1c', textColor: '#f4eeff' },
+        },
+      },
+      mount,
+      function (err) {
+        if (err) failed('The document could not be loaded.');
+      }
+    );
+  })();
+</script>
+
+</body>
+</html>

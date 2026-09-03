@@ -41,7 +41,21 @@ async def _tenant(session: SessionDep, token: Annotated[str, Query()] = "") -> T
 TenantDep = Annotated[Tenant, Depends(_tenant)]
 
 
-@router.get("/playlist.m3u", response_class=PlainTextResponse, include_in_schema=False)
+@router.get(
+    "/playlist.m3u",
+    response_class=PlainTextResponse,
+    include_in_schema=False,
+    summary="The whole line-up as an M3U playlist",
+    responses={
+        200: {
+            "description": "M3U playlist. Channels are keyed by tvtimes' own channel UUID in "
+            "both this file and the guide, so a player links a programme to its channel 1:1 "
+            "even when several upstream channels share a tvg-id.",
+            "content": {"application/x-mpegurl": {"schema": {"type": "string"}}},
+        },
+        401: {"description": "Invalid or missing export token"},
+    },
+)
 @limiter.limit(EXPORT_LIMIT)
 async def playlist(
     request: Request,
@@ -49,6 +63,10 @@ async def playlist(
     session: SessionDep,
     token: Annotated[str, Query()] = "",
 ) -> PlainTextResponse:
+    """Every channel of every enabled source, de-duplicated, in the order the
+    Sources screen shows. Each entry's stream URL points back at
+    ``/api/exports/stream/{channel_id}`` rather than the upstream provider, so
+    provider credentials never leave the server."""
     base = get_settings().public_origin.rstrip("/")
     body = await svc.render_m3u(session, tenant, base_url=base, token=token)
     return PlainTextResponse(
@@ -58,9 +76,24 @@ async def playlist(
     )
 
 
-@router.get("/epg.xml", include_in_schema=False)
+@router.get(
+    "/epg.xml",
+    include_in_schema=False,
+    summary="The guide as XMLTV",
+    responses={
+        200: {
+            "description": "XMLTV guide, streamed. Programme times are written already shifted "
+            "into each channel's display zone with the right +ZZZZ offset, so a downstream "
+            "guide needs no further correction -- that is the whole point of the export.",
+            "content": {"application/xml": {"schema": {"type": "string"}}},
+        },
+        401: {"description": "Invalid or missing export token"},
+    },
+)
 @limiter.limit(EXPORT_LIMIT)
 async def epg_xml(request: Request, tenant: TenantDep, session: SessionDep) -> StreamingResponse:
+    """The guide for every channel in ``playlist.m3u``, keyed by the same
+    channel UUIDs."""
     return StreamingResponse(
         svc.render_xmltv(session, tenant),
         media_type="application/xml",
@@ -68,7 +101,20 @@ async def epg_xml(request: Request, tenant: TenantDep, session: SessionDep) -> S
     )
 
 
-@router.get("/watchlist.json", include_in_schema=False)
+@router.get(
+    "/watchlist.json",
+    include_in_schema=False,
+    summary="Upcoming watchlisted airings",
+    responses={
+        200: {
+            "description": "Every upcoming airing anyone on the account has watchlisted, with "
+            "corrected times and the same stream URLs the playlist uses. The watchlist is per "
+            "user while the token is per account, so this is the union across the household, "
+            "de-duplicated per broadcast."
+        },
+        401: {"description": "Invalid or missing export token"},
+    },
+)
 @limiter.limit(EXPORT_LIMIT)
 async def watchlist_json(
     request: Request,
@@ -99,7 +145,18 @@ class WatchEventsIn(BaseModel):
     events: list[WatchEventIn] = Field(default_factory=list, max_length=500)
 
 
-@router.get("/favourites.json", include_in_schema=False)
+@router.get(
+    "/favourites.json",
+    include_in_schema=False,
+    summary="Favourited channels",
+    responses={
+        200: {
+            "description": "Channels anyone on the account has starred. Carries channel_name "
+            "as well as the id, because a consumer may key favourites by display name."
+        },
+        401: {"description": "Invalid or missing export token"},
+    },
+)
 @limiter.limit(EXPORT_LIMIT)
 async def favourites_json(
     request: Request,
@@ -114,7 +171,19 @@ async def favourites_json(
     return await svc.render_favourites(session, tenant, base_url=base, token=token)
 
 
-@router.post("/watch-events", include_in_schema=False)
+@router.post(
+    "/watch-events",
+    include_in_schema=False,
+    summary="Report what a player watched",
+    responses={
+        200: {
+            "description": "Counts of what was stored and what was skipped. Skipped rows are "
+            "those for channels outside this account, or with an implausible duration -- a bad "
+            "row never fails the batch."
+        },
+        401: {"description": "Invalid or missing export token"},
+    },
+)
 @limiter.limit(EXPORT_LIMIT)
 async def watch_events(
     request: Request,
@@ -150,7 +219,22 @@ async def watch_events(
     return {"stored": stored, "skipped": skipped}
 
 
-@router.get("/stream/{channel_id}", include_in_schema=False)
+@router.get(
+    "/stream/{channel_id}",
+    include_in_schema=False,
+    summary="Resolve one channel to its real stream",
+    responses={
+        302: {
+            "description": "Redirect to the upstream stream URL. Provider credentials "
+            "(Xtream logins and the like) stay on the server and never appear in the playlist."
+        },
+        401: {"description": "Invalid or missing export token"},
+        404: {"description": "Unknown channel, or not on this account"},
+        501: {
+            "description": "This source kind can't be resolved to a stream yet (Stalker portals)"
+        },
+    },
+)
 @limiter.limit(EXPORT_LIMIT)
 async def stream(
     request: Request,
@@ -198,6 +282,16 @@ PlayChannelDep = Annotated[Channel, Depends(_play_channel)]
     "/play/{channel_id}/playlist.m3u",
     response_class=PlainTextResponse,
     include_in_schema=False,
+    summary="One channel as an M3U, behind a play ticket",
+    responses={
+        200: {
+            "description": "A single-channel M3U whose url-tvg points at this channel's own "
+            "guide. Both carry the same ticket, so the link reaches exactly one channel.",
+            "content": {"audio/x-mpegurl": {"schema": {"type": "string"}}},
+        },
+        401: {"description": "Invalid or expired play link"},
+        404: {"description": "Unknown channel"},
+    },
 )
 @limiter.limit(EXPORT_LIMIT)
 async def play_playlist(
@@ -205,6 +299,9 @@ async def play_playlist(
     channel: PlayChannelDep,
     ticket: Annotated[str, Query()] = "",
 ) -> PlainTextResponse:
+    """The "Play externally" hand-off: what the web app's **Play** button emits.
+    Authenticated by a 24-hour per-channel ticket rather than the export token,
+    so handing someone a programme doesn't hand them the whole account."""
     root = f"{get_settings().public_origin.rstrip('/')}/api/exports/play/{channel.id}"
     return PlainTextResponse(
         svc.render_channel_m3u(
@@ -217,7 +314,19 @@ async def play_playlist(
     )
 
 
-@router.get("/play/{channel_id}/epg.xml", include_in_schema=False)
+@router.get(
+    "/play/{channel_id}/epg.xml",
+    include_in_schema=False,
+    summary="One channel's guide, behind a play ticket",
+    responses={
+        200: {
+            "description": "XMLTV for this channel alone.",
+            "content": {"application/xml": {"schema": {"type": "string"}}},
+        },
+        401: {"description": "Invalid or expired play link"},
+        404: {"description": "Unknown channel"},
+    },
+)
 @limiter.limit(EXPORT_LIMIT)
 async def play_epg_xml(
     request: Request,
@@ -236,7 +345,17 @@ async def play_epg_xml(
     )
 
 
-@router.get("/play/{channel_id}/stream", include_in_schema=False)
+@router.get(
+    "/play/{channel_id}/stream",
+    include_in_schema=False,
+    summary="Resolve one channel, behind a play ticket",
+    responses={
+        302: {"description": "Redirect to the upstream stream URL."},
+        401: {"description": "Invalid or expired play link"},
+        404: {"description": "Unknown channel"},
+        501: {"description": "This source kind can't be resolved to a stream yet"},
+    },
+)
 @limiter.limit(EXPORT_LIMIT)
 async def play_stream(
     request: Request,

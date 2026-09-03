@@ -26,6 +26,8 @@ jobs:
       - run: uv run ruff format --check .
       - run: uv run mypy .
       - run: uv run pytest -q
+      - name: Published export API document is in step with the routes
+        run: uv run python scripts/export_openapi.py --check
 
   migrations:
     # The backend suite runs on SQLite; this catches migrations that only break
