@@ -37,6 +37,9 @@ class ProgrammeOut(BaseModel):
     icon_url: str | None
     director: str | None
     is_movie: bool
+    # True when a player has reported watching enough of this airing — see
+    # app.services.watch. Always False for an account with nothing reporting.
+    watched: bool = False
 
 
 class ScheduleOut(BaseModel):

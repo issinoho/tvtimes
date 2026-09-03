@@ -1633,6 +1633,11 @@ export interface components {
             director: string | null;
             /** Is Movie */
             is_movie: boolean;
+            /**
+             * Watched
+             * @default false
+             */
+            watched: boolean;
         };
         /** Readiness */
         Readiness: {
