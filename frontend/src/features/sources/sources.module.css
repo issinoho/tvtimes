@@ -90,13 +90,17 @@
   border-radius: 999px;
   white-space: nowrap;
 }
+/* These were pale, dark-mode-only literals. The tint composites over white
+   in light mode, so near-white text left the pills looking blank -- the
+   --callout-*-fg tokens are the existing answer to exactly that, and flip
+   to saturated darks. .pending was already fine: it used var(--text). */
 .pill.ok {
   background: color-mix(in srgb, var(--genre-doc) 22%, transparent);
-  color: #b9f5d3;
+  color: var(--callout-success-fg);
 }
 .pill.error {
   background: color-mix(in srgb, var(--genre-news) 22%, transparent);
-  color: #ffcaca;
+  color: var(--callout-error-fg);
 }
 .pill.pending {
   background: color-mix(in srgb, var(--brand-violet) 22%, transparent);
@@ -104,7 +108,7 @@
 }
 .pill.stale {
   background: color-mix(in srgb, var(--brand-amber) 22%, transparent);
-  color: #ffe2ad;
+  color: var(--callout-warn-fg);
 }
 
 .btn {
@@ -124,7 +128,7 @@
   font-weight: 600;
 }
 .btn.danger {
-  color: #ffcaca;
+  color: var(--callout-error-fg);
   border-color: color-mix(in srgb, var(--genre-news) 45%, transparent);
 }
 .btn:disabled {
@@ -204,7 +208,7 @@
   margin-top: 1.1rem;
 }
 .err {
-  color: #ffbcbc;
+  color: var(--callout-error-fg);
   font-size: 0.85rem;
   margin: 0 0 0.75rem;
 }
