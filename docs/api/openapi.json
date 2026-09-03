@@ -1,0 +1,728 @@
+{
+  "components": {
+    "schemas": {
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "WatchEventIn": {
+        "description": "One reported viewing interval. Times are corrected UTC \u2014 the reporter\nplayed the export feed, whose guide is already clock-shifted.",
+        "properties": {
+          "channel_id": {
+            "format": "uuid",
+            "title": "Channel Id",
+            "type": "string"
+          },
+          "device": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device"
+          },
+          "ended_at": {
+            "format": "date-time",
+            "title": "Ended At",
+            "type": "string"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "channel_id",
+          "started_at",
+          "ended_at"
+        ],
+        "title": "WatchEventIn",
+        "type": "object"
+      },
+      "WatchEventsIn": {
+        "properties": {
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/WatchEventIn"
+            },
+            "maxItems": 500,
+            "title": "Events",
+            "type": "array"
+          }
+        },
+        "title": "WatchEventsIn",
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "exportToken": {
+        "description": "Per-account export token from Settings \u2192 Export feeds.",
+        "in": "query",
+        "name": "token",
+        "type": "apiKey"
+      },
+      "playTicket": {
+        "description": "24-hour, single-channel ticket minted by the web app's Play button.",
+        "in": "query",
+        "name": "ticket",
+        "type": "apiKey"
+      }
+    }
+  },
+  "info": {
+    "description": "The **export API** is how another application reads a tvtimes account: its whole\nmerged line-up, the corrected guide, what's been watchlisted and favourited, and\na way to report back what was actually watched.\n\nIt is the only part of tvtimes intended for third-party use. Everything else in\nthe app is the web client's own interface: undocumented, and free to change in\nany release. Treat the routes below as the stable surface and the rest as\ninternal.\n\n## Authentication\n\nTwo schemes, deliberately kept on separate paths so they never mix on one route.\n\n**Export token** (`?token=`) \u2014 one per account, minted under *Settings \u2192 Export\nfeeds*. It reaches the whole line-up and can stream through it, so treat it as a\npassword. Rotating it invalidates every feed URL and every saved `tvtimes://`\nbookmark at once. It is passed as a query parameter rather than a header because\na tuner or an `<img>`-style client often cannot send one.\n\n`POST /api/exports/watch-events` is the **only write** this token permits, and it\nstays narrow: it appends viewing intervals for channels already on the account\nand nothing else.\n\n**Play ticket** (`?ticket=`) \u2014 a 24-hour, single-channel credential behind the\nweb app's *Play* button, on the `/play/` routes. Handing someone a programme this\nway doesn't hand them the account.\n\n## Conventions\n\n- Channels are identified by tvtimes' own channel UUID in **both** the playlist\n  and the guide, so a programme links to its channel 1:1 even where several\n  upstream channels share a `tvg-id`.\n- Guide times are written **already corrected** into each channel's display zone\n  with the right `+ZZZZ` offset. A downstream guide needs no further shifting.\n- Every route is rate limited to 30 requests per minute per client.\n\n## Getting a token\n\n*Settings \u2192 Export feeds \u2192 Generate feed links*. The URLs are shown once. See\n[Export Feeds](https://github.com/issinoho/tvtimes/wiki/Export-Feeds) and\n[Pairing with tvdinner](https://github.com/issinoho/tvtimes/wiki/Pairing-With-tvdinner).\n",
+    "license": {
+      "name": "MIT",
+      "url": "https://github.com/issinoho/tvtimes/blob/main/LICENSE"
+    },
+    "title": "tvtimes Export API",
+    "version": "1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/exports/epg.xml": {
+      "get": {
+        "description": "The guide for every channel in ``playlist.m3u``, keyed by the same\nchannel UUIDs.",
+        "operationId": "epg_xml_api_exports_epg_xml_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "token",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "application/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "XMLTV guide, streamed. Programme times are written already shifted into each channel's display zone with the right +ZZZZ offset, so a downstream guide needs no further correction -- that is the whole point of the export."
+          },
+          "401": {
+            "description": "Invalid or missing export token"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "exportToken": []
+          }
+        ],
+        "summary": "The guide as XMLTV",
+        "tags": [
+          "Export feeds"
+        ]
+      }
+    },
+    "/api/exports/favourites.json": {
+      "get": {
+        "description": "Channels anyone on this account has favourited, so a player can show the\nsame stars \u2014 see ``exports.render_favourites``. Consumed by tvdinner's\n``--sync-favourites``.",
+        "operationId": "favourites_json_api_exports_favourites_json_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "token",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Favourites Json Api Exports Favourites Json Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Channels anyone on the account has starred. Carries channel_name as well as the id, because a consumer may key favourites by display name."
+          },
+          "401": {
+            "description": "Invalid or missing export token"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "exportToken": []
+          }
+        ],
+        "summary": "Favourited channels",
+        "tags": [
+          "Export feeds"
+        ]
+      }
+    },
+    "/api/exports/play/{channel_id}/epg.xml": {
+      "get": {
+        "description": "One channel's XMLTV \u2014 what the hand-off `.m3u`'s ``url-tvg=`` points at.\nSame play ticket, so it reaches exactly the one channel and nothing else.",
+        "operationId": "play_epg_xml_api_exports_play__channel_id__epg_xml_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "channel_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Channel Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ticket",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Ticket",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "application/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "XMLTV for this channel alone."
+          },
+          "401": {
+            "description": "Invalid or expired play link"
+          },
+          "404": {
+            "description": "Unknown channel"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "playTicket": []
+          }
+        ],
+        "summary": "One channel's guide, behind a play ticket",
+        "tags": [
+          "Export feeds"
+        ]
+      }
+    },
+    "/api/exports/play/{channel_id}/playlist.m3u": {
+      "get": {
+        "description": "The \"Play externally\" hand-off: what the web app's **Play** button emits.\nAuthenticated by a 24-hour per-channel ticket rather than the export token,\nso handing someone a programme doesn't hand them the whole account.",
+        "operationId": "play_playlist_api_exports_play__channel_id__playlist_m3u_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "channel_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Channel Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ticket",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Ticket",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "audio/x-mpegurl": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "A single-channel M3U whose url-tvg points at this channel's own guide. Both carry the same ticket, so the link reaches exactly one channel."
+          },
+          "401": {
+            "description": "Invalid or expired play link"
+          },
+          "404": {
+            "description": "Unknown channel"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "playTicket": []
+          }
+        ],
+        "summary": "One channel as an M3U, behind a play ticket",
+        "tags": [
+          "Export feeds"
+        ]
+      }
+    },
+    "/api/exports/play/{channel_id}/stream": {
+      "get": {
+        "operationId": "play_stream_api_exports_play__channel_id__stream_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "channel_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Channel Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ticket",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Ticket",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "302": {
+            "description": "Redirect to the upstream stream URL."
+          },
+          "401": {
+            "description": "Invalid or expired play link"
+          },
+          "404": {
+            "description": "Unknown channel"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "description": "This source kind can't be resolved to a stream yet"
+          }
+        },
+        "security": [
+          {
+            "playTicket": []
+          }
+        ],
+        "summary": "Resolve one channel, behind a play ticket",
+        "tags": [
+          "Export feeds"
+        ]
+      }
+    },
+    "/api/exports/playlist.m3u": {
+      "get": {
+        "description": "Every channel of every enabled source, de-duplicated, in the order the\nSources screen shows. Each entry's stream URL points back at\n``/api/exports/stream/{channel_id}`` rather than the upstream provider, so\nprovider credentials never leave the server.",
+        "operationId": "playlist_api_exports_playlist_m3u_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "token",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/x-mpegurl": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "M3U playlist. Channels are keyed by tvtimes' own channel UUID in both this file and the guide, so a player links a programme to its channel 1:1 even when several upstream channels share a tvg-id."
+          },
+          "401": {
+            "description": "Invalid or missing export token"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "exportToken": []
+          }
+        ],
+        "summary": "The whole line-up as an M3U playlist",
+        "tags": [
+          "Export feeds"
+        ]
+      }
+    },
+    "/api/exports/stream/{channel_id}": {
+      "get": {
+        "operationId": "stream_api_exports_stream__channel_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "channel_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Channel Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "token",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "302": {
+            "description": "Redirect to the upstream stream URL. Provider credentials (Xtream logins and the like) stay on the server and never appear in the playlist."
+          },
+          "401": {
+            "description": "Invalid or missing export token"
+          },
+          "404": {
+            "description": "Unknown channel, or not on this account"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "description": "This source kind can't be resolved to a stream yet (Stalker portals)"
+          }
+        },
+        "security": [
+          {
+            "exportToken": []
+          }
+        ],
+        "summary": "Resolve one channel to its real stream",
+        "tags": [
+          "Export feeds"
+        ]
+      }
+    },
+    "/api/exports/watch-events": {
+      "post": {
+        "description": "Report what a player actually watched, so the guide can show it back.\n\nThe only *write* the export token permits. Deliberately narrow: it appends\nviewing intervals for channels already in this tenant and nothing else, so\nthe worst a leaked token can do here is pollute your own watched badges \u2014\nthe same token already exposes the whole line-up and streams through it.\n\nIdempotent on ``(channel_id, started_at)``, so a reporter may safely resend\nits log or retry a failed batch. Rows for channels outside the tenant, or\nwith an implausible duration, are skipped rather than failing the batch.",
+        "operationId": "watch_events_api_exports_watch_events_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "token",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WatchEventsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "title": "Response Watch Events Api Exports Watch Events Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Counts of what was stored and what was skipped. Skipped rows are those for channels outside this account, or with an implausible duration -- a bad row never fails the batch."
+          },
+          "401": {
+            "description": "Invalid or missing export token"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "exportToken": []
+          }
+        ],
+        "summary": "Report what a player watched",
+        "tags": [
+          "Export feeds"
+        ]
+      }
+    },
+    "/api/exports/watchlist.json": {
+      "get": {
+        "description": "Every upcoming watchlisted airing on this account, flat enough for a\nrecorder to act on without understanding tvtimes \u2014 see\n``exports.render_watchlist``. Same per-tenant token as the playlist and\nguide feeds; consumed by tvdinner's ``--record-watchlist``.",
+        "operationId": "watchlist_json_api_exports_watchlist_json_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "token",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Watchlist Json Api Exports Watchlist Json Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Every upcoming airing anyone on the account has watchlisted, with corrected times and the same stream URLs the playlist uses. The watchlist is per user while the token is per account, so this is the union across the household, de-duplicated per broadcast."
+          },
+          "401": {
+            "description": "Invalid or missing export token"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "exportToken": []
+          }
+        ],
+        "summary": "Upcoming watchlisted airings",
+        "tags": [
+          "Export feeds"
+        ]
+      }
+    }
+  },
+  "servers": [
+    {
+      "description": "Your own tvtimes deployment",
+      "url": "https://{host}",
+      "variables": {
+        "host": {
+          "default": "tv.example.com",
+          "description": "The host you serve tvtimes on, including any base path."
+        }
+      }
+    }
+  ]
+}

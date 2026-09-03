@@ -227,6 +227,12 @@ Notes:
 
 - Anyone with a link can read your line-up and stream through it — treat the
   URLs as passwords. Rotating invalidates the previous token.
+- The export API has a published OpenAPI reference:
+  <https://issinoho.github.io/tvtimes/api/> (the document itself is at
+  `api/openapi.json`, if you'd rather point a client generator at it). It covers
+  the playlist, guide, watchlist, favourites, watch-events and stream routes,
+  and both auth schemes. The rest of the API is the web app's own and isn't
+  documented — it may change in any release.
 - **Settings → Export feeds** shows when the feeds were last fetched, and lists
   the players reporting watch state back (by `--device-name`, or grouped as
   "Unlabelled player" for one running without it). That's the only place a
