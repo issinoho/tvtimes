@@ -42,6 +42,7 @@ from app.services import exports as exports_svc
 from app.services import logos as logo_svc
 from app.services import sources as src_svc
 from app.services import tmdb as tmdb_svc
+from app.services import watch as watch_svc
 
 router = APIRouter(tags=["epg"])
 
@@ -66,9 +67,12 @@ def _hit_out(h: svc.SearchHit) -> SearchHitOut:
     )
 
 
-def _programme_out(p: Programme, local_start: datetime, local_stop: datetime) -> ProgrammeOut:
+def _programme_out(
+    p: Programme, local_start: datetime, local_stop: datetime, watched: bool = False
+) -> ProgrammeOut:
     return ProgrammeOut(
         id=p.id,
+        watched=watched,
         start=local_start,
         stop=local_stop,
         title=p.title,
@@ -274,6 +278,9 @@ async def guide(
         channel_ids=channels,
         limit=limit,
     )
+    watched = await watch_svc.watched_programme_ids(
+        session, user.tenant_id, [t[0] for r in rows for t in r.programmes]
+    )
     return GuideOut(
         from_=start,
         to=end,
@@ -287,7 +294,7 @@ async def guide(
                 is_hd=r.channel.is_hd,
                 timezone=r.timezone,
                 clock_shift_seconds=r.channel.clock_shift_seconds,
-                programmes=[_programme_out(*t) for t in r.programmes],
+                programmes=[_programme_out(*t, t[0].id in watched) for t in r.programmes],
             )
             for r in rows
         ],
@@ -330,13 +337,22 @@ async def guide_now_next(
     rows = await svc.now_next(
         session, user.tenant_id, source_id=source_id, group=group, limit=limit, now=now
     )
+    watched = await watch_svc.watched_programme_ids(
+        session,
+        user.tenant_id,
+        [t[0] for r in rows for t in (r.current, r.upcoming) if t is not None],
+    )
     return NowNextOut(
         now=now,
         channels=[
             NowNextRowOut(
                 channel=_search_channel_out(r.channel, r.timezone),
-                current=_programme_out(*r.current) if r.current else None,
-                upcoming=_programme_out(*r.upcoming) if r.upcoming else None,
+                current=(
+                    _programme_out(*r.current, r.current[0].id in watched) if r.current else None
+                ),
+                upcoming=(
+                    _programme_out(*r.upcoming, r.upcoming[0].id in watched) if r.upcoming else None
+                ),
             )
             for r in rows
         ],

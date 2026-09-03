@@ -5,11 +5,13 @@ client can't send a bearer header."""
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from typing import Annotated
 
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import PlainTextResponse, RedirectResponse, StreamingResponse
+from pydantic import BaseModel, Field
 
 from app.auth import tokens
 from app.auth.deps import SessionDep
@@ -18,6 +20,7 @@ from app.config import get_settings
 from app.models.source import Channel, Source
 from app.models.tenant import Tenant
 from app.services import exports as svc
+from app.services import watch as watch_svc
 
 router = APIRouter(prefix="/exports", tags=["exports"])
 
@@ -75,6 +78,57 @@ async def watchlist_json(
     guide feeds; consumed by tvdinner's ``--record-watchlist``."""
     base = get_settings().public_origin.rstrip("/")
     return await svc.render_watchlist(session, tenant, base_url=base, token=token)
+
+
+class WatchEventIn(BaseModel):
+    """One reported viewing interval. Times are corrected UTC — the reporter
+    played the export feed, whose guide is already clock-shifted."""
+
+    channel_id: uuid.UUID
+    started_at: datetime
+    ended_at: datetime
+    title: str | None = Field(default=None, max_length=500)
+    device: str | None = Field(default=None, max_length=120)
+
+
+class WatchEventsIn(BaseModel):
+    events: list[WatchEventIn] = Field(default_factory=list, max_length=500)
+
+
+@router.post("/watch-events", include_in_schema=False)
+@limiter.limit(EXPORT_LIMIT)
+async def watch_events(
+    request: Request,
+    body: WatchEventsIn,
+    tenant: TenantDep,
+    session: SessionDep,
+) -> dict[str, int]:
+    """Report what a player actually watched, so the guide can show it back.
+
+    The only *write* the export token permits. Deliberately narrow: it appends
+    viewing intervals for channels already in this tenant and nothing else, so
+    the worst a leaked token can do here is pollute your own watched badges —
+    the same token already exposes the whole line-up and streams through it.
+
+    Idempotent on ``(channel_id, started_at)``, so a reporter may safely resend
+    its log or retry a failed batch. Rows for channels outside the tenant, or
+    with an implausible duration, are skipped rather than failing the batch.
+    """
+    stored, skipped = await watch_svc.record_watch_events(
+        session,
+        tenant.id,
+        [
+            watch_svc.ReportedWatch(
+                channel_id=e.channel_id,
+                started_at=e.started_at,
+                ended_at=e.ended_at,
+                title=e.title,
+                device=e.device,
+            )
+            for e in body.events
+        ],
+    )
+    return {"stored": stored, "skipped": skipped}
 
 
 @router.get("/stream/{channel_id}", include_in_schema=False)
