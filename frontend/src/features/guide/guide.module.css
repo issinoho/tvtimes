@@ -141,8 +141,8 @@
   /* Translucent white card: enough of a light ground for logos that ship on
      white (Pluto, many IPTV feeds) or transparent, while the dark guide shows
      through so it reads as part of the surface, not a bright block. */
-  background: rgb(255 255 255 / 70%);
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 10%);
+  background: var(--logo-card);
+  box-shadow: inset 0 0 0 1px var(--logo-card-ring);
 }
 .chanLogoEmpty {
   width: 44px;
