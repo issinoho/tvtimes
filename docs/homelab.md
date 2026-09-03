@@ -228,7 +228,8 @@ Notes:
 - Anyone with a link can read your line-up and stream through it — treat the
   URLs as passwords. Rotating invalidates the previous token.
 - For the whole path — provider, through tvtimes, out to your player, and how
-  tvdinner fits — see [How the pieces fit](architecture.md), which has diagrams.
+  tvdinner fits — see [How the pieces fit](https://issinoho.github.io/tvtimes/architecture/),
+  which has diagrams.
 - The export API has a published OpenAPI reference:
   <https://issinoho.github.io/tvtimes/api/> (the document itself is at
   `api/openapi.json`, if you'd rather point a client generator at it). It covers
