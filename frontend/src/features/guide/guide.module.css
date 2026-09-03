@@ -453,6 +453,10 @@
   position: absolute;
   top: 0.75rem;
   right: 0.75rem;
+  /* .heroArt is positioned too, comes later in the DOM, and its negative
+     margins pull it into this corner -- so with both at z-index auto the
+     artwork painted over the button *and* swallowed its clicks. */
+  z-index: 1;
 }
 .sheet .watchRow {
   display: flex;
