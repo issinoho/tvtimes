@@ -247,6 +247,8 @@ source.
 
 ## See also
 
+- **[This page, rendered](https://issinoho.github.io/tvtimes/architecture/)** — same content, on the website
+
 - [Export feeds](https://github.com/issinoho/tvtimes/wiki/Export-Feeds) — turning the feeds on
 - [Pairing with tvdinner](https://github.com/issinoho/tvtimes/wiki/Pairing-With-tvdinner) — the whole pairing, end to end
 - [Export API reference](https://issinoho.github.io/tvtimes/api/) — the routes, as OpenAPI

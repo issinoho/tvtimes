@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>tvtimes — How the pieces fit</title>
+<meta name="description" content="How channels and guide data get from providers, through tvtimes, out to tvdinner and your tuner apps — with diagrams." />
+<link rel="icon" href="../logo.svg" type="image/svg+xml" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --ground: #0b0713;
+    --raised: #150c24;
+    --overlay: #1e1233;
+    --line: #2c2140;
+    --ink: #f4eeff;
+    --ink-dim: #a99fc4;
+    --ink-faint: #6f6690;
+    --violet: #a78bfa;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--ground); color: var(--ink);
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 16px; line-height: 1.7;
+  }
+
+  .topbar {
+    position: sticky; top: 0; z-index: 100;
+    display: flex; align-items: center; gap: 16px;
+    padding: 12px 22px;
+    background: rgba(11, 7, 19, 0.92);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+  }
+  .topbar a.home {
+    display: flex; align-items: center; gap: 9px;
+    font-family: "Space Grotesk", Inter, sans-serif;
+    font-weight: 700; font-size: 16px; letter-spacing: -0.01em;
+    color: var(--ink); text-decoration: none;
+  }
+  .topbar img { width: 24px; height: 24px; }
+  .topbar .tag {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 11px; color: var(--ink-dim);
+    border: 1px solid var(--line); border-radius: 999px; padding: 3px 9px;
+  }
+  .topbar nav { margin-left: auto; display: flex; gap: 18px; }
+  .topbar nav a { font-size: 13px; color: var(--ink-dim); text-decoration: none; }
+  .topbar nav a:hover { color: var(--ink); }
+
+  main { max-width: 900px; margin: 0 auto; padding: 40px 24px 96px; }
+
+  h1, h2, h3 {
+    font-family: "Space Grotesk", Inter, sans-serif;
+    font-weight: 700; letter-spacing: -0.015em; line-height: 1.25;
+    scroll-margin-top: 72px;
+  }
+  h1 { font-size: 34px; margin: 0 0 10px; }
+  h2 {
+    font-size: 24px; margin: 56px 0 14px;
+    padding-top: 22px; border-top: 1px solid var(--line);
+  }
+  h3 { font-size: 18px; margin: 34px 0 10px; color: var(--violet); }
+  p { margin: 0 0 16px; }
+  a { color: var(--violet); }
+  strong { color: #fff; }
+  em { color: var(--ink-dim); }
+  hr { display: none; }
+
+  ul, ol { padding-left: 22px; margin: 0 0 16px; }
+  li { margin: 6px 0; }
+  li::marker { color: var(--ink-faint); }
+
+  code {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.86em; color: #ddd0ff;
+    background: var(--raised); border: 1px solid var(--line);
+    border-radius: 5px; padding: 1px 5px;
+  }
+  pre code { border: 0; background: none; padding: 0; }
+
+  table {
+    width: 100%; border-collapse: collapse; margin: 0 0 20px;
+    font-size: 14.5px; display: block; overflow-x: auto;
+  }
+  th, td {
+    border: 1px solid var(--line); padding: 9px 12px;
+    text-align: left; vertical-align: top;
+  }
+  th { background: var(--raised); font-weight: 600; }
+  td:first-child { white-space: nowrap; }
+
+  blockquote {
+    margin: 0 0 16px; padding: 2px 0 2px 16px;
+    border-left: 3px solid var(--line); color: var(--ink-dim);
+  }
+
+  /* Diagrams get a panel of their own — they're the point of the page. */
+  .diagram {
+    background: var(--raised); border: 1px solid var(--line);
+    border-radius: 12px; padding: 20px; margin: 0 0 24px;
+    overflow-x: auto; text-align: center;
+  }
+  .diagram svg { max-width: 100%; height: auto; }
+  /* The prose column is 900px; several diagrams are wider than that and
+     become unreadable when squeezed into it. Let them spill symmetrically
+     into the margins, as far as the viewport allows. */
+  @media (min-width: 1040px) {
+    .diagram {
+      width: min(1240px, calc(100vw - 48px));
+      margin-left: calc(50% - min(620px, calc(50vw - 24px)));
+    }
+  }
+
+  .status {
+    max-width: 620px; margin: 12vh auto; padding: 0 24px;
+    color: var(--ink-dim); text-align: center;
+  }
+  .status h2 { border: 0; padding: 0; color: var(--ink); font-size: 20px; }
+
+  @media (max-width: 620px) {
+    .topbar .tag { display: none; }
+    main { padding: 28px 18px 72px; }
+    h1 { font-size: 27px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <a class="home" href="../"><img src="../logo.svg" alt="" /> tvtimes</a>
+  <span class="tag">Architecture</span>
+  <nav>
+    <a href="../api/">Export API</a>
+    <a href="https://github.com/issinoho/tvtimes/wiki">Wiki</a>
+    <a href="https://github.com/issinoho/tvtimes">GitHub</a>
+  </nav>
+</header>
+
+<main id="doc">
+  <div class="status"><h2>Loading…</h2></div>
+</main>
+
+<script type="module">
+  const SOURCE = '../architecture.md';
+  const ON_GITHUB = 'https://github.com/issinoho/tvtimes/blob/main/docs/architecture.md';
+  const doc = document.getElementById('doc');
+
+  function fail(what) {
+    doc.innerHTML =
+      '<div class="status"><h2>Couldn\'t render this page</h2><p>' + what +
+      ' It renders on GitHub too, where the source lives: ' +
+      '<a href="' + ON_GITHUB + '">docs/architecture.md</a>.</p></div>';
+  }
+
+  // GitHub's heading-anchor slug, so the in-page contents links in the
+  // markdown resolve here the same way they do on github.com.
+  function slug(text) {
+    return text.toLowerCase().trim()
+      .replace(/[^\w\s-]/g, '')
+      .replace(/\s+/g, '-');
+  }
+
+  try {
+    const [{ marked }, { default: mermaid }] = await Promise.all([
+      import('https://cdn.jsdelivr.net/npm/marked@18.0.11/lib/marked.esm.js'),
+      import('https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/mermaid.esm.min.mjs'),
+    ]);
+
+    const res = await fetch(SOURCE);
+    if (!res.ok) throw new Error('fetch ' + res.status);
+    const markdown = await res.text();
+
+    doc.innerHTML = marked.parse(markdown);
+
+    // Heading ids for the contents list at the top.
+    for (const h of doc.querySelectorAll('h1, h2, h3')) {
+      if (!h.id) h.id = slug(h.textContent);
+    }
+
+    // A relative .md link is a repo path, not a page here — send those to
+    // GitHub rather than 404ing against the Pages site.
+    for (const a of doc.querySelectorAll('a[href$=".md"]')) {
+      const href = a.getAttribute('href');
+      if (!/^https?:/.test(href)) {
+        a.href = 'https://github.com/issinoho/tvtimes/blob/main/docs/' + href;
+      }
+    }
+
+    // marked leaves a mermaid fence as <pre><code class="language-mermaid">;
+    // mermaid wants the source as the direct text of an element it owns.
+    const blocks = [...doc.querySelectorAll('pre > code.language-mermaid')];
+    for (const code of blocks) {
+      const holder = document.createElement('div');
+      holder.className = 'diagram';
+      const target = document.createElement('pre');
+      target.className = 'mermaid';
+      target.textContent = code.textContent;
+      holder.appendChild(target);
+      code.parentElement.replaceWith(holder);
+    }
+
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: 'dark',
+      darkMode: true,
+      fontFamily: 'Inter, system-ui, sans-serif',
+      themeVariables: {
+        background: '#150c24',
+        // Node fill/border and cluster fill are separate knobs from
+        // primary*; without these the dark theme's own greys win and the
+        // diagrams don't match the rest of the site.
+        mainBkg: '#241640',
+        nodeBorder: '#6d4fa8',
+        clusterBkg: '#1a1030',
+        clusterBorder: '#3b2c5c',
+        primaryColor: '#241640',
+        primaryTextColor: '#f4eeff',
+        primaryBorderColor: '#6d4fa8',
+        secondaryColor: '#2c1c4d',
+        tertiaryColor: '#1a1030',
+        lineColor: '#9d8bc4',
+        textColor: '#f4eeff',
+        titleColor: '#c4b5fd',
+        edgeLabelBackground: '#150c24',
+        // Sequence diagrams
+        actorBkg: '#241640',
+        actorBorder: '#6d4fa8',
+        actorTextColor: '#f4eeff',
+        signalColor: '#c9bce4',
+        signalTextColor: '#f4eeff',
+        labelBoxBkgColor: '#2c1c4d',
+        labelBoxBorderColor: '#6d4fa8',
+        labelTextColor: '#f4eeff',
+        loopTextColor: '#f4eeff',
+        noteBkgColor: '#3b2c5c',
+        noteBorderColor: '#6d4fa8',
+        noteTextColor: '#f4eeff',
+        sequenceNumberColor: '#150c24',
+      },
+    });
+    await mermaid.run({ nodes: doc.querySelectorAll('pre.mermaid') });
+
+    // Arriving with a #fragment: the content only just appeared, so the
+    // browser's own scroll has already been and gone.
+    if (location.hash) {
+      document.getElementById(decodeURIComponent(location.hash.slice(1)))
+        ?.scrollIntoView();
+    }
+  } catch (err) {
+    fail(String(err).includes('fetch') ? 'The source could not be loaded.'
+                                       : 'The renderer could not be loaded.');
+  }
+</script>
+
+</body>
+</html>
