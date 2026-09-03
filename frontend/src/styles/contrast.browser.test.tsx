@@ -99,3 +99,38 @@ for (const theme of ['light', 'dark'] as const) {
     expect(failures, `below ${AA}:1 in ${theme} mode`).toEqual([]);
   });
 }
+
+/**
+ * A channel logo sits on a tile of its own, because provider artwork is
+ * wildly inconsistent — white-on-transparent, dark-on-transparent, full-bleed
+ * colour. The tile was a translucent white tuned for the dark UI; in light
+ * mode nothing dark shows through, so it resolved to near-white and every
+ * white-on-transparent logo (Pluto's and most IPTV feeds') vanished.
+ *
+ * The tile therefore has to be distinguishable from the surface it sits on,
+ * in both themes — that difference is the only thing a pale logo has to
+ * read against.
+ */
+function distance(a: number[], b: number[]): number {
+  return Math.max(...[0, 1, 2].map((i) => Math.abs(a[i] - b[i])));
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`a channel logo tile is distinguishable from the surface in ${theme} mode`, () => {
+    document.documentElement.setAttribute('data-theme', theme);
+    const surface = over(getComputedStyle(document.body).backgroundColor, [255, 255, 255]);
+
+    const probe = document.createElement('div');
+    probe.style.background = 'var(--logo-card)';
+    document.body.appendChild(probe);
+    // backgroundColor, not background: the shorthand computes to
+    // "rgba(255, 255, 255, 0.7) none repeat scroll ..." and any attempt to
+    // pick the colour out of that by splitting on spaces gets "rgba(255,".
+    const tile = over(getComputedStyle(probe).backgroundColor, surface);
+    probe.remove();
+
+    // A white logo against a near-white tile is the bug. 24 is comfortably
+    // past "you can see the edge of it" without demanding a heavy block.
+    expect(distance(tile, surface)).toBeGreaterThan(24);
+  });
+}

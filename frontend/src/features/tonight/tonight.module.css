@@ -95,8 +95,8 @@
   padding: 2px;
   /* translucent white plate so dark / transparent marks stay legible on the
      near-black card (matches the guide grid) */
-  background: rgb(255 255 255 / 70%);
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 10%);
+  background: var(--logo-card);
+  box-shadow: inset 0 0 0 1px var(--logo-card-ring);
 }
 .logoEmpty {
   width: 34px;
