@@ -204,6 +204,13 @@ pollute your own watched badges — it already exposes the whole line-up and
 streams through it. If that's not a trade you want, leave
 `--report-watch-state` off and nothing is ever written.
 
+**Sharing favourites.** `/api/exports/favourites.json` lists the channels anyone
+on the account has starred. `tvdinner --sync-favourites` picks those up at
+startup, so a star set here shows in its guide too. It's additive and one-way:
+un-starring here won't un-star it there, because tvdinner records favourites by
+name with no note of where each came from — quietly deleting one you'd set
+locally is the worse failure.
+
 Notes:
 
 - Anyone with a link can read your line-up and stream through it — treat the
