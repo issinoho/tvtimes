@@ -13,7 +13,7 @@ export function AppLayout() {
 
   async function onSignOut() {
     await logout();
-    navigate('/login', { replace: true });
+    await navigate('/login', { replace: true });
   }
 
   function cycleTheme() {

@@ -37,7 +37,7 @@ export function LoginPage() {
     try {
       const challenge = await loginWithPassword(email, password);
       if (challenge) setMfaToken(challenge.mfaToken);
-      else done();
+      else await done();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not sign in.');
     } finally {
@@ -52,7 +52,7 @@ export function LoginPage() {
     setError(null);
     try {
       await completeMfa(mfaToken, code.trim());
-      done();
+      await done();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'That code was not accepted.');
     } finally {
@@ -65,7 +65,7 @@ export function LoginPage() {
     setError(null);
     try {
       await loginWithPasskey(email || undefined);
-      done();
+      await done();
     } catch {
       setError('Passkey sign-in was cancelled or failed.');
     } finally {

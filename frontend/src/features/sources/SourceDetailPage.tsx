@@ -84,7 +84,7 @@ export function SourceDetailPage() {
           onClick={async () => {
             if (!window.confirm('Remove this source and its channels?')) return;
             await remove.mutateAsync(sourceId);
-            navigate('/sources', { replace: true });
+            await navigate('/sources', { replace: true });
           }}
         >
           Delete
