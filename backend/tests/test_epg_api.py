@@ -270,7 +270,11 @@ async def test_programmes_fan_out_to_channels_sharing_a_tvg_id(
         f"/api/channels/{west['id']}", json={"clock_shift_seconds": 7200}, headers=headers
     )
     assert patched.status_code == 200, patched.text
-    assert patched.json() == {"id": west["id"], "clock_shift_seconds": 7200}
+    assert patched.json() == {
+        "id": west["id"],
+        "clock_shift_seconds": 7200,
+        "epg_override_id": None,
+    }
 
     guide2 = await app_client.get(
         "/api/guide",

@@ -120,3 +120,27 @@ export function useRefreshSource() {
     },
   });
 }
+
+/**
+ * Set (or clear, with an empty string) the guide key a channel is matched on.
+ *
+ * For a channel whose own tvg-id and names find nothing in the guide -- a
+ * tuner numbering BBC One Scotland HD 101 where the guide carries it as 1.
+ * Takes effect on the next guide refresh; nothing is backfilled here.
+ */
+export function useSetChannelEpgOverride(sourceId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ channelId, value }: { channelId: string; value: string }) =>
+      unwrap(
+        await api.PATCH('/api/channels/{channel_id}', {
+          params: { path: { channel_id: channelId } },
+          body: { epg_override_id: value },
+        }),
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['sources', sourceId, 'channels'] });
+      void qc.invalidateQueries({ queryKey: ['guide'] });
+    },
+  });
+}

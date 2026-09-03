@@ -619,7 +619,13 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Patch Channel */
+        /**
+         * Patch Channel
+         * @description Per-channel overrides: the clock shift, and the guide key to match on.
+         *
+         *     Setting ``epg_override_id`` doesn't backfill anything by itself -- the
+         *     channel picks up its programmes on the next guide refresh.
+         */
         patch: operations["patch_channel_api_channels__channel_id__patch"];
         trace?: never;
     };
@@ -1027,6 +1033,13 @@ export interface components {
             number: number | null;
             /** Is Hd */
             is_hd: boolean;
+            /** Epg Override Id */
+            epg_override_id?: string | null;
+            /**
+             * Programme Count
+             * @default 0
+             */
+            programme_count: number;
         };
         /** ChannelPage */
         ChannelPage: {
@@ -1039,13 +1052,18 @@ export interface components {
             /** Offset */
             offset: number;
         };
-        /** ChannelPatchIn */
+        /**
+         * ChannelPatchIn
+         * @description Patch semantics: an omitted field is left alone.
+         */
         ChannelPatchIn: {
             /** Clock Shift Seconds */
-            clock_shift_seconds: number;
+            clock_shift_seconds?: number | null;
+            /** Epg Override Id */
+            epg_override_id?: string | null;
         };
-        /** ChannelShiftOut */
-        ChannelShiftOut: {
+        /** ChannelPatchOut */
+        ChannelPatchOut: {
             /**
              * Id
              * Format: uuid
@@ -1053,6 +1071,8 @@ export interface components {
             id: string;
             /** Clock Shift Seconds */
             clock_shift_seconds: number;
+            /** Epg Override Id */
+            epg_override_id?: string | null;
         };
         /** ConnectorCreateIn */
         ConnectorCreateIn: {
@@ -3508,7 +3528,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ChannelShiftOut"];
+                    "application/json": components["schemas"]["ChannelPatchOut"];
                 };
             };
             /** @description Validation Error */

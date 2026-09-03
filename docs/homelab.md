@@ -250,6 +250,24 @@ Notes:
   never appear in the file). **Stalker portal** channels appear in the guide but
   don't play through the export yet.
 
+### A channel with an empty guide
+
+Open the source (**Settings → Sources → the source**) and look at the **Guide**
+column in its channel list: `none` means nothing in the guide matched that
+channel. tvtimes matches on the channel's tvg-id, the same with an `@feed`
+suffix stripped, and its name — so a tuner that numbers BBC One Scotland HD
+`101` while the guide carries that programming under `1` will never connect the
+two, because neither the ids nor the names agree.
+
+Put the key the guide *does* use in the **Guide key** column — `1`, in that
+example — and the channel picks up those listings on the next refresh. Two
+channels can share a key; each gets its own copy, which is how an HD variant
+borrows the SD channel's listings. Clear the box to go back to automatic
+matching.
+
+The override survives a channel refresh, unlike the name and tvg-id, which the
+source overwrites every time.
+
 ## Play a channel in your device's player
 
 To just watch one channel now — without wiring up a whole tuner — open a

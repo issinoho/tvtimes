@@ -22,7 +22,7 @@ from app.queue import (
 from app.schemas.auth import MessageOut
 from app.schemas.epg import (
     ChannelPatchIn,
-    ChannelShiftOut,
+    ChannelPatchOut,
     EpgSourceIn,
     EpgSourceOut,
     GuideChannelOut,
@@ -152,19 +152,33 @@ async def delete_epg_source(
     return MessageOut(message="EPG source removed.")
 
 
-@router.patch("/channels/{channel_id}", response_model=ChannelShiftOut)
+@router.patch("/channels/{channel_id}", response_model=ChannelPatchOut)
 async def patch_channel(
     channel_id: uuid.UUID, body: ChannelPatchIn, user: VerifiedUser, session: SessionDep
-) -> ChannelShiftOut:
+) -> ChannelPatchOut:
+    """Per-channel overrides: the clock shift, and the guide key to match on.
+
+    Setting ``epg_override_id`` doesn't backfill anything by itself -- the
+    channel picks up its programmes on the next guide refresh.
+    """
     try:
         channel = await src_svc.get_channel(session, user.tenant_id, channel_id)
     except src_svc.SourceNotFound as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Unknown channel") from exc
-    await src_svc.set_channel_clock_shift(
-        session, channel, clock_shift_seconds=body.clock_shift_seconds
-    )
+    if body.clock_shift_seconds is not None:
+        await src_svc.set_channel_clock_shift(
+            session, channel, clock_shift_seconds=body.clock_shift_seconds
+        )
+    if body.epg_override_id is not None:
+        await src_svc.set_channel_epg_override(
+            session, channel, epg_override_id=body.epg_override_id
+        )
     await session.flush()
-    return ChannelShiftOut(id=channel.id, clock_shift_seconds=channel.clock_shift_seconds)
+    return ChannelPatchOut(
+        id=channel.id,
+        clock_shift_seconds=channel.clock_shift_seconds,
+        epg_override_id=channel.epg_override_id,
+    )
 
 
 @router.post("/channels/{channel_id}/play-link", response_model=PlayLinkOut)

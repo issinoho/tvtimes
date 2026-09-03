@@ -160,8 +160,12 @@ async def list_channels(
     rows, total = await svc.list_channels(
         session, source, group=group, search=search, limit=limit, offset=offset
     )
+    counts = await svc.programme_counts(session, [c.id for c in rows])
     return ChannelPage(
-        items=[ChannelOut.model_validate(c) for c in rows],
+        items=[
+            ChannelOut.model_validate(c).model_copy(update={"programme_count": counts.get(c.id, 0)})
+            for c in rows
+        ],
         total=total,
         limit=limit,
         offset=offset,
