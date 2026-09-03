@@ -66,6 +66,9 @@ async def generate_token(session: AsyncSession, tenant: Tenant) -> str:
     raw = secrets.token_urlsafe(32)
     tenant.export_token_hash = _hash(raw)
     tenant.export_token_set_at = datetime.now(UTC)
+    # The new token has never been used; carrying the old one's stamp over
+    # would show "last fetched 2 minutes ago" for a credential nobody holds.
+    tenant.export_token_last_used_at = None
     await session.flush()
     return raw
 
@@ -73,6 +76,27 @@ async def generate_token(session: AsyncSession, tenant: Tenant) -> str:
 async def revoke_token(session: AsyncSession, tenant: Tenant) -> None:
     tenant.export_token_hash = None
     tenant.export_token_set_at = None
+    tenant.export_token_last_used_at = None
+    await session.flush()
+
+
+# How stale the recorded "last used" has to be before a read bothers writing.
+# The panel shows this as a coarse "3 minutes ago", so a minute's granularity
+# is all it can display anyway -- and it keeps a player polling hard, or a
+# tuner pulling the playlist repeatedly, from turning every read into a write.
+TOUCH_INTERVAL = timedelta(minutes=1)
+
+
+async def touch_export_token(session: AsyncSession, tenant: Tenant) -> None:
+    """Record that the export token was just used, at most once a minute.
+
+    Called for every authenticated export request. Deliberately best-effort:
+    the caller's own work is what matters, so this never fails a fetch."""
+    now = datetime.now(UTC)
+    previous = tenant.export_token_last_used_at
+    if previous is not None and now - previous < TOUCH_INTERVAL:
+        return
+    tenant.export_token_last_used_at = now
     await session.flush()
 
 

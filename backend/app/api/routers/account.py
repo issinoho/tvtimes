@@ -22,7 +22,9 @@ from app.config import get_settings
 from app.models.credentials import WebAuthnCredential
 from app.schemas.account import (
     ActivityNotificationsIn,
+    ExportActivityOut,
     ExportTokenOut,
+    ReportingDeviceOut,
     SourceAlertsIn,
     TimezoneIn,
     TmdbTokenIn,
@@ -40,6 +42,7 @@ from app.schemas.auth import (
 )
 from app.services import exports as exports_svc
 from app.services import tmdb as tmdb_svc
+from app.services import watch as watch_svc
 
 router = APIRouter(prefix="/account", tags=["account"])
 
@@ -99,6 +102,25 @@ async def create_export_token(user: VerifiedUser, session: SessionDep) -> Export
         token=raw,
         playlist_url=f"{base}/api/exports/playlist.m3u?token={raw}",
         epg_url=f"{base}/api/exports/epg.xml?token={raw}",
+    )
+
+
+@router.get("/export-activity", response_model=ExportActivityOut)
+async def export_activity(user: CurrentUser, session: SessionDep) -> ExportActivityOut:
+    """What is actually using the export feeds.
+
+    Answers a question nothing else could: an export token leaves no trace on
+    the Sessions screen (it never creates one) and a watchlist or favourites
+    poll is a plain read, so a paired player was previously invisible here.
+    """
+    devices = await watch_svc.reporting_devices(session, user.tenant_id)
+    return ExportActivityOut(
+        token_set_at=user.tenant.export_token_set_at,
+        last_used_at=user.tenant.export_token_last_used_at,
+        devices=[
+            ReportingDeviceOut(name=d.name, last_reported_at=d.last_reported_at, events=d.events)
+            for d in devices
+        ],
     )
 
 

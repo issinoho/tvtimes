@@ -31,6 +31,10 @@ async def _tenant(session: SessionDep, token: Annotated[str, Query()] = "") -> T
     tenant = await svc.tenant_for_token(session, token)
     if tenant is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or missing export token")
+    # Every export route depends on this, so one call here covers the lot --
+    # the playlist, the guide, watchlist/favourites polling, a stream request
+    # and a watch-state report all count as the token being used.
+    await svc.touch_export_token(session, tenant)
     return tenant
 
 

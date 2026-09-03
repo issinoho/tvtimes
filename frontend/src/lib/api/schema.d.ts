@@ -265,6 +265,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/account/export-activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Activity
+         * @description What is actually using the export feeds.
+         *
+         *     Answers a question nothing else could: an export token leaves no trace on
+         *     the Sessions screen (it never creates one) and a watchlist or favourites
+         *     poll is a plain read, so a paired player was previously invisible here.
+         */
+        get: operations["export_activity_api_account_export_activity_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/account/source-alerts": {
         parameters: {
             query?: never;
@@ -1163,6 +1187,22 @@ export interface components {
              */
             created_at: string;
         };
+        /**
+         * ExportActivityOut
+         * @description What's actually using the export feeds — the answer to "is the
+         *     living-room box still talking to me?", which nothing else surfaced.
+         */
+        ExportActivityOut: {
+            /** Token Set At */
+            token_set_at?: string | null;
+            /** Last Used At */
+            last_used_at?: string | null;
+            /**
+             * Devices
+             * @default []
+             */
+            devices: components["schemas"]["ReportingDeviceOut"][];
+        };
         /** ExportTokenOut */
         ExportTokenOut: {
             /** Token */
@@ -1667,6 +1707,22 @@ export interface components {
             password?: string | null;
             /** Timezone */
             timezone?: string | null;
+        };
+        /**
+         * ReportingDeviceOut
+         * @description One player that has reported watch state. `name` is null for a
+         *     reporter that sent no device label.
+         */
+        ReportingDeviceOut: {
+            /** Name */
+            name?: string | null;
+            /**
+             * Last Reported At
+             * Format: date-time
+             */
+            last_reported_at: string;
+            /** Events */
+            events: number;
         };
         /** ResetIn */
         ResetIn: {
@@ -2551,6 +2607,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_activity_api_account_export_activity_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportActivityOut"];
                 };
             };
             /** @description Validation Error */

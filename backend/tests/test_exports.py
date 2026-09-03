@@ -768,3 +768,78 @@ async def test_favourites_endpoint_is_token_gated(
     token = (await app_client.post("/api/account/export-token", headers=h)).json()["token"]
     resp = await app_client.get(f"/api/exports/favourites.json?token={token}")
     assert resp.status_code == 200 and resp.json() == []
+
+
+async def test_export_activity_records_when_a_feed_was_last_fetched(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    await register_and_verify(app_client, captured_emails)
+    h = auth_header(await login(app_client))
+    token = (await app_client.post("/api/account/export-token", headers=h)).json()["token"]
+
+    # Minted but never fetched: the honest answer is "never".
+    activity = (await app_client.get("/api/account/export-activity", headers=h)).json()
+    assert activity["token_set_at"] is not None
+    assert activity["last_used_at"] is None
+    assert activity["devices"] == []
+
+    assert (
+        await app_client.get("/api/exports/playlist.m3u", params={"token": token})
+    ).status_code == 200
+
+    activity = (await app_client.get("/api/account/export-activity", headers=h)).json()
+    assert activity["last_used_at"] is not None
+
+
+async def test_a_second_fetch_inside_the_window_does_not_rewrite_last_used(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    # The panel shows a coarse "3 minutes ago", so a write per request would
+    # buy nothing and cost a write on every poll.
+    await register_and_verify(app_client, captured_emails)
+    h = auth_header(await login(app_client))
+    token = (await app_client.post("/api/account/export-token", headers=h)).json()["token"]
+
+    await app_client.get("/api/exports/playlist.m3u", params={"token": token})
+    activity = await app_client.get("/api/account/export-activity", headers=h)
+    first = activity.json()["last_used_at"]
+
+    await app_client.get("/api/exports/epg.xml", params={"token": token})
+    activity = await app_client.get("/api/account/export-activity", headers=h)
+    assert activity.json()["last_used_at"] == first
+
+
+async def test_revoking_the_token_clears_the_last_used_stamp(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    await register_and_verify(app_client, captured_emails)
+    h = auth_header(await login(app_client))
+    token = (await app_client.post("/api/account/export-token", headers=h)).json()["token"]
+    await app_client.get("/api/exports/playlist.m3u", params={"token": token})
+    assert (await app_client.get("/api/account/export-activity", headers=h)).json()[
+        "last_used_at"
+    ] is not None
+
+    # A revoked token's usage describes a credential nobody can use again.
+    await app_client.delete("/api/account/export-token", headers=h)
+    activity = (await app_client.get("/api/account/export-activity", headers=h)).json()
+    assert activity["last_used_at"] is None
+    assert activity["token_set_at"] is None
+
+
+async def test_rotating_the_token_starts_its_usage_history_over(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    await register_and_verify(app_client, captured_emails)
+    h = auth_header(await login(app_client))
+    token = (await app_client.post("/api/account/export-token", headers=h)).json()["token"]
+    await app_client.get("/api/exports/playlist.m3u", params={"token": token})
+    activity = await app_client.get("/api/account/export-activity", headers=h)
+    assert activity.json()["last_used_at"] is not None
+
+    # A fresh token has never been fetched -- saying otherwise would describe
+    # the credential it replaced.
+    await app_client.post("/api/account/export-token", headers=h)
+    activity = await app_client.get("/api/account/export-activity", headers=h)
+    assert activity.json()["last_used_at"] is None
+    assert activity.json()["token_set_at"] is not None

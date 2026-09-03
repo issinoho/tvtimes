@@ -100,3 +100,60 @@ test('uses the plain tvtimes:// scheme for a http deployment, keeping any base p
     ),
   );
 });
+
+function renderWithActivity(activity: unknown) {
+  const fetchMock = vi.fn((i: RequestInfo | URL) => {
+    const path = pathOf(i);
+    // Must succeed here: AuthProvider only loads `me` after a good refresh,
+    // and the panel's activity query is gated on the loaded user.
+    if (path === '/api/auth/refresh') return Promise.resolve(json({ access_token: 't' }));
+    if (path === '/api/account/me') {
+      return Promise.resolve(json(me({ export_token_set_at: '2026-09-01T10:00:00Z' })));
+    }
+    if (path === '/api/account/export-activity') return Promise.resolve(json(activity));
+    return Promise.resolve(json({ code: 'nf' }, 404));
+  });
+  vi.stubGlobal('fetch', fetchMock);
+
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter>
+        <AuthProvider>
+          <ExportsSection />
+        </AuthProvider>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
+const minutesAgo = (n: number) => new Date(Date.now() - n * 60_000).toISOString();
+
+test('shows when the feeds were last fetched and which players report back', async () => {
+  renderWithActivity({
+    token_set_at: '2026-09-01T10:00:00Z',
+    last_used_at: minutesAgo(5),
+    devices: [
+      { name: 'living room', last_reported_at: minutesAgo(5), events: 12 },
+      { name: null, last_reported_at: minutesAgo(60 * 26), events: 3 },
+    ],
+  });
+
+  expect(await screen.findByText(/Feeds last fetched 5 minutes ago/)).toBeInTheDocument();
+  expect(screen.getByText('living room')).toBeInTheDocument();
+  expect(screen.getByText(/12 viewings/)).toBeInTheDocument();
+  // A reporter that sent no --device-name still has to be visible.
+  expect(screen.getByText('Unlabelled player')).toBeInTheDocument();
+  expect(screen.getByText(/yesterday/)).toBeInTheDocument();
+});
+
+test('says so plainly when a token exists but nothing has ever fetched it', async () => {
+  renderWithActivity({
+    token_set_at: '2026-09-01T10:00:00Z',
+    last_used_at: null,
+    devices: [],
+  });
+
+  expect(await screen.findByText(/never been fetched/)).toBeInTheDocument();
+  expect(screen.queryByText('Unlabelled player')).not.toBeInTheDocument();
+});

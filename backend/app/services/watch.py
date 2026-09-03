@@ -18,7 +18,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.epg import Programme
@@ -196,6 +196,44 @@ async def _channel_shifts(
         )
     }
     return {c.id: timedelta(seconds=_shift_seconds(c, sources.get(c.source_id))) for c in channels}
+
+
+@dataclass(slots=True)
+class ReportingDevice:
+    """One player that has reported watch state, as shown on the Export feeds
+    panel. ``name`` is None for a reporter that sent no ``device`` label --
+    every tvdinner before 1.40, and any that still runs without
+    ``--device-name``."""
+
+    name: str | None
+    last_reported_at: datetime
+    events: int
+
+
+async def reporting_devices(session: AsyncSession, tenant_id: uuid.UUID) -> list[ReportingDevice]:
+    """Which players have reported watch state, most recently active first.
+
+    Derived from the stored events rather than tracked separately, so it needs
+    no new bookkeeping and is automatically bounded by ``prune_watch_events``:
+    a player that stopped reporting drops off once its last interval ages out.
+    Unlabelled reports group together under a single None -- two unlabelled
+    players are indistinguishable, and claiming otherwise would be a guess.
+    """
+    rows = await session.execute(
+        select(
+            WatchEvent.device,
+            func.max(WatchEvent.ended_at),
+            func.count(),
+        )
+        .where(WatchEvent.tenant_id == tenant_id)
+        .group_by(WatchEvent.device)
+    )
+    devices = [
+        ReportingDevice(name=device, last_reported_at=last, events=count)
+        for device, last, count in rows.all()
+    ]
+    devices.sort(key=lambda d: d.last_reported_at, reverse=True)
+    return devices
 
 
 async def prune_watch_events(
