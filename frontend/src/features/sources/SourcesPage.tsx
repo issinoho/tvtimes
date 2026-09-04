@@ -15,7 +15,22 @@ export function SourcesPage() {
   // Local id order for live drag feedback; re-synced from the server list when
   // not mid-drag.
   const [order, setOrder] = useState<string[]>([]);
+  // The ref is what onDragOver / onDrop / the re-sync effect read: all of
+  // those run outside render and need the value synchronously. The state
+  // mirrors it purely so the row can dim -- mutating a ref doesn't
+  // re-render, so reading dragId.current in the markup meant the dragged
+  // row never actually dimmed on pick-up.
   const dragId = useRef<string | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+
+  const beginDrag = (id: string) => {
+    dragId.current = id;
+    setDraggingId(id);
+  };
+  const endDrag = () => {
+    dragId.current = null;
+    setDraggingId(null);
+  };
   const serverOrder = useMemo(() => (sources ?? []).map((s) => s.id), [sources]);
 
   useEffect(() => {
@@ -41,7 +56,7 @@ export function SourcesPage() {
   }
 
   function onDrop() {
-    dragId.current = null;
+    endDrag();
     if (order.length && order.join() !== serverOrder.join()) reorder.mutate(order);
   }
 
@@ -74,13 +89,11 @@ export function SourcesPage() {
             <li
               key={s.id}
               draggable
-              onDragStart={() => {
-                dragId.current = s.id;
-              }}
+              onDragStart={() => beginDrag(s.id)}
               onDragOver={(e) => onDragOver(e, s.id)}
               onDrop={onDrop}
               onDragEnd={onDrop}
-              data-dragging={dragId.current === s.id}
+              data-dragging={draggingId === s.id}
               className={styles.row}
             >
               <span className={styles.grip} aria-hidden title="Drag to reorder">

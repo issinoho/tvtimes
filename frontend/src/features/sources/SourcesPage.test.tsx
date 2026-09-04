@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
@@ -107,4 +107,29 @@ test('the add-source dialog posts a new m3u source', async () => {
       }),
     ).toBe(true),
   );
+});
+
+test('the row being dragged dims as soon as it is picked up', async () => {
+  // dragId was a ref, and data-dragging read it during render — mutating a
+  // ref doesn't re-render, so the row never dimmed on pick-up. It only
+  // corrected itself once dragging over another row happened to setState.
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((i: RequestInfo | URL, init?: RequestInit) => {
+      const { path } = reqInfo(i, init);
+      return Promise.resolve(
+        path === '/api/sources' ? json([M3U_SOURCE]) : json({ code: 'not_found' }, 404),
+      );
+    }),
+  );
+  renderPage();
+
+  const row = (await screen.findByText('My playlist')).closest('li') as HTMLElement;
+  expect(row).toHaveAttribute('data-dragging', 'false');
+
+  fireEvent.dragStart(row);
+  await waitFor(() => expect(row).toHaveAttribute('data-dragging', 'true'));
+
+  fireEvent.dragEnd(row);
+  await waitFor(() => expect(row).toHaveAttribute('data-dragging', 'false'));
 });
