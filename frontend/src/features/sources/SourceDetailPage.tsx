@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
+import { ChannelLogo } from '@/features/guide/ChannelLogo';
 import { EpgPanel } from '@/features/sources/EpgPanel';
 import { StatusPill } from '@/features/sources/StatusPill';
 import {
@@ -159,7 +160,15 @@ export function SourceDetailPage() {
             {(channels.data?.items ?? []).map((c) => (
               <tr key={c.id}>
                 <td>
-                  {c.logo_url ? <img className={styles.logo} src={c.logo_url} alt="" /> : null}
+                  {/* Through the proxy, like every other logo in the app: these
+                      URLs are usually http:// on a LAN, which an https page
+                      blocks outright. */}
+                  <ChannelLogo
+                    channelId={c.id}
+                    hasLogo={Boolean(c.logo_url)}
+                    imgClassName={styles.logo}
+                    emptyClassName={styles.logoEmpty}
+                  />
                 </td>
                 <td>
                   {c.name}
