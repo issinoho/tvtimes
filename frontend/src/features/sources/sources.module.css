@@ -263,7 +263,22 @@
   height: 28px;
   object-fit: contain;
   border-radius: 4px;
-  background: var(--bg-overlay);
+  padding: 1px;
+  /* Same adaptive ground as every other logo -- see features/guide/logoInk. */
+  background: var(--logo-card);
+}
+.logo[data-ink='light'] {
+  background: var(--logo-card-on-light-ink);
+}
+.logo[data-ink='dark'] {
+  background: var(--logo-card-on-dark-ink);
+}
+.logoEmpty {
+  display: inline-block;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--line) 45%, transparent);
 }
 .pager {
   display: flex;
