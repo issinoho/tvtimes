@@ -533,3 +533,24 @@
 .chanLogo[data-ink='dark'] {
   background: var(--logo-card-on-dark-ink);
 }
+
+/* Two steppers, each labelled by what it moves: the arrows around the date
+   change the day, the ones around the range page within it. Previously one
+   pair of arrows flanked the date but moved 3 hours, so most presses changed
+   nothing the label could show. */
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+/* Enough air that the two steppers don't read as one row of four arrows. */
+.stepper + .stepper {
+  margin-left: 0.4rem;
+}
+.rangeLabel {
+  font-size: 0.9rem;
+  color: var(--text-dim);
+  min-width: 11ch;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}

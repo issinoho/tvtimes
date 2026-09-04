@@ -49,13 +49,34 @@ export function GuidePage() {
     return list;
   }, [allChannels, search, favOnly, favs]);
 
-  const shift = (ms: number) => setWindowStart((d) => new Date(d.getTime() + ms));
+  // Pages within the day, half a window at a time, so the far half of what
+  // you were reading becomes the near half.
+  const shiftHours = (hours: number) =>
+    setWindowStart((d) => new Date(d.getTime() + hours * 3_600_000));
+
+  // A calendar day rather than 24 hours: across a DST change the clock time
+  // you were looking at is what you expect to keep, not the elapsed interval.
+  const shiftDays = (days: number) =>
+    setWindowStart((d) => {
+      const next = new Date(d);
+      next.setDate(next.getDate() + days);
+      return next;
+    });
+
+  const zone = allChannels[0]?.timezone;
   const dayLabel = windowStart.toLocaleDateString('en-GB', {
     weekday: 'short',
     day: 'numeric',
     month: 'short',
-    ...(allChannels[0]?.timezone ? { timeZone: allChannels[0].timezone } : {}),
+    ...(zone ? { timeZone: zone } : {}),
   });
+  const time = (d: Date) =>
+    d.toLocaleTimeString('en-GB', {
+      hour: '2-digit',
+      minute: '2-digit',
+      ...(zone ? { timeZone: zone } : {}),
+    });
+  const rangeLabel = `${time(windowStart)}–${time(windowEnd)}`;
 
   return (
     <div className={styles.page}>
@@ -66,13 +87,49 @@ export function GuidePage() {
       ) : null}
 
       <div className={styles.toolbar}>
-        <button type="button" className={styles.btn} onClick={() => shift(-3 * 3_600_000)}>
-          ‹
-        </button>
-        <span className={styles.dateLabel}>{dayLabel}</span>
-        <button type="button" className={styles.btn} onClick={() => shift(3 * 3_600_000)}>
-          ›
-        </button>
+        <div className={styles.stepper}>
+          <button
+            type="button"
+            className={styles.btn}
+            onClick={() => shiftDays(-1)}
+            aria-label="Previous day"
+            title="Previous day"
+          >
+            ‹
+          </button>
+          <span className={styles.dateLabel}>{dayLabel}</span>
+          <button
+            type="button"
+            className={styles.btn}
+            onClick={() => shiftDays(1)}
+            aria-label="Next day"
+            title="Next day"
+          >
+            ›
+          </button>
+        </div>
+
+        <div className={styles.stepper}>
+          <button
+            type="button"
+            className={styles.btn}
+            onClick={() => shiftHours(-3)}
+            aria-label="Earlier"
+            title="Back 3 hours"
+          >
+            «
+          </button>
+          <span className={styles.rangeLabel}>{rangeLabel}</span>
+          <button
+            type="button"
+            className={styles.btn}
+            onClick={() => shiftHours(3)}
+            aria-label="Later"
+            title="Forward 3 hours"
+          >
+            »
+          </button>
+        </div>
         <button
           type="button"
           className={`${styles.btn} ${styles.accent}`}
