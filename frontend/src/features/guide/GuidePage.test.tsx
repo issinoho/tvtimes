@@ -168,3 +168,45 @@ test('mobile: the agenda lists programmes and a tap opens the detail sheet', asy
   // focus moved into the dialog on open
   expect(dialog.contains(document.activeElement)).toBe(true);
 });
+
+/** The label between a stepper's two buttons, read without depending on
+ *  locale formatting (en-GB renders September as "Sept", for one). */
+function stepperLabel(buttonName: string): string {
+  const btn = screen.getByRole('button', { name: buttonName });
+  const span = btn.parentElement?.querySelector('span');
+  return span?.textContent ?? '';
+}
+
+test('the arrows around the date move a whole day', async () => {
+  // They used to move 3 hours while flanking a date, so most presses changed
+  // nothing the label could show.
+  renderGuide();
+  const user = userEvent.setup();
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Now' })).toBeInTheDocument());
+
+  const before = stepperLabel('Next day');
+  expect(before).not.toBe('');
+
+  await user.click(screen.getByRole('button', { name: 'Next day' }));
+  await waitFor(() => expect(stepperLabel('Next day')).not.toBe(before));
+
+  await user.click(screen.getByRole('button', { name: 'Previous day' }));
+  await waitFor(() => expect(stepperLabel('Next day')).toBe(before));
+});
+
+test('the arrows around the time range page within the day', async () => {
+  renderGuide();
+  const user = userEvent.setup();
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Now' })).toBeInTheDocument());
+
+  const beforeRange = stepperLabel('Later');
+  const beforeDay = stepperLabel('Next day');
+  expect(beforeRange).toMatch(/\d{2}:\d{2}–\d{2}:\d{2}/);
+
+  await user.click(screen.getByRole('button', { name: 'Later' }));
+
+  // The range moves and the date does not -- which is the point of splitting
+  // them: every press now changes something the reader can see.
+  await waitFor(() => expect(stepperLabel('Later')).not.toBe(beforeRange));
+  expect(stepperLabel('Next day')).toBe(beforeDay);
+});
