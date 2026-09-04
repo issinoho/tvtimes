@@ -1,0 +1,836 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>tvtimes + tvdinner for HDHomeRun</title>
+<meta
+  name="description"
+  content="Plan a recording from anywhere and capture it at home: how tvtimes and tvdinner pair with an HDHomeRun tuner, and what the pairing deliberately doesn't do."
+/>
+<link rel="icon" href="../logo.svg" type="image/svg+xml" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+/>
+
+<style>
+  :root {
+    --ground: #f4f6f8;
+    --raised: #ffffff;
+    --sunk: #eaeef2;
+    --ink: #14181f;
+    --ink-dim: #59616e;
+    --ink-faint: #858e9b;
+    --line: #dde2e8;
+    --line-soft: #e9edf1;
+
+    /* The two accents are the argument: where you are decides what happens. */
+    --away: #0e7c86;
+    --away-soft: #d9eef0;
+    --home: #a8500b;
+    --home-soft: #f7e7d4;
+
+    --display: 'Archivo Narrow', 'Arial Narrow', system-ui, sans-serif;
+    --body: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+      --ground: #0d1117;
+      --raised: #151b23;
+      --sunk: #10161d;
+      --ink: #e8ecf2;
+      --ink-dim: #97a1af;
+      --ink-faint: #6d7684;
+      --line: #232b36;
+      --line-soft: #1c232c;
+      --away: #4fd1db;
+      --away-soft: #10353a;
+      --home: #f5a524;
+      --home-soft: #3a2a10;
+    }
+  }
+
+  :root[data-theme='dark'] {
+    --ground: #0d1117;
+    --raised: #151b23;
+    --sunk: #10161d;
+    --ink: #e8ecf2;
+    --ink-dim: #97a1af;
+    --ink-faint: #6d7684;
+    --line: #232b36;
+    --line-soft: #1c232c;
+    --away: #4fd1db;
+    --away-soft: #10353a;
+    --home: #f5a524;
+    --home-soft: #3a2a10;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 17px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 0 28px;
+  }
+
+  .narrow {
+    max-width: 64ch;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--display);
+    font-weight: 700;
+    line-height: 1.08;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    margin: 0;
+  }
+
+  p {
+    margin: 0;
+  }
+
+  a {
+    color: var(--away);
+  }
+
+  .friction code,
+  .limits code {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    padding: 1px 5px;
+    border-radius: 2px;
+    background: var(--sunk);
+    color: var(--ink);
+    white-space: nowrap;
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  /* ---------- masthead ---------- */
+
+  .masthead {
+    border-bottom: 1px solid var(--line);
+    background: var(--raised);
+  }
+
+  .masthead .wrap {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    padding-block: 16px;
+    flex-wrap: wrap;
+  }
+
+  .wordmark {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 19px;
+    letter-spacing: -0.015em;
+  }
+
+  .masthead .home {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    text-decoration: none;
+    color: var(--ink);
+  }
+
+  .masthead img {
+    height: 22px;
+    width: auto;
+    display: block;
+  }
+
+  .masthead nav {
+    margin-left: auto;
+    display: flex;
+    gap: 20px;
+  }
+
+  .masthead nav a {
+    font-size: 14px;
+    color: var(--ink-dim);
+    text-decoration: none;
+  }
+
+  .masthead nav a:hover {
+    color: var(--ink);
+  }
+
+  /* ---------- hero ---------- */
+
+  .hero {
+    padding-block: 68px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+
+  .hero h1 {
+    font-size: clamp(44px, 7.5vw, 78px);
+    letter-spacing: -0.025em;
+  }
+
+  .hero h1 .away {
+    color: var(--away);
+  }
+
+  .hero h1 .home {
+    color: var(--home);
+  }
+
+  .standfirst {
+    font-size: 20px;
+    line-height: 1.55;
+    color: var(--ink-dim);
+    max-width: 60ch;
+  }
+
+  .standfirst strong {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  /* ---------- the strip: away -> server -> home ---------- */
+
+  .strip {
+    margin-block: 46px 12px;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    background: var(--raised);
+    overflow-x: auto;
+  }
+
+  .strip-inner {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(210px, 1fr));
+    min-width: 660px;
+  }
+
+  .stop {
+    padding: 20px 22px 22px;
+    border-right: 1px solid var(--line-soft);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .stop:last-child {
+    border-right: 0;
+  }
+
+  .stop-tag {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .stop-tag::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+    flex: none;
+  }
+
+  .stop.is-away .stop-tag {
+    color: var(--away);
+  }
+
+  .stop.is-home .stop-tag {
+    color: var(--home);
+  }
+
+  .stop.is-hub .stop-tag {
+    color: var(--ink-faint);
+  }
+
+  .stop h3 {
+    font-size: 21px;
+  }
+
+  .stop p {
+    font-size: 14.5px;
+    line-height: 1.5;
+    color: var(--ink-dim);
+  }
+
+  .stop code {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--ink);
+    display: block;
+    margin-top: 4px;
+    white-space: nowrap;
+  }
+
+  .strip-foot {
+    border-top: 1px solid var(--line-soft);
+    padding: 11px 22px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink-faint);
+    background: var(--sunk);
+    min-width: 660px;
+  }
+
+  /* ---------- sections ---------- */
+
+  section {
+    padding-block: 54px;
+    border-top: 1px solid var(--line);
+  }
+
+  section > .wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 26px;
+  }
+
+  .sec-head {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .sec-head h2 {
+    font-size: clamp(28px, 4vw, 38px);
+  }
+
+  .sec-head p {
+    color: var(--ink-dim);
+    max-width: 62ch;
+  }
+
+  /* ---------- friction list ---------- */
+
+  .friction {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    border-top: 1px solid var(--line-soft);
+  }
+
+  .friction div {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+    padding-block: 18px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+
+  .friction h3 {
+    font-size: 18px;
+    font-family: var(--body);
+    font-weight: 600;
+    letter-spacing: 0;
+  }
+
+  .friction p {
+    color: var(--ink-dim);
+    font-size: 15.5px;
+    max-width: 68ch;
+  }
+
+  /* ---------- feed table ---------- */
+
+  .table-scroll {
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    background: var(--raised);
+  }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 620px;
+    font-size: 15px;
+  }
+
+  th,
+  td {
+    text-align: left;
+    padding: 13px 18px;
+    border-bottom: 1px solid var(--line-soft);
+    vertical-align: top;
+  }
+
+  thead th {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    background: var(--sunk);
+  }
+
+  tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  td.what {
+    font-weight: 600;
+    min-width: 210px;
+  }
+
+  td code,
+  th code {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--ink-dim);
+    display: block;
+    margin-top: 3px;
+    white-space: nowrap;
+  }
+
+  .dir {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    padding: 3px 8px;
+    border-radius: 2px;
+  }
+
+  .dir.to-home {
+    color: var(--home);
+    background: var(--home-soft);
+  }
+
+  .dir.to-away {
+    color: var(--away);
+    background: var(--away-soft);
+  }
+
+  /* ---------- honesty panel ---------- */
+
+  .limits {
+    border-left: 3px solid var(--home);
+    background: var(--raised);
+    padding: 24px 26px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .limits h3 {
+    font-size: 20px;
+  }
+
+  .limits ul {
+    margin: 0;
+    padding-left: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 11px;
+    color: var(--ink-dim);
+    font-size: 15.5px;
+  }
+
+  .limits li::marker {
+    color: var(--ink-faint);
+  }
+
+  .limits strong {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  /* ---------- setup ---------- */
+
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1px;
+    background: var(--line-soft);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .steps > div {
+    background: var(--raised);
+    padding: 20px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .step-n {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    color: var(--ink-faint);
+  }
+
+  .steps h3 {
+    font-size: 18px;
+    font-family: var(--body);
+    font-weight: 600;
+    letter-spacing: 0;
+  }
+
+  .steps p {
+    font-size: 14.5px;
+    color: var(--ink-dim);
+    line-height: 1.5;
+  }
+
+  .steps code {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--ink);
+    word-break: break-all;
+  }
+
+  /* ---------- close ---------- */
+
+  .close {
+    border-top: 1px solid var(--line);
+    padding-block: 48px 64px;
+  }
+
+  .close .wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .close h2 {
+    font-size: clamp(26px, 3.6vw, 34px);
+    max-width: 24ch;
+  }
+
+  .facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 26px;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--ink-faint);
+  }
+
+  .links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 22px;
+    font-size: 15px;
+  }
+
+  @media (max-width: 620px) {
+    body {
+      font-size: 16px;
+    }
+    .hero {
+      padding-block: 46px 12px;
+    }
+    .wrap {
+      padding: 0 20px;
+    }
+  }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="wrap">
+    <a class="home" href="../"><img src="../logo.svg" alt="tvtimes" /></a>
+    <span class="eyebrow">For HDHomeRun owners</span>
+    <nav>
+      <a href="../architecture/">Architecture</a>
+      <a href="../api/">Export API</a>
+      <a href="https://github.com/issinoho/tvtimes">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap hero">
+  <p class="eyebrow">The pairing</p>
+  <h1><span class="away">Plan anywhere.</span><br /><span class="home">Record at home.</span></h1>
+  <p class="standfirst">
+    Your tuner sits at home on the aerial, where it has to. <strong>You don't.</strong> Flag a film
+    from a phone on the bus, and the box on your network has it scheduled within fifteen minutes —
+    off the same guide, with the same clock corrections, from a line-up that includes every other
+    source you own.
+  </p>
+</div>
+
+<div class="wrap">
+  <div class="strip">
+    <div class="strip-inner">
+      <div class="stop is-away">
+        <span class="stop-tag">Wherever you are</span>
+        <h3>You flag it</h3>
+        <p>
+          The guide in a browser — your HDHomeRun channels merged with any M3U or Xtream sources,
+          de-duplicated, times already corrected. Press <strong>Remind me</strong>.
+        </p>
+      </div>
+      <div class="stop is-hub">
+        <span class="stop-tag">Your server</span>
+        <h3>tvtimes holds the plan</h3>
+        <p>
+          Ingests the line-up and guide, applies per-channel clock corrections, and publishes the
+          watchlist as JSON behind one token.
+        </p>
+      </div>
+      <div class="stop is-home">
+        <span class="stop-tag">On your network</span>
+        <h3>tvdinner records it</h3>
+        <p>
+          Polls that watchlist every 15 minutes and schedules the airing.
+          <code>--record-watchlist</code>
+        </p>
+      </div>
+    </div>
+    <div class="strip-foot">
+      One export token covers all of it — no second credential, no per-feature pairing
+    </div>
+  </div>
+</div>
+
+<section>
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">Why bother</p>
+      <h2>What a tuner alone won't do</h2>
+      <p>
+        None of this is a criticism of the hardware. An HDHomeRun is a very good tuner. It is just
+        only a tuner.
+      </p>
+    </div>
+
+    <div class="friction">
+      <div>
+        <h3>The guide is behind a subscription</h3>
+        <p>
+          SiliconDust's own listings need a DVR subscription. tvtimes takes XMLTV from wherever you
+          like — a provider's feed, EPG.best, a self-hosted grabber — and matches it to your tuner's
+          channels itself.
+        </p>
+      </div>
+      <div>
+        <h3>Your tuner and your IPTV sources never meet</h3>
+        <p>
+          Aerial channels live in one app, a provider's M3U in another. tvtimes merges them into a
+          single ordered grid, de-duplicated, and keys every channel by its own id — so an East and
+          West feed sharing a <code>tvg-id</code> upstream still resolve to the right listings
+          downstream.
+        </p>
+      </div>
+      <div>
+        <h3>A feed with the wrong clock stays wrong</h3>
+        <p>
+          Set a per-channel offset once and every export writes times already shifted into that
+          channel's zone with the correct <code>+ZZZZ</code>. Nothing downstream has to know, and
+          correcting it later re-dates history rather than stranding it.
+        </p>
+      </div>
+      <div>
+        <h3>Nothing follows you out of the house</h3>
+        <p>
+          Watchlists, reminders and what you have already seen sit on a server you reach from
+          anywhere, not in an app pinned to the living room.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">The loop</p>
+      <h2>Four things travel, and they travel both ways</h2>
+      <p>
+        Each is one flag on tvdinner and one feed on tvtimes. Turn on the ones you want; the rest
+        stay off.
+      </p>
+    </div>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">What</th>
+            <th scope="col">Direction</th>
+            <th scope="col">How it behaves</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="what">
+              The line-up <code>playlist.m3u + epg.xml</code>
+            </td>
+            <td><span class="dir to-home">to the box</span></td>
+            <td>
+              Every enabled source as one playlist and one guide. Provider credentials stay on the
+              server and never appear in the file.
+            </td>
+          </tr>
+          <tr>
+            <td class="what">
+              Your watchlist <code>--record-watchlist</code>
+            </td>
+            <td><span class="dir to-home">to the box</span></td>
+            <td>
+              Polled every 15 minutes. Un-flag something and its pending recording goes too.
+              Recordings you scheduled by hand are never touched.
+            </td>
+          </tr>
+          <tr>
+            <td class="what">
+              What you watched <code>--report-watch-state</code>
+            </td>
+            <td><span class="dir to-away">back to the guide</span></td>
+            <td>
+              Sent as plain start/stop intervals, never “programme X”. A guide refresh or a corrected
+              clock updates what counts as watched with nothing re-reported.
+            </td>
+          </tr>
+          <tr>
+            <td class="what">
+              Favourites <code>--sync-favourites</code>
+            </td>
+            <td><span class="dir to-home">to the box</span></td>
+            <td>
+              Stars set in the browser show in the player's guide. Additive and one-way on purpose —
+              un-starring here won't delete one you set there.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">Be clear about this</p>
+      <h2>What it isn't</h2>
+    </div>
+
+    <div class="limits">
+      <h3>This is not remote streaming</h3>
+      <ul>
+        <li>
+          <strong>An HDHomeRun's streams are LAN addresses.</strong> tvtimes hands a player the
+          channel and redirects to the tuner — which resolves on your network and not outside it.
+          Planning travels; the video does not. If you want to watch away from home, that is a VPN
+          or a relay, and neither is part of this.
+        </li>
+        <li>
+          <strong>tvdinner has no background service.</strong> It has to be running when a
+          recording's time arrives. It is a player that can record, not a headless DVR.
+        </li>
+        <li>
+          <strong>Nothing in the browser plays video.</strong> tvtimes is where you plan. Playing
+          happens in tvdinner, or in whichever tuner app you point at the same two feed URLs — it
+          works just as well with Jellyfin, Plex, Emby, TiviMate or Threadfin.
+        </li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">Getting there</p>
+      <h2>Three moves</h2>
+      <p>
+        Both halves are self-hosted and yours. If the tuner is on a different network from the
+        server, a small agent bridges it — outbound HTTPS only, nothing listening, no ports opened.
+      </p>
+    </div>
+
+    <div class="steps">
+      <div>
+        <span class="step-n">01</span>
+        <h3>Point tvtimes at the tuner</h3>
+        <p>
+          Add an <strong>HDHomeRun</strong> source, plus any M3U or Xtream sources you already have.
+          Attach an XMLTV guide if your feed doesn't name its own.
+        </p>
+      </div>
+      <div>
+        <span class="step-n">02</span>
+        <h3>Generate the feed links</h3>
+        <p>
+          Settings → Export feeds. You get one token and a
+          <code>tvtimess://</code> URL that stands in for the whole account.
+        </p>
+      </div>
+      <div>
+        <span class="step-n">03</span>
+        <h3>Start the box at home</h3>
+        <p>
+          One command, with the flags you want from the table above. It picks up the line-up, the
+          guide and your watchlist together.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="close">
+  <div class="wrap">
+    <h2>Your aerial, your server, your recordings.</h2>
+    <p class="standfirst narrow">
+      Two MIT-licensed applications you run yourself. No account with anyone, no subscription, and
+      nothing phoning home — the only thing crossing the internet is your own server answering your
+      own token.
+    </p>
+    <div class="facts">
+      <span>MIT licensed</span>
+      <span>Docker Compose</span>
+      <span>Postgres + Redis</span>
+      <span>Linux &amp; Windows</span>
+    </div>
+    <div class="links">
+      <a href="https://github.com/issinoho/tvtimes">tvtimes on GitHub</a>
+      <a href="https://github.com/issinoho/tvdinner">tvdinner on GitHub</a>
+      <a href="https://github.com/issinoho/tvtimes/wiki/Pairing-With-tvdinner">How the pairing works</a>
+      <a href="https://issinoho.github.io/tvtimes/architecture/">Architecture</a>
+    </div>
+  </div>
+</footer>
+</body>
+</html>
