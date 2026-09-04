@@ -43,17 +43,19 @@
   --callout-success-fg: #d7ffe9;
   --callout-warn-fg: #ffe2ad;
 
-  /* The tile a channel logo sits on. Provider artwork is wildly
-     inconsistent and mostly ships on transparent: white marks (Pluto and
-     most IPTV feeds), black marks, and full-bleed colour all appear in one
-     line-up, so the tile has to serve all three at once.
-     Measured against 3:1, the bar for a graphical element: this is the only
-     band where white (5.65), black (3.72) and saturated yellow (4.57) all
-     clear it. A lighter tile fails white -- the previous translucent white
-     put it at 1.5 -- and a darker one fails black. Same value in both
-     themes: the artwork doesn't change with the theme, so the ground that
-     suits it shouldn't either. */
-  --logo-card: #6b6478;
+  /* The tile a channel logo sits on. Provider artwork is mostly transparent
+     and one line-up mixes pure-white marks (Pluto, Narcos), near-black ones
+     (TCM, FXM) and full-bleed colour, so the tile adapts to the artwork --
+     see features/guide/logoInk. No single colour serves them: measured
+     across a real line-up the best flat value scores 3.23:1 at worst, which
+     clears the 3:1 bar for a graphic with nothing to spare.
+
+     --logo-card is the neutral used until the ink is known (and if it can't
+     be read); it's that best-flat value, so a logo is never unreadable in
+     the meantime. The other two are the grounds worth having once it is. */
+  --logo-card: #756e84;
+  --logo-card-on-light-ink: #2b2439;
+  --logo-card-on-dark-ink: #f1eef6;
   --logo-card-ring: rgb(255 255 255 / 14%);
 
   --radius: 12px;

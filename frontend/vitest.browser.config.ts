@@ -21,7 +21,7 @@ export default defineConfig({
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
   test: {
-    include: ['src/**/*.browser.test.tsx'],
+    include: ['src/**/*.browser.test.{ts,tsx}'],
     css: true,
     browser: {
       enabled: true,
