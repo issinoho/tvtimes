@@ -44,12 +44,17 @@
   --callout-warn-fg: #ffe2ad;
 
   /* The tile a channel logo sits on. Provider artwork is wildly
-     inconsistent -- white-on-transparent, dark-on-transparent, full-bleed
-     colour -- so it needs a ground of its own rather than the surface. This
-     translucent white lets the dark UI through to a mid grey, which both
-     pale and dark marks read against. */
-  --logo-card: rgb(255 255 255 / 70%);
-  --logo-card-ring: rgb(255 255 255 / 10%);
+     inconsistent and mostly ships on transparent: white marks (Pluto and
+     most IPTV feeds), black marks, and full-bleed colour all appear in one
+     line-up, so the tile has to serve all three at once.
+     Measured against 3:1, the bar for a graphical element: this is the only
+     band where white (5.65), black (3.72) and saturated yellow (4.57) all
+     clear it. A lighter tile fails white -- the previous translucent white
+     put it at 1.5 -- and a darker one fails black. Same value in both
+     themes: the artwork doesn't change with the theme, so the ground that
+     suits it shouldn't either. */
+  --logo-card: #6b6478;
+  --logo-card-ring: rgb(255 255 255 / 14%);
 
   --radius: 12px;
   --radius-sm: 8px;
@@ -79,12 +84,6 @@
   --callout-success-fg: #0a6b45;
   --callout-warn-fg: #845107;
 
-  /* Opaque, because nothing dark shows through here: the translucent
-     version resolves to near-white on a light page, and a white logo
-     vanishes into it. */
-  --logo-card: #d5d1dc;
-  --logo-card-ring: rgb(0 0 0 / 8%);
-
   --wash:
     radial-gradient(1200px 800px at 15% -10%, rgba(109, 40, 217, 0.14), transparent 60%),
     radial-gradient(1000px 700px at 110% 10%, rgba(200, 30, 99, 0.12), transparent 55%);
@@ -104,8 +103,6 @@
     --callout-error-fg: #a3161b;
     --callout-success-fg: #0a6b45;
     --callout-warn-fg: #845107;
-    --logo-card: #d5d1dc;
-    --logo-card-ring: rgb(0 0 0 / 8%);
     --wash:
       radial-gradient(1200px 800px at 15% -10%, rgba(109, 40, 217, 0.14), transparent 60%),
       radial-gradient(1000px 700px at 110% 10%, rgba(200, 30, 99, 0.12), transparent 55%);
