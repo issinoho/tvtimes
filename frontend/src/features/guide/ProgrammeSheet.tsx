@@ -33,7 +33,17 @@ function fmtShift(seconds: number): string {
 function ChannelShiftControl({ channel }: { channel: SearchChannel }) {
   const [shift, setShift] = useState(channel.clock_shift_seconds);
   const mutation = useSetChannelShift();
-  useEffect(() => setShift(channel.clock_shift_seconds), [channel.id, channel.clock_shift_seconds]);
+
+  // Adjust during render rather than in an effect: the effect version ran a
+  // second render every time the sheet opened on a different channel, and is
+  // what "setState synchronously within an effect" was pointing at. `shift`
+  // is local so the buttons feel instant; this re-syncs it when the channel
+  // changes, or when the server's own value moves under us.
+  const [synced, setSynced] = useState({ id: channel.id, value: channel.clock_shift_seconds });
+  if (synced.id !== channel.id || synced.value !== channel.clock_shift_seconds) {
+    setSynced({ id: channel.id, value: channel.clock_shift_seconds });
+    setShift(channel.clock_shift_seconds);
+  }
 
   const apply = (seconds: number) => {
     const next = Math.max(-CLAMP, Math.min(CLAMP, seconds));
@@ -65,6 +75,23 @@ function ChannelShiftControl({ channel }: { channel: SearchChannel }) {
       </p>
     </div>
   );
+}
+
+/**
+ * A clock that ticks, for the "on now" badge and the progress bar.
+ *
+ * These were computed from a bare Date.now() during render, which is both
+ * impure and stale: nothing re-rendered the sheet on a timer, so the bar
+ * froze at whatever it read when the sheet opened and "on now" stayed put
+ * after the programme had ended.
+ */
+function useNow(intervalMs = 30_000): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), intervalMs);
+    return () => clearInterval(id);
+  }, [intervalMs]);
+  return now;
 }
 
 interface Props {
@@ -229,6 +256,7 @@ export function PlayControls({ channel }: { channel: SearchChannel }) {
 
 export function ProgrammeSheet({ channel, programme, onClose }: Props) {
   const { data: hero } = useHero(programme.id);
+  const now = useNow();
   const sheetRef = useDialogFocus<HTMLElement>();
 
   useEffect(() => {
@@ -239,7 +267,6 @@ export function ProgrammeSheet({ channel, programme, onClose }: Props) {
 
   const start = new Date(programme.start);
   const stop = new Date(programme.stop);
-  const now = Date.now();
   const live = now >= start.getTime() && now < stop.getTime();
   const pct = live
     ? Math.round(((now - start.getTime()) / (stop.getTime() - start.getTime())) * 100)

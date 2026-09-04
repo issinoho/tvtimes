@@ -1,18 +1,19 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 
 import { api, ApiError, unwrap } from '@/lib/api/client';
 import { useAuth } from '@/lib/auth/AuthProvider';
 import styles from '@/features/settings/settings.module.css';
 
-function zoneList(): string[] {
+function readZones(): string[] {
   const intl = Intl as unknown as { supportedValuesOf?: (k: string) => string[] };
   if (typeof intl.supportedValuesOf === 'function') return intl.supportedValuesOf('timeZone');
   return ['UTC', 'Europe/London', 'America/New_York', 'America/Los_Angeles', 'Australia/Sydney'];
 }
 
+const ZONES = readZones();
+
 export function TimezoneSection() {
   const { user, refreshMe } = useAuth();
-  const zones = useMemo(zoneList, []);
   const [value, setValue] = useState(user?.default_timezone ?? 'UTC');
   const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +47,7 @@ export function TimezoneSection() {
         }}
         aria-label="Default timezone"
       >
-        {zones.map((z) => (
+        {ZONES.map((z) => (
           <option key={z} value={z}>
             {z}
           </option>
