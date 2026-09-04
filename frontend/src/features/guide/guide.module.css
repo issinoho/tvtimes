@@ -524,3 +524,12 @@
   height: 100%;
   background: var(--now-line);
 }
+
+/* The ground follows the artwork -- see features/guide/logoInk. Absent
+   data-ink (still loading, or unreadable) keeps the neutral default above. */
+.chanLogo[data-ink='light'] {
+  background: var(--logo-card-on-light-ink);
+}
+.chanLogo[data-ink='dark'] {
+  background: var(--logo-card-on-dark-ink);
+}

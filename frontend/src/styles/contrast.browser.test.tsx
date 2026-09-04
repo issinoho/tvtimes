@@ -101,44 +101,65 @@ for (const theme of ['light', 'dark'] as const) {
 }
 
 /**
- * A channel logo sits on a tile of its own, because provider artwork is
- * wildly inconsistent and mostly ships on transparent: white marks (Pluto
- * and most IPTV feeds), black marks, and full-bleed colour all turn up in
- * one line-up.
+ * A channel logo's tile adapts to its artwork, because no flat colour can
+ * serve a line-up containing pure-white marks (Pluto, Narcos), near-black
+ * ones (TCM, FXM) and colour. Two attempts proved that the hard way: a light
+ * tile left white logos at 1.50:1, a dark one left charcoal at 2.85:1, and
+ * the mathematically optimal flat value tops out at 3.23:1 with no headroom.
  *
- * The first version of this test asserted the tile was distinguishable from
- * the *surface* — and passed while the bug was live, because that is not the
- * relationship that matters. What has to be legible is the artwork against
- * the tile, so that is what this measures: 1.5:1 for a white logo is what
- * "washed out" looked like.
+ * The inks below were sampled from real screenshots rather than invented.
+ * That distinction matters: an earlier version of this measured pure black,
+ * which no real logo uses, and the tile it blessed failed on the charcoal
+ * that TCM and FXM actually ship.
  */
-const ARTWORK = {
-  'white (Pluto, most IPTV feeds)': [255, 255, 255],
+const LIGHT_INK = {
+  white: [255, 255, 255],
+  'off-white (80s Rewind)': [240, 229, 228],
+  'grey-white (90s Throwback)': [218, 208, 211],
+  'pluto yellow': [255, 233, 77],
+};
+const DARK_INK = {
+  'charcoal (TCM, FXM)': [36, 32, 33],
   black: [0, 0, 0],
-  'saturated yellow': [255, 233, 77],
 };
 
 // 3:1 is the WCAG bar for a graphical object, which is what a logo is.
 const GRAPHIC_AA = 3;
 
+function tokenColour(token: string, surface: number[]): number[] {
+  const probe = document.createElement('div');
+  probe.style.background = `var(${token})`;
+  document.body.appendChild(probe);
+  // backgroundColor, not background: the shorthand computes to
+  // "rgba(...) none repeat scroll ..." and splitting it on spaces yields a
+  // truncated colour that silently measures as black.
+  const resolved = over(getComputedStyle(probe).backgroundColor, surface);
+  probe.remove();
+  return resolved;
+}
+
 for (const theme of ['light', 'dark'] as const) {
-  test(`every kind of channel logo reads against its tile in ${theme} mode`, () => {
+  test(`each logo ground suits the ink it is for, in ${theme} mode`, () => {
     document.documentElement.setAttribute('data-theme', theme);
     const surface = over(getComputedStyle(document.body).backgroundColor, [255, 255, 255]);
 
-    const probe = document.createElement('div');
-    probe.style.background = 'var(--logo-card)';
-    document.body.appendChild(probe);
-    // backgroundColor, not background: the shorthand computes to
-    // "rgba(...) none repeat scroll ..." and splitting it on spaces yields
-    // a truncated colour that silently measures as black.
-    const tile = over(getComputedStyle(probe).backgroundColor, surface);
-    probe.remove();
+    const cases: [string, Record<string, number[]>][] = [
+      ['--logo-card-on-light-ink', LIGHT_INK],
+      ['--logo-card-on-dark-ink', DARK_INK],
+      // The neutral has to carry every ink: it is what shows while the
+      // artwork is still being read, and if reading it ever fails.
+      ['--logo-card', { ...LIGHT_INK, ...DARK_INK }],
+    ];
 
-    const failures = Object.entries(ARTWORK)
-      .map(([kind, mark]) => ({ kind, ratio: Number(contrast(mark, tile).toFixed(2)) }))
-      .filter((r) => r.ratio < GRAPHIC_AA);
+    const failures = cases.flatMap(([token, inks]) => {
+      const ground = tokenColour(token, surface);
+      return Object.entries(inks)
+        .map(([kind, ink]) => ({ token, kind, ratio: Number(contrast(ink, ground).toFixed(2)) }))
+        .filter((r) => r.ratio < GRAPHIC_AA);
+    });
 
-    expect(failures, `below ${GRAPHIC_AA}:1 against the logo tile in ${theme} mode`).toEqual([]);
+    expect(failures, `below ${GRAPHIC_AA}:1 against their logo ground in ${theme} mode`).toEqual(
+      [],
+    );
   });
 }

@@ -141,3 +141,12 @@
   color: var(--text-dim);
   font-size: 0.9rem;
 }
+
+/* The ground follows the artwork -- see features/guide/logoInk. Absent
+   data-ink (still loading, or unreadable) keeps the neutral default above. */
+.logo[data-ink='light'] {
+  background: var(--logo-card-on-light-ink);
+}
+.logo[data-ink='dark'] {
+  background: var(--logo-card-on-dark-ink);
+}

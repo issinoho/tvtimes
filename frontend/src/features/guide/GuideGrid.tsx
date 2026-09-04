@@ -2,6 +2,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { GuideChannel, Programme } from '@/features/guide/api';
+import { ChannelLogo } from '@/features/guide/ChannelLogo';
 import { FavStar } from '@/features/favourites/FavStar';
 import { GENRE_VAR, genreOf } from '@/features/guide/genre';
 import { fmtTime, hourTicks, ROW_H, trackWidth, WINDOW_MINUTES, xOf } from '@/features/guide/time';
@@ -186,20 +187,12 @@ export function GuideGrid({ channels, windowStart, onOpen }: Props) {
                 style={{ top: vr.start, height: vr.size }}
               >
                 <span className={styles.chanNum}>{ch.number ?? ''}</span>
-                {ch.logo_url ? (
-                  <img
-                    className={styles.chanLogo}
-                    /* proxied through our origin: http:// LAN logos must load on an https page */
-                    src={`/api/channels/${ch.id}/logo`}
-                    alt=""
-                    loading="lazy"
-                    onError={(e) => {
-                      e.currentTarget.style.visibility = 'hidden';
-                    }}
-                  />
-                ) : (
-                  <span className={styles.chanLogoEmpty} aria-hidden />
-                )}
+                <ChannelLogo
+                  channelId={ch.id}
+                  hasLogo={Boolean(ch.logo_url)}
+                  imgClassName={styles.chanLogo}
+                  emptyClassName={styles.chanLogoEmpty}
+                />
                 <span className={styles.chanName}>{ch.name}</span>
                 <FavStar channelId={ch.id} />
               </div>

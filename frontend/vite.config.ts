@@ -48,6 +48,6 @@ export default defineConfig({
     // *.browser.test.tsx run in a real browser via vitest.browser.config.ts.
     // They assert layout, so jsdom -- which has no box model -- would fail
     // them for the wrong reason.
-    exclude: ['**/node_modules/**', '**/dist/**', '**/*.browser.test.tsx'],
+    exclude: ['**/node_modules/**', '**/dist/**', '**/*.browser.test.{ts,tsx}'],
   },
 });
