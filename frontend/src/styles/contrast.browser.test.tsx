@@ -102,21 +102,27 @@ for (const theme of ['light', 'dark'] as const) {
 
 /**
  * A channel logo sits on a tile of its own, because provider artwork is
- * wildly inconsistent — white-on-transparent, dark-on-transparent, full-bleed
- * colour. The tile was a translucent white tuned for the dark UI; in light
- * mode nothing dark shows through, so it resolved to near-white and every
- * white-on-transparent logo (Pluto's and most IPTV feeds') vanished.
+ * wildly inconsistent and mostly ships on transparent: white marks (Pluto
+ * and most IPTV feeds), black marks, and full-bleed colour all turn up in
+ * one line-up.
  *
- * The tile therefore has to be distinguishable from the surface it sits on,
- * in both themes — that difference is the only thing a pale logo has to
- * read against.
+ * The first version of this test asserted the tile was distinguishable from
+ * the *surface* — and passed while the bug was live, because that is not the
+ * relationship that matters. What has to be legible is the artwork against
+ * the tile, so that is what this measures: 1.5:1 for a white logo is what
+ * "washed out" looked like.
  */
-function distance(a: number[], b: number[]): number {
-  return Math.max(...[0, 1, 2].map((i) => Math.abs(a[i] - b[i])));
-}
+const ARTWORK = {
+  'white (Pluto, most IPTV feeds)': [255, 255, 255],
+  black: [0, 0, 0],
+  'saturated yellow': [255, 233, 77],
+};
+
+// 3:1 is the WCAG bar for a graphical object, which is what a logo is.
+const GRAPHIC_AA = 3;
 
 for (const theme of ['light', 'dark'] as const) {
-  test(`a channel logo tile is distinguishable from the surface in ${theme} mode`, () => {
+  test(`every kind of channel logo reads against its tile in ${theme} mode`, () => {
     document.documentElement.setAttribute('data-theme', theme);
     const surface = over(getComputedStyle(document.body).backgroundColor, [255, 255, 255]);
 
@@ -124,13 +130,15 @@ for (const theme of ['light', 'dark'] as const) {
     probe.style.background = 'var(--logo-card)';
     document.body.appendChild(probe);
     // backgroundColor, not background: the shorthand computes to
-    // "rgba(255, 255, 255, 0.7) none repeat scroll ..." and any attempt to
-    // pick the colour out of that by splitting on spaces gets "rgba(255,".
+    // "rgba(...) none repeat scroll ..." and splitting it on spaces yields
+    // a truncated colour that silently measures as black.
     const tile = over(getComputedStyle(probe).backgroundColor, surface);
     probe.remove();
 
-    // A white logo against a near-white tile is the bug. 24 is comfortably
-    // past "you can see the edge of it" without demanding a heavy block.
-    expect(distance(tile, surface)).toBeGreaterThan(24);
+    const failures = Object.entries(ARTWORK)
+      .map(([kind, mark]) => ({ kind, ratio: Number(contrast(mark, tile).toFixed(2)) }))
+      .filter((r) => r.ratio < GRAPHIC_AA);
+
+    expect(failures, `below ${GRAPHIC_AA}:1 against the logo tile in ${theme} mode`).toEqual([]);
   });
 }
