@@ -40,6 +40,11 @@ class ProgrammeOut(BaseModel):
     # True when a player has reported watching enough of this airing — see
     # app.services.watch. Always False for an account with nothing reporting.
     watched: bool = False
+    # Cached TMDB backdrop (falling back to poster), for views that render
+    # artwork behind a programme. Like `watched`, only the endpoints that can
+    # afford the lookup populate it — the full guide returns thousands of
+    # programmes and deliberately leaves it None. Never triggers a fetch.
+    art_url: str | None = None
 
 
 class ScheduleOut(BaseModel):

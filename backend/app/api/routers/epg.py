@@ -60,19 +60,26 @@ def _search_channel_out(channel: Channel, timezone: str) -> SearchChannelOut:
     )
 
 
-def _hit_out(h: svc.SearchHit) -> SearchHitOut:
+def _hit_out(h: svc.SearchHit, art: dict[uuid.UUID, str] | None = None) -> SearchHitOut:
     return SearchHitOut(
         channel=_search_channel_out(h.channel, h.timezone),
-        programme=_programme_out(h.programme, h.local_start, h.local_stop),
+        programme=_programme_out(
+            h.programme, h.local_start, h.local_stop, art_url=(art or {}).get(h.programme.id)
+        ),
     )
 
 
 def _programme_out(
-    p: Programme, local_start: datetime, local_stop: datetime, watched: bool = False
+    p: Programme,
+    local_start: datetime,
+    local_stop: datetime,
+    watched: bool = False,
+    art_url: str | None = None,
 ) -> ProgrammeOut:
     return ProgrammeOut(
         id=p.id,
         watched=watched,
+        art_url=art_url,
         start=local_start,
         stop=local_stop,
         title=p.title,
@@ -351,21 +358,32 @@ async def guide_now_next(
     rows = await svc.now_next(
         session, user.tenant_id, source_id=source_id, group=group, limit=limit, now=now
     )
-    watched = await watch_svc.watched_programme_ids(
-        session,
-        user.tenant_id,
-        [t[0] for r in rows for t in (r.current, r.upcoming) if t is not None],
-    )
+    programmes = [t[0] for r in rows for t in (r.current, r.upcoming) if t is not None]
+    watched = await watch_svc.watched_programme_ids(session, user.tenant_id, programmes)
+    # One cache-only query for the page; absent for anything TMDB hasn't matched.
+    art = await tmdb_svc.artwork_for(session, programmes)
     return NowNextOut(
         now=now,
         channels=[
             NowNextRowOut(
                 channel=_search_channel_out(r.channel, r.timezone),
                 current=(
-                    _programme_out(*r.current, r.current[0].id in watched) if r.current else None
+                    _programme_out(
+                        *r.current,
+                        r.current[0].id in watched,
+                        art.get(r.current[0].id),
+                    )
+                    if r.current
+                    else None
                 ),
                 upcoming=(
-                    _programme_out(*r.upcoming, r.upcoming[0].id in watched) if r.upcoming else None
+                    _programme_out(
+                        *r.upcoming,
+                        r.upcoming[0].id in watched,
+                        art.get(r.upcoming[0].id),
+                    )
+                    if r.upcoming
+                    else None
                 ),
             )
             for r in rows
@@ -376,7 +394,8 @@ async def guide_now_next(
 @router.get("/guide/highlights", response_model=HighlightsOut)
 async def guide_highlights(user: VerifiedUser, session: SessionDep) -> HighlightsOut:
     films_soon, top_rated = await svc.highlights(session, user.tenant_id)
+    art = await tmdb_svc.artwork_for(session, [h.programme for h in (*films_soon, *top_rated)])
     return HighlightsOut(
-        films_soon=[_hit_out(h) for h in films_soon],
-        top_rated=[_hit_out(h) for h in top_rated],
+        films_soon=[_hit_out(h, art) for h in films_soon],
+        top_rated=[_hit_out(h, art) for h in top_rated],
     )

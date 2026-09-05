@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
@@ -262,6 +263,42 @@ async def hero_for(
         tmdb_connected=token is not None,
         enriching=token is not None and not fresh,
     )
+
+
+async def artwork_for(
+    session: AsyncSession, programmes: Sequence[Programme]
+) -> dict[uuid.UUID, str]:
+    """Cached artwork URL per programme id, for the programmes that have one.
+
+    One query for the whole batch, and **cache-only**: a programme with no
+    enrichment row is simply absent from the result. That is the point --
+    callers are list endpoints rendering dozens of rows at once, and making
+    them trigger enrichment would turn one page load into dozens of TMDB
+    fetches. The cache is warmed ahead of time by ``enrich_epg_window``.
+
+    Backdrops first: these are used as a wash behind wide, short cards, which
+    a 16:9 backdrop fills and a 2:3 poster does not. Poster is the fallback so
+    a row TMDB matched but has no backdrop for still gets something.
+
+    Unlike ``hero_for`` this ignores ``CACHE_TTL``. A month-old backdrop is
+    still the right image, and it is decoration rather than data -- dropping
+    it on expiry would blank the card for no gain, and the warm-up refreshes
+    rows anyway.
+    """
+    if not programmes:
+        return {}
+    keyed = {
+        p.id: (MediaType.movie if p.is_movie else MediaType.tv, *cache_key(p.title, p.year))
+        for p in programmes
+    }
+    rows = await session.scalars(
+        select(TmdbEnrichment).where(
+            TmdbEnrichment.query_key.in_({key for _m, key, _y in keyed.values()}),
+            TmdbEnrichment.negative.is_(False),
+        )
+    )
+    art = {(r.media_type, r.query_key, r.query_year): r.backdrop_url or r.poster_url for r in rows}
+    return {pid: url for pid, k in keyed.items() if (url := art.get(k)) is not None}
 
 
 async def enrich_programme(

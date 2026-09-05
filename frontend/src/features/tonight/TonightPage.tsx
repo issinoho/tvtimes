@@ -16,6 +16,24 @@ import styles from '@/features/tonight/tonight.module.css';
 
 type Open = { channel: SearchChannel; programme: Programme } | null;
 
+/**
+ * The wash behind a card, as props rather than inline style scattered twice.
+ *
+ * `art_url` is populated only by the endpoints that can afford the cached
+ * lookup (now/next and highlights) and is null for anything TMDB hasn't
+ * matched -- which on a live-TV rail is most of it. An unwashed card is the
+ * normal case, not a failure, so it renders exactly as before: no attribute,
+ * no pseudo-element, no empty background fetch.
+ */
+function artProps(programme: Programme) {
+  const url = programme.art_url;
+  if (!url) return {};
+  return {
+    'data-art': '',
+    style: { ['--art' as string]: `url(${JSON.stringify(url)})` },
+  };
+}
+
 function Logo({ channel }: { channel: SearchChannel }) {
   return (
     <ChannelLogo
@@ -47,6 +65,7 @@ function HitSection({
             key={`${h.channel.id}:${h.programme.id}`}
             type="button"
             className={styles.card}
+            {...artProps(h.programme)}
             onClick={() => onOpen({ channel: h.channel, programme: h.programme })}
           >
             <div className={styles.cardHead}>
@@ -121,6 +140,7 @@ export function TonightPage() {
                 key={r.channel.id}
                 type="button"
                 className={styles.card}
+                {...artProps(r.current)}
                 onClick={() => setOpen({ channel: r.channel, programme: r.current })}
               >
                 <div className={styles.cardHead}>
