@@ -74,6 +74,54 @@
   border-radius: var(--radius-sm);
   padding: 0.7rem 0.8rem;
   cursor: pointer;
+  /* the artwork wash below is absolutely positioned against this */
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* A wash of the programme's TMDB artwork behind the card.
+ *
+ * Backdrops, not posters: the card is 220px wide and about 90 tall, a shape a
+ * 16:9 backdrop fills and a 2:3 poster only shows a narrow middle band of.
+ *
+ * `mix-blend-mode: color` is doing the real work, and it is what makes the
+ * effect affordable. A plain wash spends contrast: what sits behind the text
+ * becomes `art * opacity + card * (1 - opacity)`, and since artwork is
+ * arbitrary -- a snow scene is effectively white, a night shot black -- the
+ * opacity has to stay under about 0.18 to keep the dim `.next` line above
+ * 4.5:1 against the worst case. Measured: 0.20 takes it to 2.4:1. At 0.16 the
+ * result is barely an effect at all, and in light mode a dark backdrop just
+ * made the card look greyed-out and disabled.
+ *
+ * `color` takes hue and saturation from the artwork and keeps the *backdrop's*
+ * luminance, so contrast is preserved by construction and the opacity can go
+ * high enough to actually read. Dark mode gets each card tinted by its film.
+ *
+ * Light mode gets very little, and that is deliberate rather than a bug to fix
+ * by adding luminance back: a near-white ground has almost no room for
+ * chroma. A card that is subtly tinted is a better failure than one that looks
+ * disabled, which is where the plain wash ended up.
+ *
+ * tonight-wash.browser.test.tsx composites this the way the browser does and
+ * fails if a change spends the contrast budget.
+ */
+.card[data-art]::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image: var(--art);
+  background-size: cover;
+  background-position: center;
+  opacity: 0.85;
+  mix-blend-mode: color;
+  pointer-events: none;
+}
+/* Text and logo sit above the wash rather than being tinted by it. */
+.card > * {
+  position: relative;
+  z-index: 1;
 }
 .card:hover,
 .card:focus-visible {

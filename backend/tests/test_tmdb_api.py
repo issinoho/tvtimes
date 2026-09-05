@@ -213,3 +213,79 @@ async def test_hero_is_tenant_isolated(
     other = auth_header(await login(app_client, email="other@example.com"))
     resp = await app_client.get(f"/api/guide/programme/{programme_id}/hero", headers=other)
     assert resp.status_code == 404
+
+
+async def test_artwork_for_is_cache_only_and_prefers_backdrop(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The Tonight rails render dozens of cards at once, so their artwork
+    lookup reads the enrichment cache and never enriches. A programme TMDB
+    hasn't matched is simply absent -- not a queued fetch, and not an error."""
+    _, programme_id = await _seed(app_client, captured_emails, monkeypatch)
+
+    from app.db import get_sessionmaker
+    from app.models.epg import Programme
+    from app.models.tmdb import MediaType, TmdbEnrichment
+    from app.services import tmdb as tmdb_svc
+
+    async with get_sessionmaker()() as session:
+        programme = await session.get(Programme, uuid.UUID(programme_id))
+        assert programme is not None
+
+        # Nothing cached yet: absent, and no enrichment triggered.
+        assert await tmdb_svc.artwork_for(session, [programme]) == {}
+
+        key, year_key = tmdb_svc.cache_key(programme.title, programme.year)
+        session.add(
+            TmdbEnrichment(
+                media_type=MediaType.movie,
+                query_key=key,
+                query_year=year_key,
+                fetched_at=datetime.now(UTC),
+                backdrop_url="https://img.example.com/backdrop.jpg",
+                poster_url="https://img.example.com/poster.jpg",
+            )
+        )
+        await session.commit()
+
+        art = await tmdb_svc.artwork_for(session, [programme])
+        # Backdrop wins: the card it washes is wide and short, a shape a 2:3
+        # poster only shows a narrow band of.
+        assert art == {programme.id: "https://img.example.com/backdrop.jpg"}
+
+
+async def test_artwork_for_falls_back_to_poster_and_skips_negatives(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, programme_id = await _seed(app_client, captured_emails, monkeypatch)
+
+    from app.db import get_sessionmaker
+    from app.models.epg import Programme
+    from app.models.tmdb import MediaType, TmdbEnrichment
+    from app.services import tmdb as tmdb_svc
+
+    async with get_sessionmaker()() as session:
+        programme = await session.get(Programme, uuid.UUID(programme_id))
+        assert programme is not None
+        key, year_key = tmdb_svc.cache_key(programme.title, programme.year)
+
+        row = TmdbEnrichment(
+            media_type=MediaType.movie,
+            query_key=key,
+            query_year=year_key,
+            fetched_at=datetime.now(UTC),
+            backdrop_url=None,
+            poster_url="https://img.example.com/poster.jpg",
+        )
+        session.add(row)
+        await session.commit()
+        assert await tmdb_svc.artwork_for(session, [programme]) == {
+            programme.id: "https://img.example.com/poster.jpg"
+        }
+
+        # A cached no-match is excluded on the negative flag alone. Leaving the
+        # poster URL in place is the point: clearing it too would let this pass
+        # with the flag ignored entirely, which is the bug it exists to catch.
+        row.negative = True
+        await session.commit()
+        assert await tmdb_svc.artwork_for(session, [programme]) == {}

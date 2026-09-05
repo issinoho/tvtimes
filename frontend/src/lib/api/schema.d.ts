@@ -1698,6 +1698,8 @@ export interface components {
              * @default false
              */
             watched: boolean;
+            /** Art Url */
+            art_url?: string | null;
         };
         /** Readiness */
         Readiness: {
