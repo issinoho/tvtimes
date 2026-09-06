@@ -80,86 +80,62 @@
   isolation: isolate;
 }
 
-/* A wash of the programme's TMDB artwork behind the card.
+/* The programme's TMDB artwork, shown behind the card.
  *
  * Backdrops, not posters: the card is 220px wide and about 90 tall, a shape a
  * 16:9 backdrop fills and a 2:3 poster only shows a narrow middle band of.
  *
- * The blur is not decoration. Without it the artwork shows as a *picture*
- * behind the text -- a face, a skyline -- and the contrast measurements stop
- * meaning anything, because they model a flat fill and bound the card's
- * average. Real artwork has local structure: a dark face against a bright sky
- * inside one 220px card puts high local contrast directly under the title,
- * which the flat maths cannot see. That shipped in 0.1.65 and was legible
- * only by luck. Blurring collapses the detail toward that average, which is
- * what makes the flat-fill bound a real bound rather than a hopeful one. Do
- * not lower it without replacing the test with something that measures real
- * images.
+ * The artwork is meant to be *recognisable* -- you should be able to tell what
+ * the film is. A version that blurred it into a flat tint was tried and
+ * reverted: it measured well and lost the entire point.
  *
- * `mix-blend-mode: color` is doing the real work, and it is what makes the
- * effect affordable. A plain wash spends contrast: what sits behind the text
- * becomes `art * opacity + card * (1 - opacity)`, and since artwork is
- * arbitrary -- a snow scene is effectively white, a night shot black -- the
- * opacity has to stay under about 0.18 to keep the dim `.next` line above
- * 4.5:1 against the worst case. Measured: 0.20 takes it to 2.4:1. At 0.16 the
- * result is barely an effect at all, and in light mode a dark backdrop just
- * made the card look greyed-out and disabled.
+ * Legibility is not assumed here, it is sampled. tonight-wash.browser.test.tsx
+ * renders over deliberately hostile artwork -- a bright sky over a hard-edged
+ * dark ground, a dark head against the bright half, fine noise -- screenshots
+ * what the browser actually composited, and takes the *worst* pixel behind
+ * each run of text. Both themes clear 4.5:1 that way. An earlier test
+ * composited flat fills instead, which bounds the card's average and is blind
+ * to exactly the local contrast that matters, so don't reintroduce that shape
+ * of test when changing these numbers.
  *
- * `color` takes hue and saturation from the artwork and keeps the *backdrop's*
- * luminance, so contrast is preserved by construction and the opacity can go
- * high enough to actually read. Dark mode gets each card tinted by its film.
- *
- * Light mode needs a different treatment entirely, below -- `color` is
- * mathematically a no-op there.
- *
- * tonight-wash.browser.test.tsx composites this the way the browser does and
- * fails if a change spends the contrast budget.
+ * `mix-blend-mode: color` is what buys the strength in dark mode. It takes hue
+ * and saturation from the artwork and keeps the *backdrop's* luminance, so a
+ * high opacity costs no contrast at all.
  */
 .card[data-art]::before {
   content: '';
   position: absolute;
-  /* Over-extended, not inset: 0. The blur below fades out at the element's
-     edge, so the element has to start outside the card and be clipped by its
-     overflow, or every card gets a pale border. */
-  inset: -24px;
+  inset: 0;
   z-index: 0;
   background-image: var(--art);
   background-size: cover;
   background-position: center;
   opacity: 0.85;
   mix-blend-mode: color;
-  filter: blur(18px);
   pointer-events: none;
 }
 /* Light mode can't use the colour blend at all.
  *
  * `color` keeps the backdrop's luminance, and a white card's luminance is
  * ~1.0 -- white with any hue applied is still white. No opacity fixes that;
- * the blend has nothing to work with. So light mode goes back to a plain
- * wash, which does move luminance and therefore does spend contrast, capped
- * at the measured budget (0.18 is the last passing value, 0.20 fails).
+ * the blend has nothing to work with. So light mode uses a plain wash, at a
+ * low opacity because this one does move luminance.
  *
- * The filter is what makes that plain wash acceptable rather than the
- * greyed-out look it had before. A dark, desaturated backdrop darkens a white
- * card toward grey, which reads as "disabled"; saturating hard first means the
- * same backdrop tints the card its own colour instead, and the brightness lift
- * stops dark artwork dragging the card down.
- *
- * The filter doesn't widen the contrast budget, which is why the existing
- * worst-case test still bounds this: saturate() cannot change a pure grey, and
- * brightness() leaves black at black and clips white at white -- so at the two
- * extremes the test measures, the filter is a no-op.
+ * The filter is what keeps that from looking greyed-out: a dark, desaturated
+ * backdrop darkens a white card toward grey, which reads as "disabled";
+ * saturating hard first means the same backdrop tints the card its own colour,
+ * and the brightness lift stops dark artwork dragging it down.
  */
 :root[data-theme='light'] .card[data-art]::before {
   mix-blend-mode: normal;
   opacity: 0.16;
-  filter: blur(18px) saturate(6) brightness(1.15);
+  filter: saturate(6) brightness(1.15);
 }
 @media (prefers-color-scheme: light) {
   :root:not([data-theme]) .card[data-art]::before {
     mix-blend-mode: normal;
     opacity: 0.16;
-    filter: blur(18px) saturate(6) brightness(1.15);
+    filter: saturate(6) brightness(1.15);
   }
 }
 
