@@ -98,10 +98,8 @@
  * luminance, so contrast is preserved by construction and the opacity can go
  * high enough to actually read. Dark mode gets each card tinted by its film.
  *
- * Light mode gets very little, and that is deliberate rather than a bug to fix
- * by adding luminance back: a near-white ground has almost no room for
- * chroma. A card that is subtly tinted is a better failure than one that looks
- * disabled, which is where the plain wash ended up.
+ * Light mode needs a different treatment entirely, below -- `color` is
+ * mathematically a no-op there.
  *
  * tonight-wash.browser.test.tsx composites this the way the browser does and
  * fails if a change spends the contrast budget.
@@ -118,6 +116,38 @@
   mix-blend-mode: color;
   pointer-events: none;
 }
+/* Light mode can't use the colour blend at all.
+ *
+ * `color` keeps the backdrop's luminance, and a white card's luminance is
+ * ~1.0 -- white with any hue applied is still white. No opacity fixes that;
+ * the blend has nothing to work with. So light mode goes back to a plain
+ * wash, which does move luminance and therefore does spend contrast, capped
+ * at the measured budget (0.18 is the last passing value, 0.20 fails).
+ *
+ * The filter is what makes that plain wash acceptable rather than the
+ * greyed-out look it had before. A dark, desaturated backdrop darkens a white
+ * card toward grey, which reads as "disabled"; saturating hard first means the
+ * same backdrop tints the card its own colour instead, and the brightness lift
+ * stops dark artwork dragging the card down.
+ *
+ * The filter doesn't widen the contrast budget, which is why the existing
+ * worst-case test still bounds this: saturate() cannot change a pure grey, and
+ * brightness() leaves black at black and clips white at white -- so at the two
+ * extremes the test measures, the filter is a no-op.
+ */
+:root[data-theme='light'] .card[data-art]::before {
+  mix-blend-mode: normal;
+  opacity: 0.16;
+  filter: saturate(6) brightness(1.15);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) .card[data-art]::before {
+    mix-blend-mode: normal;
+    opacity: 0.16;
+    filter: saturate(6) brightness(1.15);
+  }
+}
+
 /* Text and logo sit above the wash rather than being tinted by it. */
 .card > * {
   position: relative;

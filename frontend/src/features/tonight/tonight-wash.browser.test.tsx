@@ -25,8 +25,18 @@ import '@/styles/global.css';
  * opacity are read from the computed style, so the test tracks the CSS rather
  * than drifting from a copy of its numbers.
  *
- * To prove it bites, change the wash to `mix-blend-mode: normal` at this
- * opacity: it stops preserving the backdrop's luminance and both themes fail.
+ * The two themes are treated differently -- dark blends `color` at a high
+ * opacity, light uses a plain wash at a low one -- and this reads both from
+ * the computed style, so it measures whichever applies rather than assuming
+ * one.
+ *
+ * It ignores the light-mode `filter`, and that is sound rather than an
+ * oversight: `saturate()` cannot change a pure grey, and `brightness()` leaves
+ * black at black and clips white at white. At exactly the two extremes
+ * measured here the filter is the identity, so the bound still holds.
+ *
+ * To prove it bites, change the dark wash to `mix-blend-mode: normal` at its
+ * opacity: it stops preserving the backdrop's luminance and the test fails.
  */
 
 const AA = 4.5;
