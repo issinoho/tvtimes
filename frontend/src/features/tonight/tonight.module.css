@@ -85,6 +85,17 @@
  * Backdrops, not posters: the card is 220px wide and about 90 tall, a shape a
  * 16:9 backdrop fills and a 2:3 poster only shows a narrow middle band of.
  *
+ * The blur is not decoration. Without it the artwork shows as a *picture*
+ * behind the text -- a face, a skyline -- and the contrast measurements stop
+ * meaning anything, because they model a flat fill and bound the card's
+ * average. Real artwork has local structure: a dark face against a bright sky
+ * inside one 220px card puts high local contrast directly under the title,
+ * which the flat maths cannot see. That shipped in 0.1.65 and was legible
+ * only by luck. Blurring collapses the detail toward that average, which is
+ * what makes the flat-fill bound a real bound rather than a hopeful one. Do
+ * not lower it without replacing the test with something that measures real
+ * images.
+ *
  * `mix-blend-mode: color` is doing the real work, and it is what makes the
  * effect affordable. A plain wash spends contrast: what sits behind the text
  * becomes `art * opacity + card * (1 - opacity)`, and since artwork is
@@ -107,13 +118,17 @@
 .card[data-art]::before {
   content: '';
   position: absolute;
-  inset: 0;
+  /* Over-extended, not inset: 0. The blur below fades out at the element's
+     edge, so the element has to start outside the card and be clipped by its
+     overflow, or every card gets a pale border. */
+  inset: -24px;
   z-index: 0;
   background-image: var(--art);
   background-size: cover;
   background-position: center;
   opacity: 0.85;
   mix-blend-mode: color;
+  filter: blur(18px);
   pointer-events: none;
 }
 /* Light mode can't use the colour blend at all.
@@ -138,13 +153,13 @@
 :root[data-theme='light'] .card[data-art]::before {
   mix-blend-mode: normal;
   opacity: 0.16;
-  filter: saturate(6) brightness(1.15);
+  filter: blur(18px) saturate(6) brightness(1.15);
 }
 @media (prefers-color-scheme: light) {
   :root:not([data-theme]) .card[data-art]::before {
     mix-blend-mode: normal;
     opacity: 0.16;
-    filter: saturate(6) brightness(1.15);
+    filter: blur(18px) saturate(6) brightness(1.15);
   }
 }
 
