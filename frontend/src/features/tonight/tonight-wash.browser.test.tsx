@@ -144,6 +144,28 @@ for (const theme of ['light', 'dark'] as const) {
   }
 }
 
+/**
+ * The contrast tests above fill with a flat colour, which bounds the card's
+ * *average* background but says nothing about local contrast within one card.
+ * Real artwork has plenty -- a face against a sky -- and at 0.16 opacity that
+ * detail lands under the title, which is how 0.1.65 shipped a wash you could
+ * read a still frame through.
+ *
+ * The blur is what closes that gap: it collapses high-frequency detail toward
+ * the average the flat fill models, so the bound above is a real one. This
+ * asserts it is still there and still substantial, because removing it would
+ * silently invalidate every other test in this file rather than failing one.
+ */
+for (const theme of ['light', 'dark'] as const) {
+  test(`the wash is blurred enough for the flat-fill bound to hold in ${theme} mode`, () => {
+    renderCard(theme);
+    const filter = getComputedStyle(screen.getByTestId('card'), '::before').filter;
+    const blur = /blur\(([\d.]+)px\)/.exec(filter);
+    expect(blur, `no blur in "${filter}"`).not.toBeNull();
+    expect(Number(blur?.[1]), 'blur radius').toBeGreaterThanOrEqual(12);
+  });
+}
+
 test('a card with no artwork has no wash to composite', () => {
   document.documentElement.setAttribute('data-theme', 'dark');
   render(
