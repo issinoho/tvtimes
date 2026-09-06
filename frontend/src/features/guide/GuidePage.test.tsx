@@ -15,7 +15,19 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-const NOW = new Date();
+/**
+ * Pinned, not `new Date()`.
+ *
+ * These tests build their fixtures around "now" and assert on what the
+ * stepper labels say, so the wall clock leaks into the assertions. The range
+ * test claims paging "Later" moves the range and not the date -- true at
+ * midday, false at 23:40, where the next range genuinely does land on
+ * tomorrow. It failed exactly that way the first night after it was written.
+ *
+ * Midday UTC is mid-afternoon at worst in the timezones this runs in, so
+ * every page step stays inside the same day.
+ */
+const NOW = new Date('2026-09-05T12:00:00Z');
 const prog = (offsetMin: number, durMin: number, over: Record<string, unknown> = {}) => ({
   id: `p-${offsetMin}`,
   start: new Date(NOW.getTime() + offsetMin * 60_000).toISOString(),
@@ -113,12 +125,18 @@ function renderGuide() {
 }
 
 beforeEach(() => {
+  // The fixtures above are built around NOW, so the clock the component reads
+  // has to agree with them. shouldAdvanceTime keeps userEvent's own delays
+  // working rather than deadlocking on a frozen clock.
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  vi.setSystemTime(NOW);
   setAccessToken('t');
   document.cookie = 'tvtimes_csrf=x';
   mockFetch();
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   setAccessToken(null);
