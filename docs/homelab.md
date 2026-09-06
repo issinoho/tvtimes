@@ -283,6 +283,10 @@ media app; it does not play video in the browser itself.
   Windows.
 - **Android** — an app chooser appears (tick "always" to skip it next time).
   Firefox for Android falls back to the `.m3u` download.
+- **Fire TV Stick** — the built-in **Silk** browser is Android, so this works
+  the same way: open tvtimes in Silk, press **Play**, and pick your player from
+  the chooser (MX Player Pro handles the handoff cleanly). Tick "always" and
+  later presses go straight through. Nothing to sideload, no export feed.
 - **Copy stream URL** gives you the raw address to paste into VLC's *Open
   Network Stream* or any other player.
 
