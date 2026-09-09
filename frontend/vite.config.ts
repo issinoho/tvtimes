@@ -10,7 +10,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'prompt',
       injectRegister: false,
-      includeAssets: ['favicon.svg'],
+      includeAssets: ['favicon.svg', 'maskable-icon.svg'],
       manifest: {
         name: 'tvtimes',
         short_name: 'tvtimes',
@@ -20,7 +20,17 @@ export default defineConfig({
         display: 'standalone',
         start_url: '/',
         icons: [
-          { src: 'favicon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' },
+          // Two separate entries on purpose. favicon.svg is drawn as a TV with
+          // a margin, which Android's maskable crop (central 80%, then a
+          // circle/squircle mask) slices the sides off. maskable-icon.svg is
+          // the full-bleed variant built for that crop.
+          { src: 'favicon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
+          {
+            src: 'maskable-icon.svg',
+            sizes: 'any',
+            type: 'image/svg+xml',
+            purpose: 'maskable',
+          },
         ],
       },
       workbox: {
