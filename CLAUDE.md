@@ -114,11 +114,23 @@ CI pins **newer** ruff/mypy than an old local pin may resolve — if `ruff forma
   rating join silently misses.
 - **`SourceKind` enum** is `native_enum=False` (VARCHAR) — adding a value needs
   no migration.
+- **PWA icons are two manifest entries, not one.** `favicon.svg` is
+  `purpose: 'any'`; `maskable-icon.svg` is `purpose: 'maskable'` and
+  full-bleed. Android crops a maskable icon to the central 80% and then
+  applies its own circle/squircle mask, and favicon.svg's TV is drawn with a
+  margin that crop cuts straight through — collapsing them back into one
+  `'any maskable'` entry re-clips the splash screen and the launcher icon
+  (#168). Artwork in the maskable variant must stay inside the safe zone: a
+  circle of radius 25.6 about (32, 32) of the 64-unit viewBox.
 
 ## Workflow
 
-Feature branch → PR → **squash-merge with `--delete-branch`**. CI (`ci.yml`):
-backend / connector / frontend / image jobs must pass. Releases are cut by
+Feature branch → PR → **squash-merge** (`gh pr merge <n> --squash`; the branch
+is deleted automatically, and `--auto` lands it as soon as CI passes). CI
+(`ci.yml`): backend / connector / frontend / image / migrations jobs must pass.
+`main` does **not** require branches to be up to date, so a PR is not tested
+against the main it merges into — the post-merge CI run is the real
+integration check, and it must be green before you tag. Releases are cut by
 pushing a tag: `v*` (app image) or `connector-v*` (connector image + wheel);
 needs repo secrets `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN`. `git remote` is
 SSH.
