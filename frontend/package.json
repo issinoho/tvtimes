@@ -40,7 +40,7 @@
     "@types/qrcode": "^1.5.5",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
-    "@vitejs/plugin-react": "^4.3.4",
+    "@vitejs/plugin-react": "^6.1.1",
     "@vitest/browser": "^3.2.7",
     "eslint": "^10.9.1",
     "eslint-plugin-react-hooks": "^7.1.1",
