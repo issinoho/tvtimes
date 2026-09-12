@@ -134,3 +134,33 @@ integration check, and it must be green before you tag. Releases are cut by
 pushing a tag: `v*` (app image) or `connector-v*` (connector image + wheel);
 needs repo secrets `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN`. `git remote` is
 SSH.
+
+### Release versioning
+
+**From 1.0.0 on, `v*` tags are real semantic versioning** (`MAJOR.MINOR.PATCH`):
+`PATCH` for a bug fix, `MINOR` for a backward-compatible feature, `MAJOR` for a
+breaking change — not the `0.1.NN` build counter that ran up to 0.1.69, where
+every release was the next number regardless of what was in it. Breaking here
+means something the *operator* has to act on before pulling: a renamed or
+removed `TVTIMES_` key, a migration that won't roll back, a changed
+`/api/exports` or connector contract, a raised minimum Compose/Postgres. A
+change users see but operators don't is a `MINOR`.
+
+**The tag is the only place the version lives.** `backend/app/__init__.py` reads
+`TVTIMES_VERSION`, which `release.yml` passes as a build-arg from the tag
+(`Dockerfile` ARG → ENV) for `/api/health` and the OpenAPI doc to report. The
+`version` fields in `backend/pyproject.toml` and `frontend/package.json` are
+inert placeholders — don't bump them, and don't add a version file or a
+CHANGELOG.md. **The annotated tag's message is the release note**, so write it
+for an operator deciding whether to pull: a `<version> — <what changed>`
+headline, then a short paragraph on why it matters. Lightweight tags carry no
+message, so always `-a`, and push the tag explicitly (`--follow-tags` won't).
+
+```sh
+git tag -a v1.1.0 -F -   # headline, blank line, paragraph
+git push origin v1.1.0
+```
+
+`connector-v*` is versioned independently on the same rules — it ships to
+operators as its own image and wheel, and its number tracks the connector's
+own compatibility with the server, not the app's release cadence.
