@@ -48,6 +48,7 @@ Make a directory, drop in the two files below, then `docker compose up -d`.
 TVTIMES_PUBLIC_ORIGIN=http://localhost:8888   # the exact URL you'll open
 TVTIMES_WEBAUTHN_RP_ID=localhost              # the origin's domain; keep as localhost for a bare-IP setup
 POSTGRES_PASSWORD=change-me
+TVTIMES_IMAGE=issinoho1969/tvtimes:1          # recommended: every non-breaking update, see Releases
 # TVTIMES_EMAIL_PROVIDER=smtp                 # optional; default logs the verification link
 ```
 
@@ -230,6 +231,11 @@ docker compose exec db pg_dump -U tvtimes tvtimes | gzip > tvtimes-$(date +%F).s
 (plain `up -d` sometimes reports "Running" and skips it). Open tabs pick up the
 new web app via the "new version available — Reload" prompt.
 
+What that `pull` actually fetches is the image tag you pinned — so pin `:1`
+and an upgrade only ever brings you backward-compatible changes, stopping at
+the first release that would need you to do something. See
+[Releases](#releases).
+
 Volumes: `tvtimes_pgdata` (accounts, sources, guide), `tvtimes_secrets` (signing
 + encryption keys — **back up**), `tvtimes_redisdata` (queue/cache, safe to lose).
 
@@ -284,10 +290,24 @@ cd frontend && npm run lint && npm run typecheck && npm test && npm run build
 
 ## Releases
 
-| Tag | Publishes |
+| Git tag | Publishes |
 |---|---|
 | `v*` | `issinoho1969/tvtimes` + GHCR mirror, multi-arch |
 | `connector-v*` | connector image + the wheel/sdist on the GitHub Release |
+
+Versions are semantic from 1.0.0 on, so an image tag is a statement about how
+far you want to be carried. Set it as `TVTIMES_IMAGE` in `.env`:
+
+| Image tag | Carries you to |
+|---|---|
+| `issinoho1969/tvtimes:1` | **recommended** — every backward-compatible release, stopping at the first that needs your attention |
+| `issinoho1969/tvtimes:1.0` | that patch line only: fixes, no new features |
+| `issinoho1969/tvtimes:1.0.1` | one exact build, forever |
+| `issinoho1969/tvtimes:latest` | whatever is newest, breaking changes included |
+
+Note the image tag has no leading `v`, unlike the git tag it's built from. A
+major release won't reach `:1` on its own — that's the point of it — so it is
+announced in its git tag's message and in the release notes.
 
 ## Contributing
 
