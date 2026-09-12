@@ -287,6 +287,8 @@ media app; it does not play video in the browser itself.
   the same way: open tvtimes in Silk, press **Play**, and pick your player from
   the chooser (MX Player Pro handles the handoff cleanly). Tick "always" and
   later presses go straight through. Nothing to sideload, no export feed.
+  A remote has no pointer to drag a scrollbar with, so the **Tonight** rows
+  carry `‹` `›` buttons the d-pad can land on to move them.
 - **Copy stream URL** gives you the raw address to paste into VLC's *Open
   Network Stream* or any other player.
 

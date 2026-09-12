@@ -24,9 +24,17 @@
 }
 .sectionHead {
   display: flex;
-  align-items: baseline;
+  /* centred, not baseline: the row can hold the filter toggle and the two
+     scroll arrows, whose glyphs sit on a different baseline to the label. */
+  align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+}
+.headControls {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 0 0 auto;
 }
 .railToggle {
   font: inherit;
@@ -41,6 +49,35 @@
 .railToggle[aria-pressed='true'] {
   border-color: var(--brand-amber);
   color: var(--text);
+}
+
+/* The rail's scroll arrows -- see RailSection.tsx for why they exist at all.
+   Sized for a d-pad: a remote aims at a target, not at a pixel. */
+.railNav {
+  display: flex;
+  gap: 0.25rem;
+}
+.railBtn {
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1;
+  min-width: 2.1rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--bg-raised);
+  color: var(--text);
+  cursor: pointer;
+}
+.railBtn:hover,
+.railBtn:focus-visible {
+  border-color: color-mix(in srgb, var(--brand-pink) 55%, var(--line));
+}
+/* Dimmed at the end of the rail, but still a real focus stop -- a disabled
+   button drops focus, which strands a d-pad walk. */
+.railBtn[aria-disabled='true'] {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .rail {

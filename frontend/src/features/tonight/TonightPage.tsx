@@ -12,6 +12,7 @@ import {
 import { ChannelLogo } from '@/features/guide/ChannelLogo';
 import { ProgrammeSheet } from '@/features/guide/ProgrammeSheet';
 import { fmtDayTime, fmtTime } from '@/features/guide/time';
+import { RailSection } from '@/features/tonight/RailSection';
 import styles from '@/features/tonight/tonight.module.css';
 
 type Open = { channel: SearchChannel; programme: Programme } | null;
@@ -57,33 +58,30 @@ function HitSection({
   onOpen: (o: Open) => void;
 }) {
   return (
-    <section className={styles.section}>
-      <h2 className={styles.heading}>{heading}</h2>
-      <div className={styles.rail}>
-        {hits.map((h, i) => (
-          <button
-            key={`${h.channel.id}:${h.programme.id}`}
-            type="button"
-            className={styles.card}
-            {...artProps(h.programme)}
-            onClick={() => onOpen({ channel: h.channel, programme: h.programme })}
-          >
-            <div className={styles.cardHead}>
-              <Logo channel={h.channel} />
-              <span className={styles.channel}>
-                {ranked ? <span className={styles.rank}>#{i + 1} · </span> : null}
-                {h.channel.name}
-              </span>
-            </div>
-            <span className={styles.now}>
-              {h.programme.title}
-              {h.programme.year ? ` · ${h.programme.year}` : ''}
+    <RailSection heading={heading}>
+      {hits.map((h, i) => (
+        <button
+          key={`${h.channel.id}:${h.programme.id}`}
+          type="button"
+          className={styles.card}
+          {...artProps(h.programme)}
+          onClick={() => onOpen({ channel: h.channel, programme: h.programme })}
+        >
+          <div className={styles.cardHead}>
+            <Logo channel={h.channel} />
+            <span className={styles.channel}>
+              {ranked ? <span className={styles.rank}>#{i + 1} · </span> : null}
+              {h.channel.name}
             </span>
-            <span className={styles.next}>{fmtDayTime(h.programme.start, h.channel.timezone)}</span>
-          </button>
-        ))}
-      </div>
-    </section>
+          </div>
+          <span className={styles.now}>
+            {h.programme.title}
+            {h.programme.year ? ` · ${h.programme.year}` : ''}
+          </span>
+          <span className={styles.next}>{fmtDayTime(h.programme.start, h.channel.timezone)}</span>
+        </button>
+      ))}
+    </RailSection>
   );
 }
 
@@ -113,10 +111,10 @@ export function TonightPage() {
     <div className={styles.page}>
       <h1 className={styles.title}>Tonight</h1>
 
-      <section className={styles.section}>
-        <div className={styles.sectionHead}>
-          <h2 className={styles.heading}>On now</h2>
-          {hasFavs ? (
+      <RailSection
+        heading="On now"
+        control={
+          hasFavs ? (
             <button
               type="button"
               className={styles.railToggle}
@@ -125,40 +123,40 @@ export function TonightPage() {
             >
               {favOnly ? '★ Favourites' : 'All channels'}
             </button>
-          ) : null}
-        </div>
-        {nowNext.isLoading ? null : onAir.length === 0 ? (
-          <p className={styles.hint}>
-            {favOnly && hasFavs
-              ? 'None of your favourite channels are on air right now.'
-              : 'Nothing on air right now — add a source and its guide data on the Sources page.'}
-          </p>
-        ) : (
-          <div className={styles.rail}>
-            {onAir.map((r) => (
-              <button
-                key={r.channel.id}
-                type="button"
-                className={styles.card}
-                {...artProps(r.current)}
-                onClick={() => setOpen({ channel: r.channel, programme: r.current })}
-              >
-                <div className={styles.cardHead}>
-                  <Logo channel={r.channel} />
-                  <span className={styles.channel}>{r.channel.name}</span>
-                  <FavStar channelId={r.channel.id} />
-                </div>
-                <span className={styles.now}>{r.current.title}</span>
-                {r.upcoming ? (
-                  <span className={styles.next}>
-                    Next: {r.upcoming.title} · {fmtTime(r.upcoming.start, r.channel.timezone)}
-                  </span>
-                ) : null}
-              </button>
-            ))}
-          </div>
-        )}
-      </section>
+          ) : null
+        }
+        note={
+          !nowNext.isLoading && onAir.length === 0 ? (
+            <p className={styles.hint}>
+              {favOnly && hasFavs
+                ? 'None of your favourite channels are on air right now.'
+                : 'Nothing on air right now — add a source and its guide data on the Sources page.'}
+            </p>
+          ) : null
+        }
+      >
+        {onAir.map((r) => (
+          <button
+            key={r.channel.id}
+            type="button"
+            className={styles.card}
+            {...artProps(r.current)}
+            onClick={() => setOpen({ channel: r.channel, programme: r.current })}
+          >
+            <div className={styles.cardHead}>
+              <Logo channel={r.channel} />
+              <span className={styles.channel}>{r.channel.name}</span>
+              <FavStar channelId={r.channel.id} />
+            </div>
+            <span className={styles.now}>{r.current.title}</span>
+            {r.upcoming ? (
+              <span className={styles.next}>
+                Next: {r.upcoming.title} · {fmtTime(r.upcoming.start, r.channel.timezone)}
+              </span>
+            ) : null}
+          </button>
+        ))}
+      </RailSection>
 
       {filmsSoon.length > 0 ? (
         <HitSection heading="Films on soon" hits={filmsSoon} onOpen={setOpen} />

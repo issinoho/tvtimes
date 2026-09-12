@@ -21,3 +21,6 @@ globalThis.ResizeObserver ??= ResizeObserverStub as unknown as typeof ResizeObse
 if (!window.HTMLElement.prototype.scrollTo) {
   window.HTMLElement.prototype.scrollTo = vi.fn();
 }
+if (!window.HTMLElement.prototype.scrollBy) {
+  window.HTMLElement.prototype.scrollBy = vi.fn();
+}
