@@ -1,4 +1,4 @@
-import { Children, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Children, useCallback, useEffect, useState, type ReactNode } from 'react';
 
 import { useMediaQuery } from '@/features/guide/useMediaQuery';
 import styles from '@/features/tonight/tonight.module.css';
@@ -41,44 +41,49 @@ export function RailSection({
   note?: ReactNode;
   children?: ReactNode;
 }) {
-  const railRef = useRef<HTMLDivElement>(null);
+  // State, not a ref: the rail is only rendered once it has cards, so on the
+  // "On now" row it mounts a beat after the section does. A ref wouldn't
+  // re-run the effect below when it finally arrived, and the rail would spend
+  // the rest of the session with no scroll listener on it.
+  const [rail, setRail] = useState<HTMLDivElement | null>(null);
   const [reach, setReach] = useState<Reach>({ left: false, right: false });
   const still = useMediaQuery('(prefers-reduced-motion: reduce)');
 
   const sync = useCallback(() => {
-    const el = railRef.current;
-    if (!el) return;
-    const max = el.scrollWidth - el.clientWidth;
     setReach((prev) => {
-      const left = el.scrollLeft > EDGE_SLACK;
-      const right = el.scrollLeft < max - EDGE_SLACK;
-      // Same object when nothing moved, so the render-effect below can't loop.
+      const max = rail ? rail.scrollWidth - rail.clientWidth : 0;
+      const left = rail ? rail.scrollLeft > EDGE_SLACK : false;
+      const right = rail ? rail.scrollLeft < max - EDGE_SLACK : false;
+      // Same object when nothing moved, so a no-op observation is a no-op render.
       return prev.left === left && prev.right === right ? prev : { left, right };
     });
-  }, []);
+  }, [rail]);
 
+  // Three things move a rail's reach, and none of them is a render: it is
+  // scrolled, it is resized, or its cards change under it (a refetch adds a
+  // few, and a rail that grows past its box changes only scrollWidth, which
+  // no resize reports). Measuring in the effect body instead would be a
+  // synchronous setState in an effect -- cascading renders, and the lint rule
+  // that says so is right. ResizeObserver also fires once on observe(), so
+  // the first measurement comes from the same path as every later one.
   useEffect(() => {
-    const el = railRef.current;
-    if (!el) return;
-    el.addEventListener('scroll', sync, { passive: true });
-    const observer = new ResizeObserver(sync);
-    observer.observe(el);
+    if (!rail) return;
+    rail.addEventListener('scroll', sync, { passive: true });
+    const resize = new ResizeObserver(sync);
+    resize.observe(rail);
+    const cards = new MutationObserver(sync);
+    cards.observe(rail, { childList: true });
     return () => {
-      el.removeEventListener('scroll', sync);
-      observer.disconnect();
+      rail.removeEventListener('scroll', sync);
+      resize.disconnect();
+      cards.disconnect();
     };
-  }, [sync]);
-
-  // Deliberately every render, not just on mount: the cards arrive from a
-  // query, and a rail that grows from empty to overflowing changes only its
-  // scrollWidth -- which no scroll event and no ResizeObserver reports.
-  useEffect(sync);
+  }, [rail, sync]);
 
   const scrollByPage = (direction: 1 | -1) => {
-    const el = railRef.current;
-    if (!el) return;
-    el.scrollBy({
-      left: direction * el.clientWidth * PAGE_FRACTION,
+    if (!rail) return;
+    rail.scrollBy({
+      left: direction * rail.clientWidth * PAGE_FRACTION,
       behavior: still ? 'auto' : 'smooth',
     });
   };
@@ -122,7 +127,7 @@ export function RailSection({
       {note ??
         (hasCards ? (
           <div
-            ref={railRef}
+            ref={setRail}
             className={styles.rail}
             // Named so a screen reader announces the row as one thing rather
             // than a loose run of buttons -- and so the arrows' own labels
