@@ -1,11 +1,18 @@
 name: Release image
 
-# Tag a release to publish the all-in-one image:
-#   git tag v1.2.0 && git push origin v1.2.0
+# Tag a release to publish the all-in-one image (annotated -- the tag's own
+# message is the release note, see CLAUDE.md):
+#   git tag -a v1.2.0 && git push origin v1.2.0
 #
 # Pushes multi-arch (amd64 + arm64) to Docker Hub and GHCR:
-#   issinoho1969/tvtimes:1.2.0  issinoho1969/tvtimes:1.2  issinoho1969/tvtimes:latest
+#   issinoho1969/tvtimes:1.2.0  issinoho1969/tvtimes:1.2
+#   issinoho1969/tvtimes:1      issinoho1969/tvtimes:latest
 #   ghcr.io/issinoho/tvtimes:<same tags>
+#
+# The four are how far an operator chooses to be carried: an exact build, the
+# patch line, every non-breaking update, or whatever is newest. `1` only says
+# something now that the numbers are semantic -- under the old 0.1.NN counter
+# it would have been a permanent `0`.
 #
 # Requires repo secrets DOCKERHUB_USERNAME and DOCKERHUB_TOKEN (a Docker Hub
 # access token with Read/Write). GHCR uses the built-in GITHUB_TOKEN.
@@ -50,6 +57,7 @@ jobs:
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
             type=raw,value=latest
 
       - name: Build and push
