@@ -1,5 +1,5 @@
 import { cleanup, render, screen } from '@testing-library/react';
-import { page } from '@vitest/browser/context';
+import { page } from 'vitest/browser';
 import { afterEach, expect, test } from 'vitest';
 
 import styles from '@/features/tonight/tonight.module.css';
