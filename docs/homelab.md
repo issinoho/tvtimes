@@ -46,11 +46,11 @@ Migrations run automatically on start. `--force-recreate` ensures the running
 containers move onto the freshly pulled image (a bare `up -d` sometimes reports
 "Running" and does nothing). A browser tab that's already open shows a "new
 version available — Reload" prompt. Pin a version in `.env`
-(`TVTIMES_IMAGE=issinoho1969/tvtimes:1.0.0`) to upgrade deliberately — note the
+(`TVTIMES_IMAGE=issinoho1969/tvtimes:1`) to upgrade deliberately — note the
 image tag has **no leading `v`**, unlike the git tag it's built from.
 
 How far you're carried is the tag you pin. From 1.0.0 the numbers are
-semantic, so `1.0.1` is one exact build, `1.0` follows that patch line, `1`
+semantic, so `1.1.0` is one exact build, `1.1` follows that line's fixes, `1`
 takes every backward-compatible release, and `latest` takes whatever is
 newest, breaking changes included. `1` is the one most homelabs want: it
 upgrades itself until something would actually need your attention, and then

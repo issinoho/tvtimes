@@ -13,7 +13,7 @@
 name: tvtimes
 
 x-app: &app
-  image: ${TVTIMES_IMAGE:-issinoho1969/tvtimes:latest}
+  image: ${TVTIMES_IMAGE:-issinoho1969/tvtimes:1}
   restart: unless-stopped
   # Everything you put in .env reaches the container (TVTIMES_FETCH_ALLOWLIST,
   # TVTIMES_LOG_LEVEL, …). The explicit values below still win for the wired-in

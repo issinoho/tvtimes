@@ -59,7 +59,7 @@ TVTIMES_IMAGE=issinoho1969/tvtimes:1          # recommended: every non-breaking 
 name: tvtimes
 
 x-app: &app
-  image: ${TVTIMES_IMAGE:-issinoho1969/tvtimes:latest}
+  image: ${TVTIMES_IMAGE:-issinoho1969/tvtimes:1}
   restart: unless-stopped
   env_file:
     - .env          # everything in .env reaches the container; the values below still win
