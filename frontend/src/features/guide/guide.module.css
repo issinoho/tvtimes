@@ -84,10 +84,40 @@
   border-bottom: 1px solid var(--line);
   display: flex;
   align-items: center;
-  padding: 0 0.75rem;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0 0.4rem 0 0.75rem;
   font-size: 0.78rem;
   color: var(--text-dim);
   background: var(--bg-overlay);
+}
+
+/* Page the channel list up/down -- see GuideGrid.tsx for why a remote needs
+   these. Sized for a cursor or d-pad: they aim at a target, not a pixel. */
+.pageNav {
+  display: flex;
+  gap: 0.25rem;
+}
+.pageBtn {
+  font: inherit;
+  font-size: 0.8rem;
+  line-height: 1;
+  min-width: 2.1rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--bg-raised);
+  color: var(--text);
+  cursor: pointer;
+}
+.pageBtn:hover,
+.pageBtn:focus-visible {
+  border-color: color-mix(in srgb, var(--brand-pink) 55%, var(--line));
+}
+/* Dimmed at either end, but still a real focus stop. */
+.pageBtn[aria-disabled='true'] {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .axis {

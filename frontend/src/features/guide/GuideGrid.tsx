@@ -6,6 +6,7 @@ import { ChannelLogo } from '@/features/guide/ChannelLogo';
 import { FavStar } from '@/features/favourites/FavStar';
 import { GENRE_VAR, genreOf } from '@/features/guide/genre';
 import { fmtTime, hourTicks, ROW_H, trackWidth, WINDOW_MINUTES, xOf } from '@/features/guide/time';
+import { useMediaQuery } from '@/features/guide/useMediaQuery';
 import { useNow } from '@/features/guide/useNow';
 import styles from '@/features/guide/guide.module.css';
 
@@ -20,11 +21,28 @@ interface Focus {
   col: number;
 }
 
+type Reach = { up: boolean; down: boolean };
+
+/** Sub-pixel layout means scrollTop never lands exactly on 0 or on the max. */
+const EDGE_SLACK = 1;
+
+/**
+ * How far one ▲/▼ press moves the grid: just under a screenful, in whole
+ * rows, so the last channel you could see is still there as an anchor and no
+ * row lands half-cut at the top.
+ */
+function pageRows(clientHeight: number) {
+  return Math.max(1, Math.floor((clientHeight * 0.85) / ROW_H));
+}
+
 export function GuideGrid({ channels, windowStart, onOpen }: Props) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const chanRef = useRef<HTMLDivElement>(null);
   const axisRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
   const [focus, setFocus] = useState<Focus | null>(null);
+  const [reach, setReach] = useState<Reach>({ up: false, down: false });
+  const still = useMediaQuery('(prefers-reduced-motion: reduce)');
   const now = useNow();
 
   const width = trackWidth();
@@ -66,6 +84,16 @@ export function GuideGrid({ channels, windowStart, onOpen }: Props) {
     }
   }, []);
 
+  const syncReach = useCallback(() => {
+    const body = bodyRef.current;
+    if (!body) return;
+    const max = body.scrollHeight - body.clientHeight;
+    const up = body.scrollTop > EDGE_SLACK;
+    const down = body.scrollTop < max - EDGE_SLACK;
+    // Same object when nothing moved, so a no-op observation is a no-op render.
+    setReach((prev) => (prev.up === up && prev.down === down ? prev : { up, down }));
+  }, []);
+
   const syncScroll = useCallback(() => {
     const body = bodyRef.current;
     if (!body) return;
@@ -74,7 +102,56 @@ export function GuideGrid({ channels, windowStart, onOpen }: Props) {
       axisRef.current.style.transform = `translateX(${-body.scrollLeft}px)`;
     }
     pinLabels();
-  }, [pinLabels]);
+    syncReach();
+  }, [pinLabels, syncReach]);
+
+  // Two things move the reach without a scroll: the grid is resized, or a
+  // filter changes how many channels it holds -- which resizes the inner
+  // track, not the box. ResizeObserver also fires once on observe(), which
+  // takes the first measurement.
+  useEffect(() => {
+    const body = bodyRef.current;
+    const inner = innerRef.current;
+    if (!body || !inner) return;
+    const resize = new ResizeObserver(syncReach);
+    resize.observe(body);
+    resize.observe(inner);
+    return () => resize.disconnect();
+  }, [syncReach]);
+
+  /**
+   * The ▲/▼ buttons are there for remotes. Silk on a Fire TV Stick drives the
+   * page with a cursor, and at the screen edge that cursor scrolls the
+   * *document* -- which never moves here, because the rows scroll inside
+   * `.body`. There is no wheel, no touch and no scrollbar it can drag, so
+   * past the first screenful of channels the guide was unreachable. A cursor
+   * (or a d-pad) can always land on a button. Same answer as the Tonight
+   * rails' arrows (RailSection.tsx).
+   */
+  const scrollByPage = (direction: 1 | -1) => {
+    const body = bodyRef.current;
+    if (!body) return;
+    const row = Math.round(body.scrollTop / ROW_H) + direction * pageRows(body.clientHeight);
+    body.scrollTo({ top: Math.max(0, row * ROW_H), behavior: still ? 'auto' : 'smooth' });
+  };
+
+  // aria-disabled rather than disabled: a disabled button drops focus, which
+  // strands a d-pad walk at the top or bottom of the list.
+  const pager = (direction: 1 | -1, glyph: string, label: string) => {
+    const live = direction === 1 ? reach.down : reach.up;
+    return (
+      <button
+        type="button"
+        className={styles.pageBtn}
+        aria-disabled={!live}
+        aria-label={label}
+        title={label}
+        onClick={() => live && scrollByPage(direction)}
+      >
+        {glyph}
+      </button>
+    );
+  };
 
   // Centre on "now" — on first mount and whenever the window is re-anchored
   // (the "Now" button, day nav). Reads the clock directly so the 30s `now`
@@ -164,7 +241,15 @@ export function GuideGrid({ channels, windowStart, onOpen }: Props) {
 
   return (
     <div className={styles.gridWrap}>
-      <div className={styles.corner}>Channel</div>
+      <div className={styles.corner}>
+        <span>Channel</span>
+        {reach.up || reach.down ? (
+          <div className={styles.pageNav}>
+            {pager(-1, '▲', 'Previous channels')}
+            {pager(1, '▼', 'More channels')}
+          </div>
+        ) : null}
+      </div>
 
       <div className={styles.axis} ref={axisRef}>
         <div className={styles.axisInner} style={{ width }}>
@@ -210,7 +295,11 @@ export function GuideGrid({ channels, windowStart, onOpen }: Props) {
         role="grid"
         aria-label="TV guide"
       >
-        <div className={styles.bodyInner} style={{ width, height: rowVirt.getTotalSize() }}>
+        <div
+          ref={innerRef}
+          className={styles.bodyInner}
+          style={{ width, height: rowVirt.getTotalSize() }}
+        >
           {showNow ? <div className={styles.nowLine} style={{ left: nowX }} /> : null}
           {rowVirt.getVirtualItems().map((vr) => {
             const ch = channels[vr.index];
