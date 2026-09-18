@@ -26,7 +26,7 @@ cinematic TMDB "hero" panel. Everything runs on your own hardware.
 |---|---|
 | **Sources** | M3U / M3U8 playlists · Xtream Codes · Stalker portals · **HDHomeRun** (native discovery, or the connector agent for tuners on another network). Drag to reorder them — the guide lists channels source-by-source in that order. |
 | **Tonight** | the landing view: a card per channel that's on air now (with what's next), films starting in the next few hours, and the highest TMDB-rated films across the coming week — each card opens the programme panel |
-| **Guide** | virtualised grid + live "now" line on desktop, single-channel agenda on phones; genre colours, date nav, group filter, channel search, full keyboard nav; programme labels stay pinned as you scroll through a long film; installable PWA with an offline shell and an in-app "new version" prompt |
+| **Guide** | virtualised grid + live "now" line on desktop, single-channel agenda on phones; genre colours, date nav, group filter, channel search, full keyboard nav, and ▲/▼ page buttons a Fire TV remote can reach; programme labels stay pinned as you scroll through a long film; installable PWA with an offline shell and an in-app "new version" prompt |
 | **Time** | one account timezone (captured from your browser at signup) with a per-source override and a per-channel offset you nudge from a programme's info panel — line a US-West feed up with an East-coast EPG without touching its sibling |
 | **Enrichment** | your own TMDB API key powers backdrops, logos, cast, ratings and synopses for film programmes. Channel logos come from the playlist, else the iptv-org database, else the SiliconDust guide for HDHomeRun — shown on a neutral plate so dark and light marks both read |
 | **Export** | hand your whole line-up to another player — one merged, de-duplicated **M3U playlist** + **XMLTV guide** (times already timezone-corrected per channel) behind a rotatable token. Drop the two URLs into Jellyfin, Plex, Emby, TiviMate or Threadfin. The settings panel shows when the feeds were last fetched and which players report watch state back. The routes are documented as OpenAPI: [tvtimes Export API](https://issinoho.github.io/tvtimes/api/); see [how the pieces fit](docs/architecture.md) for the whole path from provider to player. Own an HDHomeRun? [Start here](https://issinoho.github.io/tvtimes/hdhomerun/) |
@@ -301,8 +301,8 @@ far you want to be carried. Set it as `TVTIMES_IMAGE` in `.env`:
 | Image tag | Carries you to |
 |---|---|
 | `issinoho1969/tvtimes:1` | **recommended** — every backward-compatible release, stopping at the first that needs your attention |
-| `issinoho1969/tvtimes:1.0` | that patch line only: fixes, no new features |
-| `issinoho1969/tvtimes:1.0.1` | one exact build, forever |
+| `issinoho1969/tvtimes:1.1` | that line only: fixes, no new features |
+| `issinoho1969/tvtimes:1.1.0` | one exact build, forever |
 | `issinoho1969/tvtimes:latest` | whatever is newest, breaking changes included |
 
 Note the image tag has no leading `v`, unlike the git tag it's built from. A
