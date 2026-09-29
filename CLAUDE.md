@@ -95,6 +95,10 @@ CI pins **newer** ruff/mypy than an old local pin may resolve — if `ruff forma
 - **Email is fail-open.** `auth/email.send_email` catches provider errors, logs
   `email.delivery_failed` + `email.undelivered_body` (so the link is
   recoverable), and returns — a broken mailer must not 500 registration.
+  Those two events (and `email.console`) carry a live `?token=` link, so
+  `app.logging._UNREDACTED_FIELDS` exempts their `body` from the log
+  redactor — masking it leaves a dead link and a console-mode install that
+  can't finish signup (#190).
 - **Watchlist items are snapshots.** A `watchlist_item` of kind `programme`
   stores `channel_id` + start + title, deliberately **not** an FK to
   `programme` (an EPG refresh deletes and recreates those rows). Kind `title`

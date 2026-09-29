@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import smtplib
+from typing import Any
 
 import pytest
 import respx
+import structlog
+import structlog.testing
 from app.auth import email as email_mod
 from app.config import get_settings
+from app.logging import redact_processor
 from httpx import AsyncClient, Response
 
 
@@ -105,3 +109,28 @@ async def test_register_returns_202_when_mailer_is_broken(
         },
     )
     assert again.status_code == 202, again.text
+
+
+async def test_console_link_survives_the_real_processor_chain(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """#190: the recording-log tests above bypass structlog, so they never saw
+    the redactor turn the logged link into ``?token=***``."""
+    monkeypatch.setenv("TVTIMES_EMAIL_PROVIDER", "console")
+    get_settings.cache_clear()
+    saved = structlog.get_config()
+    cap = structlog.testing.LogCapture()
+    processors: list[Any] = [redact_processor, cap]
+    structlog.configure(
+        processors=processors,
+        wrapper_class=structlog.make_filtering_bound_logger(0),
+        cache_logger_on_first_use=False,
+    )
+    try:
+        monkeypatch.setattr(email_mod, "_log", structlog.get_logger("auth.email"))
+        await email_mod.send_email(
+            to="x@example.com", subject="hi", body_text="http://h/verify?token=abcdef123456"
+        )
+    finally:
+        structlog.configure(**saved)
+    assert cap.entries[0]["body"] == "http://h/verify?token=abcdef123456"
