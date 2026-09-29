@@ -9,7 +9,7 @@ import uuid
 import zoneinfo
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, NoReturn
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -42,6 +42,8 @@ from app.models.user import User
 _log = get_logger("auth.service")
 
 _EMAIL_TOKEN_TTL = timedelta(hours=2)
+# Floor between verification emails a sign-in attempt can trigger (#192).
+_VERIFY_RESEND_INTERVAL = timedelta(minutes=5)
 _CHALLENGE_TTL = timedelta(minutes=5)
 _LOCK_THRESHOLD = 5
 _LOCK_BASE = timedelta(seconds=30)
@@ -184,6 +186,32 @@ def _verify_email_body(raw_token: str) -> str:
     return f"Welcome to tvtimes. Confirm your address:\n\n{url}\n\nThe link expires in 2 hours."
 
 
+async def _refuse_unverified(
+    session: AsyncSession, user: User, meta: ClientMeta | None
+) -> NoReturn:
+    """Refuse a sign-in that proved the credential but not the address — and
+    send a fresh verification link, since the first one expires in 2 hours and
+    there is no other way to get another (#192). Only a correct password or
+    passkey reaches here, so the resend reveals nothing about which addresses
+    have accounts. At most one resend per ``_VERIFY_RESEND_INTERVAL``."""
+    recent = await session.scalar(
+        select(EmailToken.id).where(
+            EmailToken.user_id == user.id,
+            EmailToken.purpose == EmailTokenPurpose.verify,
+            EmailToken.created_at > _now() - _VERIFY_RESEND_INTERVAL,
+        )
+    )
+    if recent is None:
+        raw_token = await _issue_email_token(session, user, EmailTokenPurpose.verify)
+        await _audit(session, "verification_resent", user=user, meta=meta)
+        await send_email(
+            to=user.email,
+            subject="tvtimes — confirm your email",
+            body_text=_verify_email_body(raw_token),
+        )
+    raise EmailNotVerified()
+
+
 async def verify_email(
     session: AsyncSession, *, raw_token: str, meta: ClientMeta | None = None
 ) -> None:
@@ -242,7 +270,7 @@ async def password_login(
         user.password.hash = passwords.hash_password(password)
 
     if user.email_verified_at is None:
-        raise EmailNotVerified()
+        await _refuse_unverified(session, user, meta)
 
     if user.totp is not None and user.totp.confirmed_at is not None:
         await _audit(session, "login_password_ok_mfa_pending", user=user, meta=meta)
@@ -590,7 +618,7 @@ async def webauthn_login_complete(
     cred.sign_count = result.new_sign_count
     cred.last_used_at = _now()
     if user.email_verified_at is None:
-        raise EmailNotVerified()
+        await _refuse_unverified(session, user, meta)
     # A passkey is phishing-resistant MFA on its own; no TOTP step.
     return await issue_session(session, user, meta, method="passkey")
 

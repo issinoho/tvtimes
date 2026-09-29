@@ -160,6 +160,9 @@ verification link is printed to the log:
 docker compose logs tvtimes | grep -E "email.console|email.undelivered_body"
 ```
 
+The link expires after two hours. If it lapses, sign in with the new account's
+password and tvtimes sends a fresh one.
+
 One container serves the API **and** the web app on port 8888; a second runs the
 background worker. Postgres, Redis and the auto-generated secrets live in named
 volumes, so accounts and sessions survive `docker compose pull && docker compose up -d`.
