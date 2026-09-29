@@ -23,13 +23,24 @@ _QUERY_CRED_RE = re.compile(
 )
 _USERINFO_RE = re.compile(r"://([^/:@\s]+):([^/@\s]+)@")
 
+# Fields that deliberately carry a one-time secret to the operator: the console
+# mailer and the fail-open fallback log the whole email so its verify/reset link
+# can be followed by hand. Masking ``?token=`` there leaves a dead link (#190).
+_UNREDACTED_FIELDS: dict[str, frozenset[str]] = {
+    "email.console": frozenset({"body"}),
+    "email.undelivered_body": frozenset({"body"}),
+}
+
 
 def _mask(value: str) -> str:
     return value[:2] + "***" if len(value) > 4 else "***"
 
 
 def redact_processor(_logger: Any, _name: str, event_dict: dict[str, Any]) -> dict[str, Any]:
+    exempt = _UNREDACTED_FIELDS.get(str(event_dict.get("event")), frozenset())
     for key, val in list(event_dict.items()):
+        if key in exempt:
+            continue
         if isinstance(val, str):
             val = _QUERY_CRED_RE.sub(lambda m: m.group(1) + "***", val)
             val = _USERINFO_RE.sub(lambda m: f"://{m.group(1)}:***@", val)
