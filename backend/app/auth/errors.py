@@ -32,7 +32,13 @@ class EmailNotVerified(AuthError):
     status_code = 403
     code = "email_not_verified"
 
-    def __init__(self, message: str = "Verify your email address to continue.") -> None:
+    def __init__(
+        self,
+        message: str = (
+            "Confirm your email address to finish signing in. We've sent you a "
+            "confirmation link — open it, then sign in again."
+        ),
+    ) -> None:
         super().__init__(message)
 
 

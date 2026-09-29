@@ -5,8 +5,9 @@ from datetime import UTC, datetime, timedelta
 from app.auth import tokens
 from app.db import get_sessionmaker
 from app.models.session import AuthSession
+from app.models.token import EmailToken
 from httpx import AsyncClient
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from tests.conftest import (
     DEFAULT_PASSWORD,
@@ -322,3 +323,51 @@ async def test_verify_with_bad_token_is_rejected(app_client: AsyncClient) -> Non
     resp = await app_client.post("/api/auth/verify", json={"token": "not-a-real-token"})
     assert resp.status_code == 401
     assert resp.json()["code"] == "token_invalid"
+
+
+async def test_unverified_login_resends_an_expired_link(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    """#192: once the first link expired there was no way to get another."""
+    creds = {"email": "late@example.com", "password": DEFAULT_PASSWORD}
+    await app_client.post("/api/auth/register", json={**creds, "display_name": "Late"})
+    assert len(captured_emails) == 1
+
+    # Straight after registering, the first link is still fresh: no resend.
+    resp = await app_client.post("/api/auth/login", json=creds)
+    assert resp.status_code == 403
+    assert resp.json()["code"] == "email_not_verified"
+    assert len(captured_emails) == 1
+
+    # Age the original link past both the resend floor and its expiry.
+    long_ago = datetime.now(UTC) - timedelta(hours=3)
+    async with get_sessionmaker()() as s:
+        await s.execute(
+            update(EmailToken).values(created_at=long_ago, expires_at=long_ago + timedelta(hours=2))
+        )
+        await s.commit()
+    first_link = token_from_link(captured_emails[0]["body"])
+    resp = await app_client.post("/api/auth/verify", json={"token": first_link})
+    assert resp.status_code == 401
+
+    # A wrong password sends nothing, so it can't be used to probe addresses.
+    resp = await app_client.post(
+        "/api/auth/login", json={**creds, "password": "wrong password entirely"}
+    )
+    assert resp.status_code == 401
+    assert len(captured_emails) == 1
+
+    # The right password gets a fresh link, and only one per interval.
+    resp = await app_client.post("/api/auth/login", json=creds)
+    assert resp.status_code == 403
+    assert "sent you a confirmation link" in resp.json()["message"]
+    resp = await app_client.post("/api/auth/login", json=creds)
+    assert resp.status_code == 403
+    assert len(captured_emails) == 2
+    fresh = captured_emails[1]
+    assert fresh["to"] == "late@example.com" and "confirm" in fresh["subject"]
+
+    resp = await app_client.post("/api/auth/verify", json={"token": token_from_link(fresh["body"])})
+    assert resp.status_code == 200, resp.text
+    resp = await app_client.post("/api/auth/login", json=creds)
+    assert resp.status_code == 200, resp.text
