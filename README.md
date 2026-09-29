@@ -173,7 +173,7 @@ volumes, so accounts and sessions survive `docker compose pull && docker compose
 |---|---|
 | `TVTIMES_PUBLIC_ORIGIN` | The exact URL the browser uses — scheme, host, port, no trailing slash. Passkeys are bound to it. `http://192.168.x.x:8888` is fine on a trusted LAN; use `https://…` behind a reverse proxy. |
 | `TVTIMES_WEBAUTHN_RP_ID` | The registrable domain of that origin (no scheme/port); `localhost` for a bare-IP setup. **Changing it later invalidates every passkey.** |
-| `TVTIMES_HTTP_PORT` | Host port to expose (default `8888`). |
+| `TVTIMES_HTTP_PORT` | Host port Docker publishes the app on (default `8888`). Only Compose reads it; tvtimes builds its links from `TVTIMES_PUBLIC_ORIGIN`. Without a reverse proxy the two name the same port, so change them together; behind a proxy the origin has no port and this is just where the proxy connects. |
 | `POSTGRES_PASSWORD` | Used by the db container and the app connection string. |
 | `TVTIMES_EMAIL_PROVIDER` | `console` (log only) · `smtp` (+ `TVTIMES_SMTP_*`) · `resend` (+ `TVTIMES_RESEND_API_KEY`). |
 
