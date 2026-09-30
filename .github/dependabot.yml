@@ -63,6 +63,14 @@ updates:
     groups:
       frontend:
         update-types: [minor, patch]
+    ignore:
+      # TypeScript 7 is the native (Go) compiler, and the tools that drive the
+      # compiler API haven't followed: openapi-typescript peers on `^5.x` and
+      # typescript-eslint on `<6.1.0`, so a TS major fails `npm ci` with
+      # ERESOLVE (#164). Revisit once both widen their peer ranges; minors and
+      # patches inside 5.x still arrive with the weekly group.
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
 
   # --- Base images -----------------------------------------------------------
   # The four Dockerfiles: the all-in-one image at the root (node + python + the
