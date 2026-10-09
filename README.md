@@ -10,7 +10,10 @@
 <p align="center">
   <a href="https://issinoho.github.io/tvtimes/"><img alt="Website" src="https://img.shields.io/badge/website-issinoho.github.io%2Ftvtimes-DB2777"></a>
   <a href="https://hub.docker.com/r/issinoho1969/tvtimes"><img alt="Docker Hub" src="https://img.shields.io/badge/docker-issinoho1969%2Ftvtimes-2496ED?logo=docker&logoColor=white"></a>
-  <img alt="License" src="https://img.shields.io/badge/license-MIT-6D28D9">
+  <a href="https://github.com/issinoho/tvtimes/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/issinoho/tvtimes?label=release"></a>
+  <a href="https://hub.docker.com/r/issinoho1969/tvtimes"><img alt="Docker pulls" src="https://img.shields.io/docker/pulls/issinoho1969/tvtimes?logo=docker&logoColor=white"></a>
+  <img alt="Platform" src="https://img.shields.io/badge/platform-linux%2Famd64%20%7C%20linux%2Farm64-blue">
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-6D28D9"></a>
 </p>
 
 ---
