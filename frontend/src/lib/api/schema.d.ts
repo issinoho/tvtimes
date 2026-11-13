@@ -1293,6 +1293,16 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** HdhomerunConfigPatch */
+        HdhomerunConfigPatch: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "hdhomerun";
+            /** Device Url */
+            device_url?: string | null;
+        };
         /** HdhomerunSourceIn */
         HdhomerunSourceIn: {
             /** Display Name */
@@ -1442,6 +1452,16 @@ export interface components {
             email: string;
             /** Password */
             password: string;
+        };
+        /** M3uConfigPatch */
+        M3uConfigPatch: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "m3u";
+            /** Url */
+            url?: string | null;
         };
         /** M3uSourceIn */
         M3uSourceIn: {
@@ -1935,6 +1955,26 @@ export interface components {
             clock_shift_seconds?: number | null;
             /** Refresh Interval Minutes */
             refresh_interval_minutes?: number | null;
+            /** Config */
+            config?: (components["schemas"]["M3uConfigPatch"] | components["schemas"]["XtreamConfigPatch"] | components["schemas"]["StalkerConfigPatch"] | components["schemas"]["HdhomerunConfigPatch"]) | null;
+        };
+        /** StalkerConfigPatch */
+        StalkerConfigPatch: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "stalker";
+            /** Portal Url */
+            portal_url?: string | null;
+            /** Mac */
+            mac?: string | null;
+            /** Serial */
+            serial?: string | null;
+            /** Device Id */
+            device_id?: string | null;
+            /** Stb Type */
+            stb_type?: string | null;
         };
         /** StalkerSourceIn */
         StalkerSourceIn: {
@@ -2100,6 +2140,22 @@ export interface components {
              * @default Passkey
              */
             nickname: string;
+        };
+        /** XtreamConfigPatch */
+        XtreamConfigPatch: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "xtream";
+            /** Server Url */
+            server_url?: string | null;
+            /** Username */
+            username?: string | null;
+            /** Password */
+            password?: string | null;
+            /** Output */
+            output?: string | null;
         };
         /** XtreamSourceIn */
         XtreamSourceIn: {
