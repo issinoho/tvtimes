@@ -8,7 +8,8 @@ import styles from '@/features/sources/sources.module.css';
 const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString() : 'never');
 
 /** The XMLTV guide source(s) feeding this channel source — the one discovered
- * from the playlist, plus any standalone URL you attach here. */
+ * from the playlist, any standalone URL attached here (which matches only this
+ * source's channels), and any tenant-wide one attached before scoping existed. */
 export function EpgPanel({ sourceId }: { sourceId: string }) {
   const qc = useQueryClient();
   const [url, setUrl] = useState('');
@@ -38,7 +39,7 @@ export function EpgPanel({ sourceId }: { sourceId: string }) {
 
   const attach = useMutation({
     mutationFn: async (u: string) =>
-      unwrap(await api.POST('/api/epg-sources', { body: { url: u } })),
+      unwrap(await api.POST('/api/epg-sources', { body: { url: u, scope_source_id: sourceId } })),
     onSuccess: () => {
       setUrl('');
       setError(null);
@@ -58,9 +59,20 @@ export function EpgPanel({ sourceId }: { sourceId: string }) {
     onSuccess: invalidate,
   });
 
-  // The playlist-discovered EPG for this source, plus standalone URLs (which
-  // apply to every channel, this source's included).
-  const mine = (epgSources ?? []).filter((s) => s.source_id === sourceId || s.source_id === null);
+  // The playlist-discovered EPG for this source, standalone URLs attached to
+  // it, and unscoped standalone URLs (which apply to every source's channels).
+  const mine = (epgSources ?? []).filter(
+    (s) =>
+      s.source_id === sourceId ||
+      s.scope_source_id === sourceId ||
+      (s.source_id === null && s.scope_source_id === null),
+  );
+  const label = (s: (typeof mine)[number]) =>
+    s.source_id !== null
+      ? 'from the playlist'
+      : s.scope_source_id !== null
+        ? 'attached here'
+        : 'attached · all sources — paste the URL again to limit it to this one';
 
   return (
     <section className={styles.card} style={{ display: 'block' }}>
@@ -82,7 +94,7 @@ export function EpgPanel({ sourceId }: { sourceId: string }) {
                 {s.url}
               </div>
               <div className={styles.sub}>
-                {s.source_id === null ? 'attached · all channels' : 'from the playlist'}
+                {label(s)}
                 {s.last_status === 'ok' ? ` · ${s.programme_count} programmes` : ''}
                 {` · fetched ${fmt(s.last_fetched_at)}`}
                 {s.last_status === 'error' && s.last_error ? ` · ${s.last_error}` : ''}

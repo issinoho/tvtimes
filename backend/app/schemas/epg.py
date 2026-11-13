@@ -8,6 +8,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class EpgSourceIn(BaseModel):
     url: str = Field(min_length=1, max_length=2048)
+    # The source whose channels this feed may match; omitted = every source.
+    scope_source_id: uuid.UUID | None = None
 
 
 class EpgSourceOut(BaseModel):
@@ -16,6 +18,7 @@ class EpgSourceOut(BaseModel):
     id: uuid.UUID
     url: str
     source_id: uuid.UUID | None
+    scope_source_id: uuid.UUID | None
     last_status: str
     last_error: str | None
     programme_count: int

@@ -119,7 +119,23 @@ async def list_epg_sources(user: VerifiedUser, session: SessionDep) -> list[EpgS
 async def create_epg_source(
     body: EpgSourceIn, user: VerifiedUser, session: SessionDep
 ) -> EpgSourceOut:
-    row = await svc.create_epg_source(session, tenant_id=user.tenant_id, url=body.url)
+    if body.scope_source_id is not None:
+        try:
+            await src_svc.get_source(session, user.tenant_id, body.scope_source_id)
+        except src_svc.SourceNotFound as exc:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Unknown source") from exc
+    try:
+        row = await svc.create_epg_source(
+            session,
+            tenant_id=user.tenant_id,
+            url=body.url,
+            scope_source_id=body.scope_source_id,
+        )
+    except svc.EpgScopeConflict as exc:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"That guide is already attached to {exc.source_name}. Remove it there first.",
+        ) from exc
     await session.flush()
     await enqueue_epg_refresh(row.id)
     return EpgSourceOut.model_validate(row)
