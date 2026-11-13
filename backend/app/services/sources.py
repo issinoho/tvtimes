@@ -184,6 +184,9 @@ async def update_source(
 
 
 async def delete_source(session: AsyncSession, source: Source) -> None:
+    # Guides attached on this source's page go with it. The FK cascades too,
+    # but SQLite only honours that with foreign_keys enabled -- don't rely on it.
+    await session.execute(delete(EpgSource).where(EpgSource.scope_source_id == source.id))
     await session.delete(source)
 
 

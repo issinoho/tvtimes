@@ -1179,6 +1179,8 @@ export interface components {
         EpgSourceIn: {
             /** Url */
             url: string;
+            /** Scope Source Id */
+            scope_source_id?: string | null;
         };
         /** EpgSourceOut */
         EpgSourceOut: {
@@ -1191,6 +1193,8 @@ export interface components {
             url: string;
             /** Source Id */
             source_id: string | null;
+            /** Scope Source Id */
+            scope_source_id: string | null;
             /** Last Status */
             last_status: string;
             /** Last Error */

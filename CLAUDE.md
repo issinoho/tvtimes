@@ -92,6 +92,11 @@ CI pins **newer** ruff/mypy than an old local pin may resolve — if `ruff forma
 - **EPG fan-out.** `epg._channel_index` maps each XMLTV key to a **list** of
   channel ids; `_resolve_channels` returns all of them and a programme row is
   written per channel — so an East/West pair sharing a tvg-id both get data.
+- **EPG scope.** A playlist-discovered feed (`epg_source.source_id`) matches
+  *every* channel in the tenant (an HDHomeRun may lean on an M3U's guide). A
+  URL attached on a source's page sets `scope_source_id` and matches only that
+  source's channels; null there means tenant-wide (feeds attached before
+  scoping existed). Re-attaching a tenant-wide URL on a source narrows it.
 - **Email is fail-open.** `auth/email.send_email` catches provider errors, logs
   `email.delivery_failed` + `email.undelivered_body` (so the link is
   recoverable), and returns — a broken mailer must not 500 registration.

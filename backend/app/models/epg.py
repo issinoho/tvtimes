@@ -35,6 +35,13 @@ class EpgSource(PkUuidMixin, TimestampMixin, Base):
     source_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("source.id", ondelete="CASCADE"), index=True
     )
+    # For a standalone URL only: the source it was attached on. Its programmes
+    # are then matched against that source's channels alone. Null means
+    # tenant-wide -- every channel of every source is a candidate (the only
+    # behaviour before scoping existed). Unused when ``source_id`` is set.
+    scope_source_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("source.id", ondelete="CASCADE"), index=True
+    )
     url: Mapped[str] = mapped_column(Text, nullable=False)
 
     etag: Mapped[str | None] = mapped_column(String(400))
@@ -47,7 +54,7 @@ class EpgSource(PkUuidMixin, TimestampMixin, Base):
     programme_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     refresh_interval_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=720)
 
-    source: Mapped[Source | None] = relationship()
+    source: Mapped[Source | None] = relationship(foreign_keys=[source_id])
 
 
 class Programme(PkUuidMixin, Base):

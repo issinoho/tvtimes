@@ -47,6 +47,14 @@ class EpgSourceNotFound(Exception):
     pass
 
 
+class EpgScopeConflict(Exception):
+    """The URL is already attached, scoped to a different source."""
+
+    def __init__(self, source_name: str) -> None:
+        super().__init__(source_name)
+        self.source_name = source_name
+
+
 def _now() -> datetime:
     return datetime.now(UTC)
 
@@ -54,7 +62,22 @@ def _now() -> datetime:
 # --- CRUD -----------------------------------------------------------------------
 
 
-async def create_epg_source(session: AsyncSession, *, tenant_id: uuid.UUID, url: str) -> EpgSource:
+async def create_epg_source(
+    session: AsyncSession,
+    *,
+    tenant_id: uuid.UUID,
+    url: str,
+    scope_source_id: uuid.UUID | None = None,
+) -> EpgSource:
+    """Attach a standalone XMLTV URL. ``scope_source_id`` limits matching to
+    that source's channels; ``None`` makes it tenant-wide.
+
+    The URL is unique per tenant, so attaching one that already exists:
+    returns it unchanged when the scope agrees, none was asked for, or it came
+    from a playlist;
+    narrows a tenant-wide row to the requested source -- the way to scope a
+    feed attached before scoping existed; and refuses to move a row already
+    scoped to another source (:class:`EpgScopeConflict`)."""
     url = url.strip()
     # A transient DNS failure is left for the refresh to report. A LAN URL the
     # operator has allow-listed (TVTIMES_FETCH_ALLOWLIST) is permitted.
@@ -64,8 +87,27 @@ async def create_epg_source(session: AsyncSession, *, tenant_id: uuid.UUID, url:
         select(EpgSource).where(EpgSource.tenant_id == tenant_id, EpgSource.url == url)
     )
     if existing is not None:
+        if (
+            existing.source_id is not None
+            or scope_source_id is None
+            or existing.scope_source_id == scope_source_id
+        ):
+            return existing
+        if existing.scope_source_id is not None:
+            other = await session.get(Source, existing.scope_source_id)
+            raise EpgScopeConflict(other.display_name if other else "another source")
+        # Narrowing: the next refresh must re-parse to drop the rows it wrote
+        # onto other sources' channels, even if the feed is a 304.
+        existing.scope_source_id = scope_source_id
+        existing.etag = existing.last_modified = None
+        existing.last_status = EpgStatus.pending
         return existing
-    row = EpgSource(tenant_id=tenant_id, url=url, last_status=EpgStatus.pending)
+    row = EpgSource(
+        tenant_id=tenant_id,
+        url=url,
+        scope_source_id=scope_source_id,
+        last_status=EpgStatus.pending,
+    )
     session.add(row)
     await session.flush()
     return row
@@ -130,7 +172,9 @@ async def delete_epg_source(session: AsyncSession, row: EpgSource) -> None:
 # --- refresh ------------------------------------------------------------------
 
 
-async def _channel_index(session: AsyncSession, tenant_id: uuid.UUID) -> dict[str, list[uuid.UUID]]:
+async def _channel_index(
+    session: AsyncSession, tenant_id: uuid.UUID, *, source_id: uuid.UUID | None = None
+) -> dict[str, list[uuid.UUID]]:
     """Map XMLTV channel keys -> our channel ids. Keys: raw tvg-id, the
     ``@feed``-stripped tvg-id, and normalised display / tvg names. A key can
     fan out to several channels (e.g. an East and West feed that share a
@@ -138,9 +182,15 @@ async def _channel_index(session: AsyncSession, tenant_id: uuid.UUID) -> dict[st
 
     ``epg_override_id`` replaces all of that for a channel: it is the only key
     that channel is indexed under. Pointing two channels at the same override
-    is how an HD variant borrows the guide of the SD one it duplicates."""
+    is how an HD variant borrows the guide of the SD one it duplicates.
+
+    ``source_id`` restricts the index to one source's channels (a scoped
+    attached feed)."""
     index: dict[str, list[uuid.UUID]] = {}
-    rows = await session.scalars(select(Channel).where(Channel.tenant_id == tenant_id))
+    stmt = select(Channel).where(Channel.tenant_id == tenant_id)
+    if source_id is not None:
+        stmt = stmt.where(Channel.source_id == source_id)
+    rows = await session.scalars(stmt)
     for ch in rows:
         keys: list[str] = []
         if ch.epg_override_id:
@@ -224,7 +274,12 @@ async def refresh_epg_source(session: AsyncSession, epg_source: EpgSource) -> No
         _log.exception("epg.parse_failed", epg_source_id=str(epg_source.id))
         return
 
-    index = await _channel_index(session, epg_source.tenant_id)
+    # A playlist-discovered feed stays tenant-wide (another source -- e.g. an
+    # HDHomeRun with no guide of its own -- may lean on it); an attached feed
+    # is limited to the source it was attached on, if any.
+    index = await _channel_index(
+        session, epg_source.tenant_id, source_id=epg_source.scope_source_id
+    )
     now = _now()
     lo, hi = now - WINDOW_PAST, now + WINDOW_FUTURE
     group_by_channel = await _channel_groups(session, epg_source.tenant_id)
