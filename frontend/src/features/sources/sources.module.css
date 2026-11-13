@@ -191,6 +191,7 @@
   margin-bottom: 0.3rem;
 }
 .field input,
+.field select,
 .card input[type='url'] {
   width: 100%;
   padding: 0.6rem 0.7rem;
@@ -314,4 +315,19 @@
 }
 .noGuide {
   color: var(--callout-warn-fg);
+}
+
+.legend {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 1.1rem 0 0.6rem;
+}
+
+/* Taller than the add dialog: let it scroll on a short phone screen. */
+.dialogTall {
+  max-height: calc(100dvh - 2.5rem);
+  overflow-y: auto;
 }

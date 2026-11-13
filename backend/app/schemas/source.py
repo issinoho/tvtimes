@@ -77,12 +77,59 @@ SourceIn = Annotated[
 ]
 
 
+# Connection edits. ``kind`` must match the source's (a source can't change
+# kind). Every other field is optional and an omitted / null one keeps its
+# stored value, so the client never needs the saved credentials back. Where a
+# blank value means something (an HDHomeRun's empty address = auto-discover, a
+# Stalker serial / device id cleared), send "" to set it.
+
+
+class M3uConfigPatch(BaseModel):
+    kind: Literal["m3u"]
+    url: str | None = Field(default=None, min_length=1, max_length=2048)
+
+
+class XtreamConfigPatch(BaseModel):
+    kind: Literal["xtream"]
+    server_url: str | None = Field(default=None, min_length=1, max_length=2048)
+    username: str | None = Field(default=None, min_length=1, max_length=256)
+    password: str | None = Field(default=None, min_length=1, max_length=256)
+    output: str | None = Field(default=None, pattern=r"^[a-z0-9]{1,8}$")
+
+
+class StalkerConfigPatch(BaseModel):
+    kind: Literal["stalker"]
+    portal_url: str | None = Field(default=None, min_length=1, max_length=2048)
+    mac: str | None = Field(default=None, pattern=_MAC)
+    serial: str | None = Field(default=None, max_length=64)
+    device_id: str | None = Field(default=None, max_length=128)
+    stb_type: str | None = Field(default=None, min_length=1, max_length=32)
+
+
+class HdhomerunConfigPatch(BaseModel):
+    kind: Literal["hdhomerun"]
+    device_url: str | None = Field(default=None, max_length=2048)
+
+
+SourceConfigPatch = Annotated[
+    M3uConfigPatch | XtreamConfigPatch | StalkerConfigPatch | HdhomerunConfigPatch,
+    Field(discriminator="kind"),
+]
+
+
 class SourcePatchIn(BaseModel):
     display_name: str | None = Field(default=None, min_length=1, max_length=120)
     enabled: bool | None = None
     timezone_override: str | None = Field(default=None, max_length=64)
     clock_shift_seconds: int | None = Field(default=None, ge=-86_400, le=86_400)
     refresh_interval_minutes: int | None = Field(default=None, ge=15, le=10_080)
+    config: SourceConfigPatch | None = None
+
+    def config_changes(self) -> dict[str, object] | None:
+        """The connection fields to overwrite, ``kind`` and kept ones dropped."""
+        if self.config is None:
+            return None
+        return self.config.model_dump(exclude={"kind"}, exclude_none=True)
 
 
 class SourceOrderIn(BaseModel):

@@ -37,6 +37,11 @@ class SourceNotFound(Exception):
     pass
 
 
+class SourceConfigKindMismatch(Exception):
+    """A connection edit for a different kind than the source (or for a
+    connector source, whose connection is the agent's, not ours)."""
+
+
 def _now() -> datetime:
     return datetime.now(UTC)
 
@@ -162,8 +167,28 @@ async def update_source(
     unset_timezone: bool = False,
     clock_shift_seconds: int | None = None,
     refresh_interval_minutes: int | None = None,
-    config: dict[str, object] | None = None,
-) -> None:
+    config_kind: str | None = None,
+    config_changes: dict[str, object] | None = None,
+) -> bool:
+    """Apply the given edits. ``config_changes`` is merged over the stored
+    connection config (fields it leaves out are kept) and must be for
+    ``config_kind`` == the source's kind. Returns ``True`` when the connection
+    actually changed -- the caller then queues a refresh, which reconciles the
+    channel list in place so channels that survive keep their ids."""
+    if config_kind is not None and (
+        config_kind != source.kind.value or source.kind is SourceKind.connector
+    ):
+        raise SourceConfigKindMismatch
+    # Validate the new connection before touching anything, so a rejected URL
+    # leaves the whole edit unapplied.
+    new_config: dict[str, object] | None = None
+    if config_changes:
+        current = decrypt_config(source)
+        merged = _normalize_config(source.kind, {**current, **config_changes})
+        if merged != current:
+            await assert_config_url_allowed(source.kind, merged)
+            new_config = merged
+
     if display_name is not None:
         source.display_name = display_name.strip()
     if enabled is not None:
@@ -176,11 +201,12 @@ async def update_source(
         source.clock_shift_seconds = clock_shift_seconds
     if refresh_interval_minutes is not None:
         source.refresh_interval_minutes = refresh_interval_minutes
-    if config is not None:
-        normalized = _normalize_config(source.kind, config)
-        await assert_config_url_allowed(source.kind, normalized)
-        source.config_encrypted = encrypt(json.dumps(normalized))
-        source.last_status = SourceStatus.pending
+    if new_config is None:
+        return False
+    source.config_encrypted = encrypt(json.dumps(new_config))
+    source.last_status = SourceStatus.pending
+    source.last_error = None
+    return True
 
 
 async def delete_source(session: AsyncSession, source: Source) -> None:

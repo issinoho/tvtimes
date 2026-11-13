@@ -12,7 +12,7 @@ const KIND_LABEL: Record<SourceKind, string> = {
   hdhomerun: 'HDHomeRun',
 };
 
-function Field({
+export function Field({
   label,
   value,
   onChange,

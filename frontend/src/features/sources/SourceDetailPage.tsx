@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { ChannelLogo } from '@/features/guide/ChannelLogo';
+import { EditSourceDialog } from '@/features/sources/EditSourceDialog';
 import { EpgPanel } from '@/features/sources/EpgPanel';
 import { StatusPill } from '@/features/sources/StatusPill';
 import {
@@ -68,6 +69,7 @@ export function SourceDetailPage() {
   const refresh = useRefreshSource();
   const remove = useDeleteSource();
   const patch = usePatchSource(sourceId);
+  const [editing, setEditing] = useState(false);
 
   if (isPending) return <p>Loading…</p>;
   if (!source) return <p>Source not found.</p>;
@@ -110,6 +112,9 @@ export function SourceDetailPage() {
         >
           {source.last_status === 'pending' ? 'Refreshing…' : 'Refresh now'}
         </button>
+        <button type="button" className={styles.btn} onClick={() => setEditing(true)}>
+          Edit
+        </button>
         <button
           type="button"
           className={styles.btn}
@@ -129,6 +134,7 @@ export function SourceDetailPage() {
           Delete
         </button>
       </div>
+      {editing ? <EditSourceDialog source={source} onClose={() => setEditing(false)} /> : null}
 
       <div className={styles.toolbar}>
         <input

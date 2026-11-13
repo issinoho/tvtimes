@@ -112,17 +112,27 @@ async def patch_source(
     source = await _load(session, user, source_id)
     _check_timezone(body.timezone_override)
     fields = body.model_dump(exclude_unset=True)
-    await svc.update_source(
-        session,
-        source,
-        display_name=fields.get("display_name"),
-        enabled=fields.get("enabled"),
-        timezone_override=fields.get("timezone_override"),
-        unset_timezone="timezone_override" in fields and fields["timezone_override"] is None,
-        clock_shift_seconds=fields.get("clock_shift_seconds"),
-        refresh_interval_minutes=fields.get("refresh_interval_minutes"),
-    )
+    try:
+        reconnected = await svc.update_source(
+            session,
+            source,
+            display_name=fields.get("display_name"),
+            enabled=fields.get("enabled"),
+            timezone_override=fields.get("timezone_override"),
+            unset_timezone="timezone_override" in fields and fields["timezone_override"] is None,
+            clock_shift_seconds=fields.get("clock_shift_seconds"),
+            refresh_interval_minutes=fields.get("refresh_interval_minutes"),
+            config_kind=body.config.kind if body.config is not None else None,
+            config_changes=body.config_changes(),
+        )
+    except svc.SourceConfigKindMismatch as exc:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            f"This is a {source.kind.value} source; its connection can't be edited that way.",
+        ) from exc
     await session.flush()
+    if reconnected:
+        await enqueue_source_refresh(source.id)
     return await _one_out(session, source)
 
 
