@@ -1,5 +1,6 @@
 import { ActivityNotificationsSection } from '@/features/settings/ActivityNotificationsSection';
 import { ConnectorsSection } from '@/features/settings/ConnectorsSection';
+import { DevicesSection } from '@/features/settings/DevicesSection';
 import { ExportsSection } from '@/features/settings/ExportsSection';
 import { NotificationsSection } from '@/features/settings/NotificationsSection';
 import { PasskeysSection } from '@/features/settings/PasskeysSection';
@@ -35,6 +36,7 @@ export function SettingsPage() {
       <TimezoneSection />
       <TmdbSection />
       <ConnectorsSection />
+      <DevicesSection />
       <ExportsSection />
       <SourceAlertsSection />
       <NotificationsSection />

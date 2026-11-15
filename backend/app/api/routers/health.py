@@ -18,6 +18,10 @@ router = APIRouter(tags=["meta"])
 class Health(BaseModel):
     status: Literal["ok"]
     version: str
+    # Lets a player scanning the LAN tell tvtimes from any other /healthz,
+    # and know it can pair (POST /api/pairing/start).
+    app: Literal["tvtimes"] = "tvtimes"
+    pairing: bool = True
 
 
 class Readiness(BaseModel):

@@ -9,6 +9,7 @@ from app.api.routers import (
     auth,
     connector,
     connectors,
+    devices,
     epg,
     exports,
     favourites,
@@ -32,5 +33,7 @@ api_router.include_router(connector.router)
 api_router.include_router(watchlist.router)
 api_router.include_router(favourites.router)
 api_router.include_router(notifications.router)
+api_router.include_router(devices.pairing_router)
+api_router.include_router(devices.devices_router)
 
 __all__ = ["api_router"]

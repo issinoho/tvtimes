@@ -77,6 +77,13 @@ per-tenant token as `?token=`, matched against its sha256; there is nothing to
 configure server-side. They are rate-limited (30/min) and safe to expose
 through the same proxy as the rest of the app.
 
+Paired devices (**Settings → Devices**) hold their own tokens for the same
+routes. Pairing uses two unauthenticated, rate-limited calls —
+`POST /api/pairing/start` and `POST /api/pairing/poll` — and needs a signed-in,
+verified user to approve the code, so nothing is granted without one. The poll
+response includes `TVTIMES_PUBLIC_ORIGIN`, which the device prefers for its
+feed URLs when it can reach it.
+
 ## Upgrades
 
 `docker compose pull && docker compose up -d`. The `web` container runs
@@ -84,8 +91,9 @@ through the same proxy as the rest of the app.
 
 ## Health
 
-- `GET /api/healthz` — liveness (returns the version). Used by the compose
-  healthcheck.
+- `GET /api/healthz` — liveness (returns the version, plus `"app": "tvtimes"`
+  and `"pairing": true` so a TV scanning the LAN can recognise it). Used by
+  the compose healthcheck.
 - `GET /api/readyz` — readiness (checks the DB).
 
 ## Connector (optional)

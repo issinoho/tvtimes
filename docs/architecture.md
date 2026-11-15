@@ -204,11 +204,20 @@ sequenceDiagram
 | | Reach | Lifetime |
 |---|---|---|
 | **Export token** | whole line-up, streams, watchlist, favourites; **writes** watch state | until rotated |
+| **Device token** | the same as the export token, for one paired TV | until that device is removed |
 | **Play ticket** | one channel and its guide | 24 hours |
 
 `POST /api/exports/watch-events` is the only **write** the export token permits,
 and it stays narrow: it appends viewing intervals for channels already on the
 account and nothing else.
+
+A **device token** comes from find-and-approve pairing instead of being copied:
+a TV app (radiotimes) finds tvtimes on the LAN (`GET /api/healthz` answers
+`"app": "tvtimes"`), calls `POST /api/pairing/start` and shows the code it gets
+back; someone signed in enters that code under **Settings → Devices**; the TV's
+next `POST /api/pairing/poll` returns its own token, once. It reads the same
+`/api/exports/*` routes as the export token, independently of it, and removing
+the device revokes it.
 
 ---
 

@@ -16,6 +16,7 @@ from app.db import Base
 from app.models.audit import AuditLog
 from app.models.connector import Connector, ConnectorStatus
 from app.models.credentials import PasswordCredential, TotpSecret, WebAuthnCredential
+from app.models.device import PairedDevice
 from app.models.epg import EpgSource, EpgStatus, Programme
 from app.models.favourite import FavouriteChannel
 from app.models.notification import NotificationTarget
@@ -47,6 +48,7 @@ __all__ = [
     "FavouriteChannel",
     "MediaType",
     "NotificationTarget",
+    "PairedDevice",
     "PasswordCredential",
     "Programme",
     "Source",

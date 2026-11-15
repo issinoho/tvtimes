@@ -11,7 +11,7 @@ async def test_healthz(app_client: AsyncClient) -> None:
     resp = await app_client.get("/api/healthz")
     assert resp.status_code == 200
     body = resp.json()
-    assert body == {"status": "ok", "version": __version__}
+    assert body == {"status": "ok", "version": __version__, "app": "tvtimes", "pairing": True}
 
 
 async def test_readyz_reports_database_up(app_client: AsyncClient) -> None:
