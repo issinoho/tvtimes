@@ -19,6 +19,7 @@ from app.auth.ratelimit import limiter
 from app.config import get_settings
 from app.models.source import Channel, Source
 from app.models.tenant import Tenant
+from app.services import devices as devices_svc
 from app.services import exports as svc
 from app.services import watch as watch_svc
 
@@ -28,14 +29,21 @@ EXPORT_LIMIT = "30/minute"
 
 
 async def _tenant(session: SessionDep, token: Annotated[str, Query()] = "") -> Tenant:
-    tenant = await svc.tenant_for_token(session, token)
-    if tenant is None:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or missing export token")
     # Every export route depends on this, so one call here covers the lot --
     # the playlist, the guide, watchlist/favourites polling, a stream request
     # and a watch-state report all count as the token being used.
-    await svc.touch_export_token(session, tenant)
-    return tenant
+    tenant = await svc.tenant_for_token(session, token)
+    if tenant is not None:
+        await svc.touch_export_token(session, tenant)
+        return tenant
+    # A paired device's own token (app.services.devices) reads the same feeds.
+    device = await devices_svc.device_for_token(session, token)
+    if device is not None and device.tenant_id is not None:
+        device_tenant = await session.get(Tenant, device.tenant_id)
+        if device_tenant is not None:
+            await devices_svc.touch(session, device)
+            return device_tenant
+    raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or missing export token")
 
 
 TenantDep = Annotated[Tenant, Depends(_tenant)]

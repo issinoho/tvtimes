@@ -117,6 +117,15 @@ CI pins **newer** ruff/mypy than an old local pin may resolve — if `ruff forma
   can't send an `Authorization` header. Rotating just replaces the hash. The
   M3U/XMLTV writers call `epg.resolve_display_tz` so the export and the grid
   agree on zone + per-channel clock shift.
+- **Paired devices** (`models/device.py`, `services/devices.py`) hold their own
+  export tokens, sha256 only, accepted by `routers/exports._tenant` after the
+  tenant token misses. Independent of the tenant token: rotating or disabling
+  that leaves devices alone; removing a device is the revoke. A pairing row has
+  no tenant until a verified user approves its code (`/api/devices`); the token
+  is minted on the device's next `/api/pairing/poll` and returned exactly once.
+  Unapproved/uncollected rows expire (10 min) and are swept; `MAX_PENDING` caps
+  the unauthenticated table growth. `/api/healthz`'s `app`/`pairing` fields are
+  how a LAN scan recognises tvtimes — keep them.
 - **`tmdb.cache_key`** (was `_cache_key`, now public) is the one mapping from a
   programme to its `tmdb_enrichment` row: `(normalize_name(title)[:300], year
   or "")`. `services/epg` highlights and `services/tmdb` must both use it or the

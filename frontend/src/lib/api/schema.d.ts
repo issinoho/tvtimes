@@ -985,6 +985,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/pairing/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start
+         * @description A device asks to pair. It shows ``code`` on screen and polls with
+         *     ``poll_secret`` every ``interval`` seconds until someone approves the code
+         *     under Settings -> Devices, or ``expires_in`` seconds pass.
+         */
+        post: operations["start_api_pairing_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/pairing/poll": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Poll
+         * @description ``pending`` until approved; then ``approved`` with the device's export
+         *     token, once. 404 once the request has expired or been collected.
+         */
+        post: operations["poll_api_pairing_poll_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Devices */
+        get: operations["list_devices_api_devices_get"];
+        put?: never;
+        /**
+         * Approve
+         * @description Approve the code a device is showing. It gets its own export token on
+         *     its next poll, a few seconds later.
+         */
+        post: operations["approve_api_devices_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/devices/{device_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove
+         * @description Unpair a device. Its token stops working at once.
+         */
+        delete: operations["remove_api_devices__device_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1145,6 +1230,27 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+        };
+        /** DeviceApproveIn */
+        DeviceApproveIn: {
+            /** Code */
+            code: string;
+        };
+        /** DeviceOut */
+        DeviceOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Approved At */
+            approved_at: string | null;
+            /** Last Used At */
+            last_used_at: string | null;
+            /** Paired */
+            paired: boolean;
         };
         /** EnrichmentOut */
         EnrichmentOut: {
@@ -1339,6 +1445,17 @@ export interface components {
             status: "ok";
             /** Version */
             version: string;
+            /**
+             * App
+             * @default tvtimes
+             * @constant
+             */
+            app: "tvtimes";
+            /**
+             * Pairing
+             * @default true
+             */
+            pairing: boolean;
         };
         /** HeartbeatIn */
         HeartbeatIn: {
@@ -1653,6 +1770,42 @@ export interface components {
             token: string;
             /** Heartbeat Interval */
             heartbeat_interval: number;
+        };
+        /** PairingPollIn */
+        PairingPollIn: {
+            /** Poll Secret */
+            poll_secret: string;
+        };
+        /** PairingPollOut */
+        PairingPollOut: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "approved";
+            /** Token */
+            token?: string | null;
+            /** Origin */
+            origin?: string | null;
+        };
+        /** PairingStartIn */
+        PairingStartIn: {
+            /**
+             * Name
+             * @default TV
+             */
+            name: string;
+        };
+        /** PairingStartOut */
+        PairingStartOut: {
+            /** Code */
+            code: string;
+            /** Poll Secret */
+            poll_secret: string;
+            /** Expires In */
+            expires_in: number;
+            /** Interval */
+            interval: number;
         };
         /** PasskeyOut */
         PasskeyOut: {
@@ -4424,6 +4577,171 @@ export interface operations {
             };
             path: {
                 target_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_api_pairing_start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PairingStartIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PairingStartOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    poll_api_pairing_poll_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PairingPollIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PairingPollOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_devices_api_devices_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_api_devices_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceApproveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_api_devices__device_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                device_id: string;
             };
             cookie?: never;
         };

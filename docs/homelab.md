@@ -173,6 +173,15 @@ URL that stands in for both feeds. Click it (once tvdinner has run
 guide pair, so its own program guide, recording and scheduling all work against
 your merged line-up.
 
+### Pairing a TV without copying a token
+
+A TV app that supports it — [radiotimes](https://github.com/issinoho/radiotimes)
+on Fire TV — can pair instead: choose **Pair with tvtimes** on the TV, which
+finds tvtimes on your network (or asks for its address) and shows a code, then
+enter that code under **Settings → Devices**. The TV gets its own feed token;
+**Remove** there revokes it without touching your export links or any other
+device. Pending codes expire after 10 minutes.
+
 **Recording straight from your watchlist.** The same token also serves
 `/api/exports/watchlist.json` — every upcoming airing anyone on the account has
 watchlisted, with corrected times and the same `/stream/<id>` URLs the M3U uses.
