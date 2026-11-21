@@ -74,7 +74,9 @@ async def create_source(body: SourceIn, user: VerifiedUser, session: SessionDep)
         clock_shift_seconds=body.clock_shift_seconds,
         refresh_interval_minutes=body.refresh_interval_minutes,
     )
-    await session.flush()
+    # Commit before enqueueing: the worker reads the source in its own session
+    # and can pick the job up before the request's teardown commit.
+    await session.commit()
     await enqueue_source_refresh(source.id)
     return await _one_out(session, source)
 
@@ -133,9 +135,12 @@ async def patch_source(
             status.HTTP_422_UNPROCESSABLE_CONTENT,
             f"This is a {source.kind.value} source; its connection can't be edited that way.",
         ) from exc
-    await session.flush()
     if reconnected:
+        # Commit first, or the worker can refresh from the old connection.
+        await session.commit()
         await enqueue_source_refresh(source.id)
+    else:
+        await session.flush()
     return await _one_out(session, source)
 
 

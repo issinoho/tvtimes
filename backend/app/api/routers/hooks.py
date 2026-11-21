@@ -79,7 +79,9 @@ async def push_source_url(
                 detail={"source_id": str(source.id), "host": host},
             )
         )
-        await session.flush()
+        # Commit before enqueueing: the worker reads the source in its own
+        # session and would otherwise refresh from the old URL.
+        await session.commit()
         _log.info("hooks.source_url_pushed", source_id=str(source.id), host=host)
         await enqueue_source_refresh(source.id)
     return SourceUrlPushOut(source_id=source.id, changed=changed)

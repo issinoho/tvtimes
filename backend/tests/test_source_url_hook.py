@@ -211,3 +211,46 @@ async def test_minting_and_pushing_are_audited_without_the_full_url(
     by_event = {r.event: r.detail for r in rows}
     assert by_event["source.update_token_set"] == {"source_id": sid}
     assert by_event["source.url_pushed"] == {"source_id": sid, "host": "feed.example.com"}
+
+
+async def test_new_url_is_committed_before_the_refresh_is_queued(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The worker reads the source in its own session and can pick the job up
+    # straight away, before the request's teardown commit -- so the change must
+    # be committed *before* the enqueue, or the refresh runs against the old URL.
+    # (The test DB is one shared in-memory connection, so a second session
+    # can't observe this directly; check the order instead.)
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    headers = await _headers(app_client, captured_emails)
+    events: list[str] = []
+    real_commit = AsyncSession.commit
+
+    async def _commit(self: AsyncSession) -> None:
+        events.append("commit")
+        await real_commit(self)
+
+    async def _record(source_id: uuid.UUID, **_: object) -> None:
+        events.append("enqueue")
+
+    monkeypatch.setattr(AsyncSession, "commit", _commit)
+    monkeypatch.setattr("app.api.routers.sources.enqueue_source_refresh", _record)
+    monkeypatch.setattr("app.api.routers.hooks.enqueue_source_refresh", _record)
+
+    sid, token = await _source_with_token(app_client, headers)
+    events.clear()
+    resp = await app_client.post(
+        HOOK, json={"url": "http://feed.example.com/p.m3u?s=1"}, headers=_bearer(token)
+    )
+    assert resp.status_code == 200, resp.text
+    assert events[:2] == ["commit", "enqueue"]
+
+    events.clear()
+    resp = await app_client.patch(
+        f"/api/sources/{sid}",
+        json={"config": {"kind": "m3u", "url": "http://feed.example.com/e.m3u"}},
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+    assert events[:2] == ["commit", "enqueue"]
