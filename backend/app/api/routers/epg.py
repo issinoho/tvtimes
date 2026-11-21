@@ -136,7 +136,7 @@ async def create_epg_source(
             status.HTTP_409_CONFLICT,
             f"That guide is already attached to {exc.source_name}. Remove it there first.",
         ) from exc
-    await session.flush()
+    await session.commit()  # before enqueueing: the worker reads it in its own session
     await enqueue_epg_refresh(row.id)
     return EpgSourceOut.model_validate(row)
 
