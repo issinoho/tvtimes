@@ -10,6 +10,9 @@ from app.ingest.ssrf import fetch_text
 
 _ATTR_RE = re.compile(r'([\w-]+)="([^"]*)"')
 _DURATION_RE = re.compile(r"^-?\d+(?:\.\d+)?\s*(.*)$")
+# Tags only an HLS stream manifest carries: a master playlist lists variants
+# (#EXT-X-STREAM-INF), a media playlist lists segments (#EXT-X-TARGETDURATION).
+_HLS_MANIFEST_RE = re.compile(r"^\s*#EXT-X-(?:STREAM-INF|TARGETDURATION)\b", re.MULTILINE)
 
 
 def _parse_extinf(line: str) -> tuple[dict[str, str], str]:
@@ -64,6 +67,17 @@ def looks_like_m3u(text: str) -> bool:
     return False
 
 
+def is_hls_manifest(text: str) -> bool:
+    """True for one stream's own HLS manifest rather than a channel list.
+
+    Both start with ``#EXTM3U``, but parsing a manifest as a channel list finds
+    nothing (a master playlist has no ``#EXTINF``) or worse (a media playlist's
+    ``#EXTINF`` lines are segments, each of which would become a "channel")."""
+    return bool(_HLS_MANIFEST_RE.search(text))
+
+
 async def load_m3u_playlist(url: str) -> Playlist:
     text = await fetch_text(url, m3u_sniff=True)
+    if is_hls_manifest(text):
+        return Playlist(direct_stream=url)
     return parse_m3u(text)
