@@ -15,6 +15,7 @@ from app.api.routers import (
     favourites,
     health,
     hero,
+    hooks,
     notifications,
     sources,
     watchlist,
@@ -25,6 +26,7 @@ api_router.include_router(health.router)
 api_router.include_router(auth.router)
 api_router.include_router(account.router)
 api_router.include_router(sources.router)
+api_router.include_router(hooks.router)
 api_router.include_router(epg.router)
 api_router.include_router(exports.router)
 api_router.include_router(hero.router)

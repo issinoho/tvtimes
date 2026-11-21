@@ -164,6 +164,30 @@ class SourceOut(BaseModel):
     epg_last_fetched_at: datetime | None = None
     programme_count: int = 0
 
+    # Remote URL updates (``POST /api/hooks/source-url``). ``url_updates_supported``
+    # is false for kinds with no public URL to push (hdhomerun, connector);
+    # ``update_token_set_at`` null = no token, updates off.
+    url_updates_supported: bool = False
+    update_token_set_at: datetime | None = None
+    update_token_last_used_at: datetime | None = None
+
+
+class UpdateTokenOut(BaseModel):
+    # The raw token, shown exactly once.
+    token: str
+    set_at: datetime
+
+
+class SourceUrlPushIn(BaseModel):
+    # The new playlist (m3u), server (xtream) or portal (stalker) URL.
+    url: str = Field(min_length=1, max_length=2048)
+
+
+class SourceUrlPushOut(BaseModel):
+    source_id: uuid.UUID
+    # False when the source already had this URL: nothing stored, no refresh.
+    changed: bool
+
 
 class ChannelOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import secrets
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -208,6 +209,77 @@ async def update_source(
     source.last_status = SourceStatus.pending
     source.last_error = None
     return True
+
+
+# --- URL-update token ---------------------------------------------------------
+# Lets another system push a new address for a source whose playlist / panel URL
+# changes (a signed link that expires, a rotating host). Scoped to one source and
+# to its URL alone: the token can't read anything or touch the credentials. Only
+# the sha256 is stored; the raw value is shown once.
+
+
+class UpdateTokenUnsupported(Exception):
+    """This kind of source has no public URL to push (hdhomerun, connector)."""
+
+
+# Coarse "last used" granularity, as for the export token: a pusher polling
+# hard mustn't turn every call into a write.
+UPDATE_TOKEN_TOUCH_INTERVAL = timedelta(minutes=1)
+
+
+def _hash_token(raw: str) -> str:
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def supports_url_updates(source: Source) -> bool:
+    return source.kind in _CONFIG_URL_FIELD
+
+
+async def generate_update_token(session: AsyncSession, source: Source) -> str:
+    """Mint (or rotate) the source's URL-update token; returns the raw value once."""
+    if not supports_url_updates(source):
+        raise UpdateTokenUnsupported
+    raw = secrets.token_urlsafe(32)
+    source.update_token_hash = _hash_token(raw)
+    source.update_token_set_at = datetime.now(UTC)
+    source.update_token_last_used_at = None
+    await session.flush()
+    return raw
+
+
+async def revoke_update_token(session: AsyncSession, source: Source) -> None:
+    source.update_token_hash = None
+    source.update_token_set_at = None
+    source.update_token_last_used_at = None
+    await session.flush()
+
+
+async def source_for_update_token(session: AsyncSession, raw: str) -> Source | None:
+    if not raw:
+        return None
+    source: Source | None = await session.scalar(
+        select(Source).where(Source.update_token_hash == _hash_token(raw))
+    )
+    return source
+
+
+async def push_source_url(session: AsyncSession, source: Source, url: str) -> bool:
+    """Point the source at ``url`` (its playlist / server / portal address,
+    whichever its kind has), keeping every other connection field. Goes
+    through the same validation and SSRF check as an edit in the UI. Returns
+    ``True`` when the address actually changed -- the caller queues a refresh.
+    Pushing the address it already has is a no-op, so a pusher can run on a
+    schedule without causing a refresh each time."""
+    field = _CONFIG_URL_FIELD.get(source.kind)
+    if field is None:
+        raise UpdateTokenUnsupported
+    now = datetime.now(UTC)
+    previous = source.update_token_last_used_at
+    if previous is None or now - previous >= UPDATE_TOKEN_TOUCH_INTERVAL:
+        source.update_token_last_used_at = now
+    return await update_source(
+        session, source, config_kind=source.kind.value, config_changes={field: url}
+    )
 
 
 async def delete_source(session: AsyncSession, source: Source) -> None:

@@ -5,6 +5,7 @@ import { ChannelLogo } from '@/features/guide/ChannelLogo';
 import { EditSourceDialog } from '@/features/sources/EditSourceDialog';
 import { EpgPanel } from '@/features/sources/EpgPanel';
 import { StatusPill } from '@/features/sources/StatusPill';
+import { UrlUpdatesPanel } from '@/features/sources/UrlUpdatesPanel';
 import {
   useChannels,
   useDeleteSource,
@@ -175,6 +176,7 @@ export function SourceDetailPage() {
       ) : null}
 
       <EpgPanel sourceId={sourceId} />
+      <UrlUpdatesPanel source={source} />
 
       <div className={styles.toolbar}>
         <button

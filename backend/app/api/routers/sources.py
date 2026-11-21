@@ -8,8 +8,9 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, status
 
-from app.auth.deps import SessionDep, VerifiedUser
+from app.auth.deps import ClientMetaDep, SessionDep, VerifiedUser
 from app.ingest.redact import source_config_summary
+from app.models.audit import AuditLog
 from app.models.source import Source, SourceKind
 from app.queue import enqueue_source_refresh
 from app.schemas.auth import MessageOut
@@ -20,6 +21,7 @@ from app.schemas.source import (
     SourceOrderIn,
     SourceOut,
     SourcePatchIn,
+    UpdateTokenOut,
 )
 from app.services import sources as svc
 
@@ -34,6 +36,7 @@ def _to_out(source: Source, health: svc.SourceHealth) -> SourceOut:
     out.epg_error = health.epg_error
     out.epg_last_fetched_at = health.epg_last_fetched_at
     out.programme_count = health.programme_count
+    out.url_updates_supported = svc.supports_url_updates(source)
     return out
 
 
@@ -154,6 +157,57 @@ async def refresh_source(
     source = await _load(session, user, source_id)
     await enqueue_source_refresh(source.id, force_epg=True)
     return MessageOut(message="Refresh queued.")
+
+
+@router.post(
+    "/{source_id}/update-token",
+    response_model=UpdateTokenOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_update_token(
+    source_id: uuid.UUID, user: VerifiedUser, session: SessionDep, meta: ClientMetaDep
+) -> UpdateTokenOut:
+    """Turn on remote URL updates for this source, or rotate its token. The raw
+    token is in this response only; the old one stops working at once."""
+    source = await _load(session, user, source_id)
+    try:
+        token = await svc.generate_update_token(session, source)
+    except svc.UpdateTokenUnsupported as exc:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            f"A {source.kind.value} source has no URL that can be updated remotely.",
+        ) from exc
+    session.add(
+        AuditLog(
+            event="source.update_token_set",
+            user_id=user.id,
+            tenant_id=user.tenant_id,
+            ip=meta.ip,
+            user_agent=meta.user_agent,
+            detail={"source_id": str(source.id)},
+        )
+    )
+    assert source.update_token_set_at is not None
+    return UpdateTokenOut(token=token, set_at=source.update_token_set_at)
+
+
+@router.delete("/{source_id}/update-token", response_model=MessageOut)
+async def delete_update_token(
+    source_id: uuid.UUID, user: VerifiedUser, session: SessionDep, meta: ClientMetaDep
+) -> MessageOut:
+    source = await _load(session, user, source_id)
+    await svc.revoke_update_token(session, source)
+    session.add(
+        AuditLog(
+            event="source.update_token_revoked",
+            user_id=user.id,
+            tenant_id=user.tenant_id,
+            ip=meta.ip,
+            user_agent=meta.user_agent,
+            detail={"source_id": str(source.id)},
+        )
+    )
+    return MessageOut(message="Remote URL updates turned off.")
 
 
 @router.get("/{source_id}/channels", response_model=ChannelPage)

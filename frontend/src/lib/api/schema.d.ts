@@ -537,6 +537,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sources/{source_id}/update-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Update Token
+         * @description Turn on remote URL updates for this source, or rotate its token. The raw
+         *     token is in this response only; the old one stops working at once.
+         */
+        post: operations["create_update_token_api_sources__source_id__update_token_post"];
+        /** Delete Update Token */
+        delete: operations["delete_update_token_api_sources__source_id__update_token_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sources/{source_id}/channels": {
         parameters: {
             query?: never;
@@ -548,6 +570,32 @@ export interface paths {
         get: operations["list_channels_api_sources__source_id__channels_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hooks/source-url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Push Source Url
+         * @description Point the token's source at a new playlist / server / portal URL.
+         *
+         *     Send ``Authorization: Bearer <token>`` (from the source's page) and
+         *     ``{"url": "..."}``. Other connection settings are kept. The URL is checked
+         *     exactly as an edit in the app is; if it differs from the stored one the
+         *     source is refreshed in place, so channels keep their guide data. Sending
+         *     the URL it already has changes nothing, so it is safe to push on a timer.
+         */
+        post: operations["push_source_url_api_hooks_source_url_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2137,6 +2185,15 @@ export interface components {
              * @default 0
              */
             programme_count: number;
+            /**
+             * Url Updates Supported
+             * @default false
+             */
+            url_updates_supported: boolean;
+            /** Update Token Set At */
+            update_token_set_at?: string | null;
+            /** Update Token Last Used At */
+            update_token_last_used_at?: string | null;
         };
         /** SourcePatchIn */
         SourcePatchIn: {
@@ -2152,6 +2209,21 @@ export interface components {
             refresh_interval_minutes?: number | null;
             /** Config */
             config?: (components["schemas"]["M3uConfigPatch"] | components["schemas"]["XtreamConfigPatch"] | components["schemas"]["StalkerConfigPatch"] | components["schemas"]["HdhomerunConfigPatch"]) | null;
+        };
+        /** SourceUrlPushIn */
+        SourceUrlPushIn: {
+            /** Url */
+            url: string;
+        };
+        /** SourceUrlPushOut */
+        SourceUrlPushOut: {
+            /**
+             * Source Id
+             * Format: uuid
+             */
+            source_id: string;
+            /** Changed */
+            changed: boolean;
         };
         /** StalkerConfigPatch */
         StalkerConfigPatch: {
@@ -2242,6 +2314,16 @@ export interface components {
         TotpConfirmIn: {
             /** Code */
             code: string;
+        };
+        /** UpdateTokenOut */
+        UpdateTokenOut: {
+            /** Token */
+            token: string;
+            /**
+             * Set At
+             * Format: date-time
+             */
+            set_at: string;
         };
         /** ValidationError */
         ValidationError: {
@@ -3592,6 +3674,72 @@ export interface operations {
             };
         };
     };
+    create_update_token_api_sources__source_id__update_token_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdateTokenOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_update_token_api_sources__source_id__update_token_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_channels_api_sources__source_id__channels_get: {
         parameters: {
             query?: {
@@ -3627,6 +3775,46 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    push_source_url_api_hooks_source_url_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SourceUrlPushIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceUrlPushOut"];
+                };
+            };
+            /** @description Missing or invalid update token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The URL was rejected (bad scheme, private address, ...) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

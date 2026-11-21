@@ -29,6 +29,9 @@ function source(over: Partial<SourceOut>): SourceOut {
     epg_error: null,
     epg_last_fetched_at: null,
     programme_count: 0,
+    url_updates_supported: true,
+    update_token_set_at: null,
+    update_token_last_used_at: null,
     ...over,
   };
 }
