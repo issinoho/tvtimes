@@ -26,6 +26,7 @@ from urllib.parse import urljoin, urlsplit
 import anyio
 import httpx
 
+from app import __version__
 from app.config import get_settings
 from app.ingest.errors import SourceInvalid, SourceRejected, SourceUnreachable
 from app.ingest.redact import redact_resource_url
@@ -162,11 +163,19 @@ class _GuardedTransport(httpx.AsyncHTTPTransport):
         self._pool._network_backend = _PinnedBackend(self._pool._network_backend)  # type: ignore[assignment]
 
 
+# Sent on every guarded fetch unless a caller sets its own (Stalker sends a
+# MAG box's). httpx's default ``python-httpx/x.y`` is refused outright by some
+# hosts — upload.wikimedia.org 403s it and i.imgur.com 429s it, which is where
+# most playlists' tvg-logo images live.
+USER_AGENT = f"tvtimes/{__version__} (+https://github.com/issinoho/tvtimes)"
+
+
 def _client(timeout: float) -> httpx.AsyncClient:
     return httpx.AsyncClient(
         transport=_GuardedTransport(),
         follow_redirects=False,
         timeout=timeout,
+        headers={"User-Agent": USER_AGENT},
     )
 
 
