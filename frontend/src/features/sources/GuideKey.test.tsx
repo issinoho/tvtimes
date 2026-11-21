@@ -76,6 +76,7 @@ function renderPage(onPatch: (body: unknown) => void) {
         programme_count: 71,
       });
     }
+    if (path === '/api/channels/groups') return json(['News', 'Sports']);
     if (path === `/api/sources/${SOURCE_ID}/channels`) {
       return json({ items: CHANNELS, total: 2, limit: 50, offset: 0 });
     }
@@ -83,7 +84,14 @@ function renderPage(onPatch: (body: unknown) => void) {
       // openapi-fetch passes a Request with no init, so the body may be on
       // either; both are strings here.
       const raw = (init?.body as string | undefined) ?? (await (i as Request).clone().text());
-      onPatch(JSON.parse(raw));
+      const body = JSON.parse(raw) as { logo_override?: string };
+      onPatch(body);
+      if (body.logo_override === 'sfb.png') {
+        return json(
+          { code: 'error', message: 'A logo must be an http:// or https:// image URL.' },
+          422,
+        );
+      }
       return json({ id: HD_ID, clock_shift_seconds: 0, epg_override_id: '1' });
     }
     return json({ code: 'nf' }, 404);
@@ -138,4 +146,38 @@ test('leaving a guide key untouched saves nothing', async () => {
   await user.tab();
 
   expect(bodies).toEqual([]);
+});
+
+test("a category typed against a channel saves, with the account's categories suggested", async () => {
+  const bodies: unknown[] = [];
+  const { container } = renderPage((b) => bodies.push(b));
+  const user = userEvent.setup();
+
+  const field = await screen.findByLabelText('Category for BBC 1 Scot HD');
+  expect(field).toHaveAttribute('list', 'channel-groups');
+  await waitFor(() =>
+    expect(
+      [...container.querySelectorAll('#channel-groups option')].map((o) => o.getAttribute('value')),
+    ).toEqual(['News', 'Sports']),
+  );
+  await user.type(field, 'Sports{Enter}');
+
+  await waitFor(() => expect(bodies).toEqual([{ group_override: 'Sports' }]));
+});
+
+test('a pasted logo URL saves, and a rejected one says why', async () => {
+  const bodies: unknown[] = [];
+  renderPage((b) => bodies.push(b));
+  const user = userEvent.setup();
+
+  const field = await screen.findByLabelText('Logo URL for BBC 1 Scot HD');
+  await user.type(field, 'https://img.example.com/bbc1.png');
+  await user.tab();
+  await waitFor(() =>
+    expect(bodies).toEqual([{ logo_override: 'https://img.example.com/bbc1.png' }]),
+  );
+
+  await user.clear(field);
+  await user.type(field, 'sfb.png{Enter}');
+  expect(await screen.findByRole('alert')).toHaveTextContent('http:// or https://');
 });

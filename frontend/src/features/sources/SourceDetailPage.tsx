@@ -9,9 +9,11 @@ import {
   useChannels,
   useDeleteSource,
   usePatchSource,
+  useChannelGroups,
+  usePatchChannel,
   useRefreshSource,
-  useSetChannelEpgOverride,
   useSource,
+  type ChannelPatch,
 } from '@/features/sources/api';
 import styles from '@/features/sources/sources.module.css';
 import type { components } from '@/lib/api/schema';
@@ -20,37 +22,107 @@ type Channel = components['schemas']['ChannelOut'];
 
 const PAGE = 50;
 
-/**
- * The guide key a channel is matched on, editable in place.
- *
- * Only earns its keep for a channel showing 0 programmes: it means the
- * channel's own tvg-id and names found nothing in the guide, and this is the
- * only way to say what to look for instead.
- */
-function GuideKeyCell({ channel, sourceId }: { channel: Channel; sourceId: string }) {
-  const [value, setValue] = useState(channel.epg_override_id ?? '');
-  const mutation = useSetChannelEpgOverride(sourceId);
-  const saved = channel.epg_override_id ?? '';
+const GROUPS_LIST = 'channel-groups';
 
+/**
+ * One hand-set override on the channel table, edited in place: an input that
+ * reads as text until touched, saving on Enter or when focus leaves, and only
+ * if the value changed. Empty clears the override; the placeholder shows what
+ * the channel falls back to then.
+ */
+function OverrideCell({
+  label,
+  saved,
+  placeholder,
+  onSave,
+  pending,
+  list,
+  wide,
+}: {
+  label: string;
+  saved: string;
+  placeholder: string;
+  onSave: (value: string) => void;
+  pending: boolean;
+  list?: string;
+  wide?: boolean;
+}) {
+  const [value, setValue] = useState(saved);
+  const save = () => {
+    if (value.trim() !== saved) onSave(value);
+  };
   return (
     <form
-      className={styles.guideKey}
+      className={wide ? `${styles.guideKey} ${styles.wide}` : styles.guideKey}
       onSubmit={(e) => {
         e.preventDefault();
-        if (value.trim() !== saved) mutation.mutate({ channelId: channel.id, value });
+        save();
       }}
     >
       <input
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        onBlur={() => {
-          if (value.trim() !== saved) mutation.mutate({ channelId: channel.id, value });
-        }}
-        placeholder={channel.ext_id ?? '—'}
-        aria-label={`Guide key for ${channel.name}`}
-        disabled={mutation.isPending}
+        onBlur={save}
+        placeholder={placeholder}
+        aria-label={label}
+        list={list}
+        disabled={pending}
       />
     </form>
+  );
+}
+
+/**
+ * The per-channel overrides: the guide key (only earns its keep for a channel
+ * showing 0 programmes -- its own tvg-id and names found nothing in the
+ * guide), the category, and the logo URL. Category and logo apply at once and
+ * survive source refreshes, which otherwise rewrite both from the feed.
+ */
+function ChannelOverrides({ channel, sourceId }: { channel: Channel; sourceId: string }) {
+  const patch = usePatchChannel(sourceId);
+  const save = (body: ChannelPatch) => patch.mutate({ channelId: channel.id, body });
+  const pending = patch.isPending;
+  return (
+    <>
+      <td>
+        <OverrideCell
+          label={`Category for ${channel.name}`}
+          saved={channel.group_override ?? ''}
+          placeholder={channel.upstream_group_title ?? '—'}
+          onSave={(v) => save({ group_override: v })}
+          pending={pending}
+          list={GROUPS_LIST}
+        />
+      </td>
+      <td>{channel.number ?? '—'}</td>
+      <td className={channel.programme_count === 0 ? styles.noGuide : undefined}>
+        {channel.programme_count === 0 ? 'none' : channel.programme_count}
+      </td>
+      <td>
+        <OverrideCell
+          label={`Guide key for ${channel.name}`}
+          saved={channel.epg_override_id ?? ''}
+          placeholder={channel.ext_id ?? '—'}
+          onSave={(v) => save({ epg_override_id: v })}
+          pending={pending}
+        />
+      </td>
+      <td>
+        <OverrideCell
+          label={`Logo URL for ${channel.name}`}
+          saved={channel.logo_override ?? ''}
+          placeholder={channel.upstream_logo_url ? 'from source' : 'Paste image URL'}
+          onSave={(v) => save({ logo_override: v })}
+          pending={pending}
+          wide
+        />
+        {patch.error ? (
+          <div className={styles.cellError} role="alert">
+            {patch.error instanceof Error ? patch.error.message : 'Could not save'}
+          </div>
+        ) : null}
+      </td>
+    </>
   );
 }
 
@@ -60,6 +132,7 @@ export function SourceDetailPage() {
   const { data: source, isPending } = useSource(sourceId);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
+  const groups = useChannelGroups();
   const channels = useChannels(sourceId, {
     search: search || undefined,
     limit: PAGE,
@@ -150,16 +223,24 @@ export function SourceDetailPage() {
         <span className={styles.sub}>{total} channels</span>
       </div>
 
+      {/* One list for every Category cell: the categories already on the
+          account, so "Sports" is one keystroke, while a new name still goes. */}
+      <datalist id={GROUPS_LIST}>
+        {(groups.data ?? []).map((g) => (
+          <option key={g} value={g} />
+        ))}
+      </datalist>
       <div style={{ overflowX: 'auto' }}>
         <table className={styles.channels}>
           <thead>
             <tr>
               <th />
               <th>Name</th>
-              <th>Group</th>
+              <th>Category</th>
               <th>No.</th>
               <th>Guide</th>
               <th>Guide key</th>
+              <th>Logo URL</th>
             </tr>
           </thead>
           <tbody>
@@ -180,14 +261,7 @@ export function SourceDetailPage() {
                   {c.name}
                   {c.is_hd ? <span className={styles.kindTag}> HD</span> : null}
                 </td>
-                <td>{c.group_title ?? '—'}</td>
-                <td>{c.number ?? '—'}</td>
-                <td className={c.programme_count === 0 ? styles.noGuide : undefined}>
-                  {c.programme_count === 0 ? 'none' : c.programme_count}
-                </td>
-                <td>
-                  <GuideKeyCell channel={c} sourceId={sourceId} />
-                </td>
+                <ChannelOverrides channel={c} sourceId={sourceId} />
               </tr>
             ))}
           </tbody>

@@ -179,10 +179,12 @@ async def delete_epg_source(
 async def patch_channel(
     channel_id: uuid.UUID, body: ChannelPatchIn, user: VerifiedUser, session: SessionDep
 ) -> ChannelPatchOut:
-    """Per-channel overrides: the clock shift, and the guide key to match on.
+    """Per-channel overrides: the clock shift, the guide key to match on, and
+    the category and logo to show whatever the source says.
 
     Setting ``epg_override_id`` doesn't backfill anything by itself -- the
-    channel picks up its programmes on the next guide refresh.
+    channel picks up its programmes on the next guide refresh. A category or
+    logo applies at once, and survives source refreshes.
     """
     try:
         channel = await src_svc.get_channel(session, user.tenant_id, channel_id)
@@ -196,12 +198,29 @@ async def patch_channel(
         await src_svc.set_channel_epg_override(
             session, channel, epg_override_id=body.epg_override_id
         )
+    if body.group_override is not None:
+        src_svc.set_channel_group(channel, body.group_override)
+    if body.logo_override is not None:
+        try:
+            src_svc.set_channel_logo(channel, body.logo_override)
+        except src_svc.InvalidLogoUrl as exc:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
     await session.flush()
     return ChannelPatchOut(
         id=channel.id,
         clock_shift_seconds=channel.clock_shift_seconds,
         epg_override_id=channel.epg_override_id,
+        group_override=channel.group_override,
+        logo_override=channel.logo_override,
+        group_title=channel.group_title,
+        logo_url=channel.logo_url,
     )
+
+
+@router.get("/channels/groups", response_model=list[str])
+async def channel_groups(user: VerifiedUser, session: SessionDep) -> list[str]:
+    """Every category in use on the account, to suggest when setting one."""
+    return await src_svc.channel_groups(session, user.tenant_id)
 
 
 @router.post("/channels/{channel_id}/play-link", response_model=PlayLinkOut)

@@ -95,8 +95,20 @@ class Channel(PkUuidMixin, TimestampMixin, Base):
     ext_id: Mapped[str | None] = mapped_column(String(256))  # tvg-id
     name: Mapped[str] = mapped_column(String(400), nullable=False)
     tvg_name: Mapped[str | None] = mapped_column(String(400))
+    # The *effective* logo and category: the override below when one is set,
+    # else what the source says. Everything that reads a channel (guide,
+    # filters, exports, the logo proxy) uses these two, so an override needs
+    # no special casing downstream. Recomputed by refresh_source and by
+    # set_channel_group / set_channel_logo -- never written directly.
     logo_url: Mapped[str | None] = mapped_column(Text)
     group_title: Mapped[str | None] = mapped_column(String(400))
+    # What the source itself last said, kept so clearing an override restores
+    # it at once rather than on the next refresh.
+    upstream_logo_url: Mapped[str | None] = mapped_column(Text)
+    upstream_group_title: Mapped[str | None] = mapped_column(String(400))
+    # Set by hand; survive a channel refresh. Null = use the source's.
+    logo_override: Mapped[str | None] = mapped_column(Text)
+    group_override: Mapped[str | None] = mapped_column(String(400))
     number: Mapped[int | None] = mapped_column(Integer)
     is_hd: Mapped[bool] = mapped_column(nullable=False, default=False)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
