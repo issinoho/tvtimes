@@ -313,6 +313,14 @@
   border-color: var(--brand-pink);
   background: var(--bg);
 }
+.guideKey.wide input {
+  width: 14rem;
+}
+.cellError {
+  color: var(--callout-warn-fg);
+  font-size: 0.75rem;
+  max-width: 14rem;
+}
 .noGuide {
   color: var(--callout-warn-fg);
 }

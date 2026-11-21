@@ -177,6 +177,12 @@ class ChannelOut(BaseModel):
     is_hd: bool
     # Set by hand when this channel can't find its own guide data.
     epg_override_id: str | None = None
+    # Set by hand; ``group_title`` / ``logo_url`` above already apply them.
+    group_override: str | None = None
+    logo_override: str | None = None
+    # What the source itself says, shown as the placeholder when overriding.
+    upstream_group_title: str | None = None
+    upstream_logo_url: str | None = None
     programme_count: int = 0
 
 

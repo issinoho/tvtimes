@@ -9,6 +9,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Literal
+from urllib.parse import urlsplit
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -231,6 +232,41 @@ async def set_channel_clock_shift(
     channel.clock_shift_seconds = clock_shift_seconds
 
 
+class InvalidLogoUrl(ValueError):
+    pass
+
+
+def set_channel_group(channel: Channel, value: str) -> None:
+    """Put this channel in category ``value`` whatever its source says.
+    Blank restores the source's own category, at once."""
+    channel.group_override = value.strip()[:400] or None
+    channel.group_title = channel.group_override or channel.upstream_group_title
+
+
+def set_channel_logo(channel: Channel, value: str) -> None:
+    """Show the image at ``value`` as this channel's logo whatever its source
+    says. Blank restores the source's own logo, at once.
+
+    Only the scheme is checked here: the logo proxy fetches it through the SSRF
+    guard (and sniffs it, refusing SVG), so an address it can't or shouldn't
+    reach just shows no logo, like a broken upstream one."""
+    url = value.strip()
+    if url and urlsplit(url).scheme not in ("http", "https"):
+        raise InvalidLogoUrl("A logo must be an http:// or https:// image URL.")
+    channel.logo_override = url or None
+    channel.logo_url = channel.logo_override or channel.upstream_logo_url
+
+
+async def channel_groups(session: AsyncSession, tenant_id: uuid.UUID) -> list[str]:
+    """Every category in use on the account, for suggesting one by hand."""
+    rows = await session.scalars(
+        select(Channel.group_title)
+        .where(Channel.tenant_id == tenant_id, Channel.group_title.is_not(None))
+        .distinct()
+    )
+    return sorted({g for g in rows if g}, key=str.casefold)
+
+
 async def set_channel_epg_override(
     session: AsyncSession, channel: Channel, *, epg_override_id: str
 ) -> None:
@@ -312,14 +348,18 @@ async def refresh_source(session: AsyncSession, source: Source) -> bool:
         logo = (
             ch.tvg_logo
             or channel_logos.lookup(logo_index, ext_id=ch.tvg_id, name=name, tvg_name=ch.tvg_name)
-            or (row.logo_url if row else None)  # keep a prior backfill if iptv-org is down
+            or (row.upstream_logo_url if row else None)  # keep a prior backfill if iptv-org is down
         )
+        group = (ch.group_title or None) and ch.group_title[:400]
         fields: dict[str, object] = {
             "ext_id": ch.tvg_id,
             "name": name[:400],
             "tvg_name": ch.tvg_name,
-            "logo_url": logo,
-            "group_title": (ch.group_title or None) and ch.group_title[:400],
+            "upstream_logo_url": logo,
+            "upstream_group_title": group,
+            # A hand-set override wins over whatever the source now says.
+            "logo_url": (row.logo_override if row else None) or logo,
+            "group_title": (row.group_override if row else None) or group,
             "number": ch.number,
             "is_hd": ch.is_hd,
             "sort_order": order,

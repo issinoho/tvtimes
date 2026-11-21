@@ -621,12 +621,34 @@ export interface paths {
         head?: never;
         /**
          * Patch Channel
-         * @description Per-channel overrides: the clock shift, and the guide key to match on.
+         * @description Per-channel overrides: the clock shift, the guide key to match on, and
+         *     the category and logo to show whatever the source says.
          *
          *     Setting ``epg_override_id`` doesn't backfill anything by itself -- the
-         *     channel picks up its programmes on the next guide refresh.
+         *     channel picks up its programmes on the next guide refresh. A category or
+         *     logo applies at once, and survives source refreshes.
          */
         patch: operations["patch_channel_api_channels__channel_id__patch"];
+        trace?: never;
+    };
+    "/api/channels/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Channel Groups
+         * @description Every category in use on the account, to suggest when setting one.
+         */
+        get: operations["channel_groups_api_channels_groups_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/channels/{channel_id}/play-link": {
@@ -1120,6 +1142,14 @@ export interface components {
             is_hd: boolean;
             /** Epg Override Id */
             epg_override_id?: string | null;
+            /** Group Override */
+            group_override?: string | null;
+            /** Logo Override */
+            logo_override?: string | null;
+            /** Upstream Group Title */
+            upstream_group_title?: string | null;
+            /** Upstream Logo Url */
+            upstream_logo_url?: string | null;
             /**
              * Programme Count
              * @default 0
@@ -1146,6 +1176,10 @@ export interface components {
             clock_shift_seconds?: number | null;
             /** Epg Override Id */
             epg_override_id?: string | null;
+            /** Group Override */
+            group_override?: string | null;
+            /** Logo Override */
+            logo_override?: string | null;
         };
         /** ChannelPatchOut */
         ChannelPatchOut: {
@@ -1158,6 +1192,14 @@ export interface components {
             clock_shift_seconds: number;
             /** Epg Override Id */
             epg_override_id?: string | null;
+            /** Group Override */
+            group_override?: string | null;
+            /** Logo Override */
+            logo_override?: string | null;
+            /** Group Title */
+            group_title?: string | null;
+            /** Logo Url */
+            logo_url?: string | null;
         };
         /** ConnectorCreateIn */
         ConnectorCreateIn: {
@@ -3744,6 +3786,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ChannelPatchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    channel_groups_api_channels_groups_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": string[];
                 };
             };
             /** @description Validation Error */

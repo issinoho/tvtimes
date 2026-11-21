@@ -121,26 +121,41 @@ export function useRefreshSource() {
   });
 }
 
+export type ChannelPatch = components['schemas']['ChannelPatchIn'];
+
 /**
- * Set (or clear, with an empty string) the guide key a channel is matched on.
+ * Set (or clear, with an empty string) a channel's hand-set overrides:
  *
- * For a channel whose own tvg-id and names find nothing in the guide -- a
- * tuner numbering BBC One Scotland HD 101 where the guide carries it as 1.
- * Takes effect on the next guide refresh; nothing is backfilled here.
+ * - `epg_override_id`: the guide key it's matched on, for a channel whose own
+ *   tvg-id and names find nothing (a tuner numbering BBC One Scotland HD 101
+ *   where the guide carries it as 1). Takes effect on the next guide refresh.
+ * - `group_override` / `logo_override`: the category and logo URL to show
+ *   whatever the source says. Applied at once and kept across refreshes.
  */
-export function useSetChannelEpgOverride(sourceId: string) {
+export function usePatchChannel(sourceId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ channelId, value }: { channelId: string; value: string }) =>
+    mutationFn: async ({ channelId, body }: { channelId: string; body: ChannelPatch }) =>
       unwrap(
         await api.PATCH('/api/channels/{channel_id}', {
           params: { path: { channel_id: channelId } },
-          body: { epg_override_id: value },
+          body,
         }),
       ),
-    onSuccess: () => {
+    onSuccess: (_d, { body }) => {
       void qc.invalidateQueries({ queryKey: ['sources', sourceId, 'channels'] });
       void qc.invalidateQueries({ queryKey: ['guide'] });
+      if (body.group_override !== undefined)
+        void qc.invalidateQueries({ queryKey: ['channel-groups'] });
     },
+  });
+}
+
+/** Every category in use on the account, suggested when setting one by hand. */
+export function useChannelGroups() {
+  return useQuery({
+    queryKey: ['channel-groups'],
+    queryFn: async () => unwrap(await api.GET('/api/channels/groups')),
+    staleTime: 60_000,
   });
 }

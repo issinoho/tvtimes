@@ -121,12 +121,23 @@ class ChannelPatchIn(BaseModel):
     # Empty string clears it and restores automatic matching -- None means
     # "not supplied", which is how an empty text input has to reach us.
     epg_override_id: str | None = Field(default=None, max_length=256)
+    # The category to show this channel under whatever its source says; empty
+    # string restores the source's own.
+    group_override: str | None = Field(default=None, max_length=400)
+    # An http(s) image URL to use as the logo whatever the source says; empty
+    # string restores the source's own.
+    logo_override: str | None = Field(default=None, max_length=2048)
 
 
 class ChannelPatchOut(BaseModel):
     id: uuid.UUID
     clock_shift_seconds: int
     epg_override_id: str | None = None
+    group_override: str | None = None
+    logo_override: str | None = None
+    # The effective values after the patch (override, else the source's).
+    group_title: str | None = None
+    logo_url: str | None = None
 
 
 class PlayLinkOut(BaseModel):

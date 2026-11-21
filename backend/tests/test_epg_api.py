@@ -274,6 +274,10 @@ async def test_programmes_fan_out_to_channels_sharing_a_tvg_id(
         "id": west["id"],
         "clock_shift_seconds": 7200,
         "epg_override_id": None,
+        "group_override": None,
+        "logo_override": None,
+        "group_title": None,
+        "logo_url": None,
     }
 
     guide2 = await app_client.get(

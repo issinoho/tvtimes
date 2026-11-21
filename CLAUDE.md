@@ -89,6 +89,14 @@ CI pins **newer** ruff/mypy than an old local pin may resolve — if `ruff forma
   the worker passes `reset_cache=changed` to `epg.ensure_epg_source_for` so a
   changed set forces a full EPG re-parse instead of short-circuiting on a 304.
   The manual `POST /sources/{id}/refresh` also forces it (`force_epg=True`).
+- **Channel category/logo overrides.** `Channel.group_title` / `logo_url`
+  are the *effective* values every reader uses (guide filter, exports, logo
+  proxy). The source's own go in `upstream_group_title` / `upstream_logo_url`,
+  the hand-set ones in `group_override` / `logo_override`; `refresh_source`
+  and `services/sources.set_channel_group|logo` recompute effective =
+  override or upstream. Never write the effective columns directly, or a
+  refresh silently undoes a user's override (and clearing one can't restore
+  the source's value).
 - **EPG fan-out.** `epg._channel_index` maps each XMLTV key to a **list** of
   channel ids; `_resolve_channels` returns all of them and a programme row is
   written per channel — so an East/West pair sharing a tvg-id both get data.
