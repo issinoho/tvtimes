@@ -70,6 +70,14 @@ class Source(PkUuidMixin, TimestampMixin, Base):
     # worker hasn't assessed this source yet.
     alerted_health: Mapped[str | None] = mapped_column(String(16))
 
+    # sha256 hex of this source's URL-update token: lets another system push a
+    # new playlist / panel URL to ``POST /api/hooks/source-url`` for a feed
+    # whose address changes. Shown once, never stored; null = updates off.
+    update_token_hash: Mapped[str | None] = mapped_column(String(64), unique=True, index=True)
+    update_token_set_at: Mapped[datetime | None] = mapped_column(TZDateTime)
+    # Bumped at most once a minute, as the export token's is.
+    update_token_last_used_at: Mapped[datetime | None] = mapped_column(TZDateTime)
+
     tenant: Mapped[Tenant] = relationship()
     channels: Mapped[list[Channel]] = relationship(
         back_populates="source", cascade="all, delete-orphan"

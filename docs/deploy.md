@@ -84,6 +84,29 @@ verified user to approve the code, so nothing is granted without one. The poll
 response includes `TVTIMES_PUBLIC_ORIGIN`, which the device prefers for its
 feed URLs when it can reach it.
 
+## Remote source URL updates
+
+For a source whose address keeps changing (a signed playlist link that expires,
+a panel that moves host), **Source → Remote URL updates** mints a token scoped
+to that one source. Another system then pushes the new address:
+
+```sh
+curl -X POST https://tv.example.com/api/hooks/source-url \
+  -H 'Authorization: Bearer <token>' \
+  -H 'Content-Type: application/json' \
+  -d '{"url": "https://provider.example/playlist.m3u?sig=…"}'
+```
+
+The URL replaces the m3u playlist URL, Xtream server URL or Stalker portal URL;
+credentials are kept. It goes through the same SSRF check as an edit in the
+app (`422` if rejected), and a changed URL refreshes the source in place, so
+channels keep their guide data. Re-sending the stored URL returns
+`{"changed": false}` and does nothing, so pushing on a timer is fine. The token
+is header-only (never `?token=`), stored as a sha256, rate-limited (30/min), and
+each change is audited with the new URL's host only. HDHomeRun and connector
+sources have no public URL and can't get a token. Rotating or turning it off on
+the source page revokes the old one at once.
+
 ## Upgrades
 
 `docker compose pull && docker compose up -d`. The `web` container runs
