@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Enum, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Enum, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base, TZDateTime
@@ -64,6 +64,9 @@ class Source(PkUuidMixin, TimestampMixin, Base):
     last_error: Mapped[str | None] = mapped_column(Text)
     channel_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     epg_url: Mapped[str | None] = mapped_column(Text)
+    # Guide URLs the playlist lists when it lists more than one (``epg_url`` is
+    # then null): offered on the source's page, attached only by hand.
+    advertised_epg_urls: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
 
     # The rolled-up health ("ok" | "stale" | "error") we last emailed the tenant
     # about — so alerts fire on a transition, not every worker tick. None = the

@@ -89,6 +89,49 @@ async def test_create_list_and_refresh_m3u_source(
     assert [c["name"] for c in filtered.json()["items"]] == ["News HD"]
 
 
+async def test_playlist_listing_several_guides_offers_them_and_drops_the_old_feed(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.db import get_sessionmaker
+    from app.models.source import Source
+    from app.services import epg as epg_svc
+
+    headers = await _auth(app_client, captured_emails, "sam@example.com")
+    source = (await app_client.post("/api/sources", json=M3U_BODY, headers=headers)).json()
+    channels = [ParsedChannel(name="BBC One", stream_ref="http://s/1", tvg_id="BBCOne.uk")]
+
+    async def one_guide(_kind: object, _config: object) -> Playlist:
+        return Playlist(channels=channels, epg_url="http://epg.example.com/x.xml")
+
+    monkeypatch.setattr("app.services.sources._ingest", one_guide)
+    await _run_refresh(source["id"])
+    async with get_sessionmaker()() as session:
+        row = await session.get(Source, uuid.UUID(source["id"]))
+        assert row is not None
+        assert await epg_svc.ensure_epg_source_for(session, row) is not None
+        await session.commit()
+
+    urls = ["https://e.example/AL1.xml.gz", "https://e.example/UK1.xml.gz"]
+
+    async def many_guides(_kind: object, _config: object) -> Playlist:
+        return Playlist(channels=channels, advertised_epg_urls=urls)
+
+    monkeypatch.setattr("app.services.sources._ingest", many_guides)
+    await _run_refresh(source["id"])
+    async with get_sessionmaker()() as session:
+        row = await session.get(Source, uuid.UUID(source["id"]))
+        assert row is not None
+        # nothing to fetch automatically, so the old discovered feed goes
+        assert await epg_svc.ensure_epg_source_for(session, row) is None
+        await session.commit()
+
+    detail = (await app_client.get(f"/api/sources/{source['id']}", headers=headers)).json()
+    assert detail["epg_url"] is None
+    assert detail["advertised_epg_urls"] == urls
+    feeds = (await app_client.get("/api/epg-sources", headers=headers)).json()
+    assert feeds == []
+
+
 async def test_create_rejects_ssrf_url(
     app_client: AsyncClient, captured_emails: list[dict[str, str]]
 ) -> None:

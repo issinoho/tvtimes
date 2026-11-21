@@ -175,7 +175,7 @@ export function SourceDetailPage() {
         </p>
       ) : null}
 
-      <EpgPanel sourceId={sourceId} />
+      <EpgPanel sourceId={sourceId} advertised={source.advertised_epg_urls} />
       <UrlUpdatesPanel source={source} />
 
       <div className={styles.toolbar}>

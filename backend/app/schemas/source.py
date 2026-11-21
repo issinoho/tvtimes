@@ -153,6 +153,8 @@ class SourceOut(BaseModel):
     last_error: str | None
     channel_count: int
     epg_url: str | None
+    # Several guide URLs from the playlist header, none auto-attached.
+    advertised_epg_urls: list[str] = []
     last_refreshed_at: datetime | None
     created_at: datetime
 

@@ -30,6 +30,32 @@ def test_parse_m3u_header_and_channels() -> None:
     assert pl.channels[1].tvg_id is None
 
 
+def test_parse_m3u_header_with_several_epg_urls_attaches_none() -> None:
+    # Free-TV's playlists list every epgshare01 country feed in one header.
+    pl = parse_m3u(
+        '#EXTM3U x-tvg-url="https://e.example/AL1.xml.gz, https://e.example/UK1.xml.gz,'
+        'https://e.example/US1.xml.gz , https://e.example/UK1.xml.gz"\n'
+    )
+    assert pl.epg_url is None
+    assert pl.advertised_epg_urls == [
+        "https://e.example/AL1.xml.gz",
+        "https://e.example/UK1.xml.gz",
+        "https://e.example/US1.xml.gz",
+    ]
+
+
+def test_split_epg_urls_keeps_commas_inside_a_url() -> None:
+    assert m3u.split_epg_urls("http://e.example/epg?ids=a,b,c") == [
+        "http://e.example/epg?ids=a,b,c"
+    ]
+    assert m3u.split_epg_urls("  ") == []
+    assert m3u.split_epg_urls(None) == []
+    # one URL listed twice is still one URL, and still auto-attached
+    pl = parse_m3u('#EXTM3U url-tvg="http://e.example/g.xml,http://e.example/g.xml"\n')
+    assert pl.epg_url == "http://e.example/g.xml"
+    assert pl.advertised_epg_urls == []
+
+
 def test_parse_m3u_empty() -> None:
     pl = parse_m3u("#EXTM3U\n")
     assert pl.channels == []
