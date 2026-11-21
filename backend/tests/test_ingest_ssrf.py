@@ -136,3 +136,17 @@ async def test_pinned_backend_passes_through_when_unpinned() -> None:
 
     await ssrf._PinnedBackend(_FakeInner()).connect_tcp("host.example", 80)
     assert seen == ["host.example"]
+
+
+async def test_guarded_client_identifies_as_tvtimes_not_python_httpx() -> None:
+    # upload.wikimedia.org 403s and i.imgur.com 429s httpx's default UA, so
+    # playlist logos hosted there never loaded through the logo proxy.
+    async with ssrf._client(5.0) as client:
+        default = client.build_request("GET", "https://logo.example/a.png")
+        assert default.headers["User-Agent"] == ssrf.USER_AGENT
+        assert default.headers["User-Agent"].startswith("tvtimes/")
+        # a caller's own UA (Stalker's MAG one) still wins
+        own = client.build_request(
+            "GET", "https://portal.example/", headers={"User-Agent": "MAG250"}
+        )
+        assert own.headers["User-Agent"] == "MAG250"
