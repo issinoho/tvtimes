@@ -22,6 +22,7 @@ function source(over: Partial<SourceOut>): SourceOut {
     last_error: null,
     channel_count: 1,
     epg_url: null,
+    advertised_epg_urls: [],
     last_refreshed_at: null,
     created_at: new Date().toISOString(),
     health: 'ok',

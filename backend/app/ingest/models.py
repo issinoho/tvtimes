@@ -38,6 +38,9 @@ class Playlist:
     channels: list[Channel] = field(default_factory=list)
     # XMLTV URL discovered from the source (M3U header / Xtream xmltv.php).
     epg_url: str | None = None
+    # Set instead of ``epg_url`` when the M3U header lists several guide URLs:
+    # none is attached automatically, the user picks one on the source's page.
+    advertised_epg_urls: list[str] = field(default_factory=list)
     # Non-fatal notes to surface to the user (e.g. "account status: Expired").
     warnings: list[str] = field(default_factory=list)
     # Set when the "playlist" URL is really one HLS stream's own manifest

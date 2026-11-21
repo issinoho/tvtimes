@@ -13,6 +13,22 @@ _DURATION_RE = re.compile(r"^-?\d+(?:\.\d+)?\s*(.*)$")
 # Tags only an HLS stream manifest carries: a master playlist lists variants
 # (#EXT-X-STREAM-INF), a media playlist lists segments (#EXT-X-TARGETDURATION).
 _HLS_MANIFEST_RE = re.compile(r"^\s*#EXT-X-(?:STREAM-INF|TARGETDURATION)\b", re.MULTILINE)
+# ``x-tvg-url`` is often a comma-separated list (one feed per country/provider).
+# Commas are legal inside a URL, so only split where the next piece starts a new
+# http(s) URL.
+_EPG_URL_SPLIT_RE = re.compile(r"\s*,\s*(?=https?://)", re.IGNORECASE)
+
+
+def split_epg_urls(value: str | None) -> list[str]:
+    """The distinct guide URLs an M3U header advertises, in order."""
+    if not value:
+        return []
+    seen: dict[str, None] = {}
+    for piece in _EPG_URL_SPLIT_RE.split(value.strip()):
+        url = piece.strip()
+        if url:
+            seen.setdefault(url, None)
+    return list(seen)
 
 
 def _parse_extinf(line: str) -> tuple[dict[str, str], str]:
@@ -35,7 +51,12 @@ def parse_m3u(text: str) -> Playlist:
             continue
         if line.startswith("#EXTM3U"):
             header = dict(_ATTR_RE.findall(line))
-            playlist.epg_url = header.get("x-tvg-url") or header.get("url-tvg")
+            urls = split_epg_urls(header.get("x-tvg-url") or header.get("url-tvg"))
+            # One URL is auto-attached. Several are only offered: fetching
+            # every one (a playlist may list a hundred country feeds) is far
+            # too heavy, and there's no telling which one fits.
+            playlist.epg_url = urls[0] if len(urls) == 1 else None
+            playlist.advertised_epg_urls = urls if len(urls) > 1 else []
             continue
         if line.startswith("#EXTINF:"):
             pending_attrs, pending_name = _parse_extinf(line[len("#EXTINF:") :])

@@ -2161,6 +2161,11 @@ export interface components {
             channel_count: number;
             /** Epg Url */
             epg_url: string | null;
+            /**
+             * Advertised Epg Urls
+             * @default []
+             */
+            advertised_epg_urls: string[];
             /** Last Refreshed At */
             last_refreshed_at: string | null;
             /**

@@ -455,6 +455,7 @@ async def refresh_source(session: AsyncSession, source: Source) -> bool:
 
     source.channel_count = len(seen)
     source.epg_url = playlist.epg_url
+    source.advertised_epg_urls = playlist.advertised_epg_urls
     source.last_status = SourceStatus.ok
     source.last_error = "; ".join(playlist.warnings) if playlist.warnings else None
     source.last_refreshed_at = _now()

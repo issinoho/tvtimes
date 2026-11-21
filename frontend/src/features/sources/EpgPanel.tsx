@@ -7,12 +7,32 @@ import styles from '@/features/sources/sources.module.css';
 
 const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString() : 'never');
 
+/** A short label for one advertised feed: the file name, which is what tells
+ * them apart (they usually share a host and directory). */
+function feedLabel(url: string): string {
+  try {
+    const last = new URL(url).pathname.split('/').filter(Boolean).pop();
+    return last ? decodeURIComponent(last) : url;
+  } catch {
+    return url;
+  }
+}
+
 /** The XMLTV guide source(s) feeding this channel source — the one discovered
  * from the playlist, any standalone URL attached here (which matches only this
  * source's channels), and any tenant-wide one attached before scoping existed. */
-export function EpgPanel({ sourceId }: { sourceId: string }) {
+export function EpgPanel({
+  sourceId,
+  advertised = [],
+}: {
+  sourceId: string;
+  /** Guide URLs the playlist lists when it lists several — none of them is
+   * attached automatically, so they're offered here to pick from. */
+  advertised?: string[];
+}) {
   const qc = useQueryClient();
   const [url, setUrl] = useState('');
+  const [picked, setPicked] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const invalidate = () => {
@@ -42,6 +62,7 @@ export function EpgPanel({ sourceId }: { sourceId: string }) {
       unwrap(await api.POST('/api/epg-sources', { body: { url: u, scope_source_id: sourceId } })),
     onSuccess: () => {
       setUrl('');
+      setPicked('');
       setError(null);
       invalidate();
     },
@@ -74,11 +95,18 @@ export function EpgPanel({ sourceId }: { sourceId: string }) {
         ? 'attached here'
         : 'attached · all sources — paste the URL again to limit it to this one';
 
+  const attachedUrls = new Set(mine.map((s) => s.url));
+  const offered = advertised.filter((u) => !attachedUrls.has(u));
+  // Duplicate file names (same name on two hosts) fall back to the full URL.
+  const labels = offered.map(feedLabel);
+  const optionLabel = (u: string, i: number) =>
+    labels.indexOf(labels[i]) === labels.lastIndexOf(labels[i]) ? labels[i] : u;
+
   return (
     <section className={styles.card} style={{ display: 'block' }}>
       <h3 style={{ margin: '0 0 0.5rem' }}>Programme guide</h3>
 
-      {mine.length === 0 ? (
+      {mine.length === 0 && offered.length === 0 ? (
         <p className={styles.sub}>
           No XMLTV URL yet. If your playlist doesn’t advertise one, paste it below.
         </p>
@@ -124,6 +152,50 @@ export function EpgPanel({ sourceId }: { sourceId: string }) {
           </div>
         ))
       )}
+
+      {offered.length > 0 ? (
+        <form
+          className={styles.toolbar}
+          style={{ marginTop: '0.75rem', gap: '0.5rem', flexWrap: 'wrap' }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (picked) attach.mutate(picked);
+          }}
+        >
+          <p className={styles.sub} style={{ flexBasis: '100%', margin: 0 }}>
+            Your playlist lists {advertised.length} guide feeds, so none was attached automatically.
+            Pick the one that covers these channels.
+          </p>
+          <select
+            value={picked}
+            onChange={(e) => setPicked(e.target.value)}
+            aria-label="Guide feed from the playlist"
+            style={{ flex: 1, minWidth: 0 }}
+          >
+            <option value="">Choose a feed…</option>
+            {offered.map((u, i) => (
+              <option key={u} value={u}>
+                {optionLabel(u, i)}
+              </option>
+            ))}
+          </select>
+          <button
+            type="submit"
+            className={`${styles.btn} ${styles.primary}`}
+            disabled={attach.isPending || !picked}
+          >
+            Attach feed
+          </button>
+          {picked ? (
+            <p
+              className={styles.sub}
+              style={{ flexBasis: '100%', margin: 0, wordBreak: 'break-all' }}
+            >
+              {picked}
+            </p>
+          ) : null}
+        </form>
+      ) : null}
 
       <form
         className={styles.toolbar}
