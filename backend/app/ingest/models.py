@@ -40,3 +40,7 @@ class Playlist:
     epg_url: str | None = None
     # Non-fatal notes to surface to the user (e.g. "account status: Expired").
     warnings: list[str] = field(default_factory=list)
+    # Set when the "playlist" URL is really one HLS stream's own manifest
+    # (a CDN's master.m3u8), not a channel list: the source is that single
+    # stream, and ``channels`` is empty. The refresh names it after the source.
+    direct_stream: str | None = None

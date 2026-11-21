@@ -290,6 +290,12 @@ async def refresh_source(session: AsyncSession, source: Source) -> bool:
         _log.exception("source.refresh_crashed", source_id=str(source.id))
         return False
 
+    if playlist.direct_stream:
+        # A single stream, not a channel list: one channel named after the
+        # source. Its key is the stream URL alone (see _dedupe_key), so
+        # renaming the source renames the channel without changing its id.
+        playlist.channels = [ParsedChannel(name="", stream_ref=playlist.direct_stream)]
+
     existing = {
         c.dedupe_key: c
         for c in await session.scalars(select(Channel).where(Channel.source_id == source.id))
@@ -302,16 +308,15 @@ async def refresh_source(session: AsyncSession, source: Source) -> bool:
             continue
         seen.add(key)
         row = existing.get(key)
+        name = ch.name or source.display_name  # a direct stream takes the source's name
         logo = (
             ch.tvg_logo
-            or channel_logos.lookup(
-                logo_index, ext_id=ch.tvg_id, name=ch.name, tvg_name=ch.tvg_name
-            )
+            or channel_logos.lookup(logo_index, ext_id=ch.tvg_id, name=name, tvg_name=ch.tvg_name)
             or (row.logo_url if row else None)  # keep a prior backfill if iptv-org is down
         )
         fields: dict[str, object] = {
             "ext_id": ch.tvg_id,
-            "name": ch.name[:400],
+            "name": name[:400],
             "tvg_name": ch.tvg_name,
             "logo_url": logo,
             "group_title": (ch.group_title or None) and ch.group_title[:400],

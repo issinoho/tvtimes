@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from app.ingest.m3u import parse_m3u
+import pytest
+from app.ingest import m3u
+from app.ingest.m3u import is_hls_manifest, parse_m3u
 from app.ingest.models import Channel
 from app.ingest.redact import redact_mac, redact_resource_url, source_config_summary
 from app.ingest.stalker import StalkerCreds, parse_stalker_url, valid_mac
@@ -31,6 +33,59 @@ def test_parse_m3u_header_and_channels() -> None:
 def test_parse_m3u_empty() -> None:
     pl = parse_m3u("#EXTM3U\n")
     assert pl.channels == []
+
+
+HLS_MASTER = """#EXTM3U
+#EXT-X-VERSION:3
+#EXT-X-INDEPENDENT-SEGMENTS
+
+#EXT-X-STREAM-INF:BANDWIDTH=1210000,CODECS="avc1.64001F,mp4a.40.2",RESOLUTION=1280x720
+source/index.m3u8
+"""
+
+HLS_MEDIA = """#EXTM3U
+#EXT-X-VERSION:3
+#EXT-X-TARGETDURATION:6
+#EXT-X-MEDIA-SEQUENCE:101
+#EXTINF:6.000,
+seg101.ts
+#EXTINF:6.000,
+seg102.ts
+"""
+
+
+def test_is_hls_manifest() -> None:
+    assert is_hls_manifest(HLS_MASTER)
+    assert is_hls_manifest(HLS_MEDIA)
+    assert not is_hls_manifest(SAMPLE_M3U)
+    assert not is_hls_manifest("#EXTM3U\n")
+
+
+@pytest.mark.parametrize("manifest", [HLS_MASTER, HLS_MEDIA])
+async def test_load_m3u_playlist_treats_a_manifest_as_one_stream(
+    manifest: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def fake_fetch(_url: str, **_kw: object) -> str:
+        return manifest
+
+    monkeypatch.setattr(m3u, "fetch_text", fake_fetch)
+    url = "https://cdn.example.com/live/abc/master.m3u8"
+    pl = await m3u.load_m3u_playlist(url)
+    # not a master's zero channels, nor a media playlist's segment-per-channel
+    assert pl.channels == []
+    assert pl.direct_stream == url
+
+
+async def test_load_m3u_playlist_still_parses_a_channel_list(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_fetch(_url: str, **_kw: object) -> str:
+        return SAMPLE_M3U
+
+    monkeypatch.setattr(m3u, "fetch_text", fake_fetch)
+    pl = await m3u.load_m3u_playlist("http://feed.example.com/list.m3u")
+    assert pl.direct_stream is None
+    assert len(pl.channels) == 2
 
 
 def test_channel_groups_and_hd() -> None:

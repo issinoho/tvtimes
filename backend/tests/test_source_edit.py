@@ -221,3 +221,38 @@ async def test_stalker_serial_can_be_cleared(
     cfg = await _config(sid)
     assert cfg["serial"] is None
     assert cfg["mac"] == "00:1A:79:00:00:01"
+
+
+async def test_a_direct_stream_is_one_channel_named_after_the_source(
+    app_client: AsyncClient,
+    captured_emails: list[dict[str, str]],
+    enqueued: list[uuid.UUID],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An HLS master.m3u8 added as an M3U source imports as a single channel,
+    and renaming the source renames it without changing its id."""
+    headers = await _headers(app_client, captured_emails)
+    stream = "https://cdn.example.com/live/abc/master.m3u8"
+
+    async def fake_ingest(_kind: object, _config: object) -> Playlist:
+        return Playlist(direct_stream=stream)
+
+    monkeypatch.setattr("app.services.sources._ingest", fake_ingest)
+    body = {"kind": "m3u", "display_name": "Scottish Fitbaw 1", "url": stream}
+    sid = (await app_client.post("/api/sources", json=body, headers=headers)).json()["id"]
+    await _run_refresh(sid)
+
+    detail = await app_client.get(f"/api/sources/{sid}", headers=headers)
+    assert detail.json()["last_status"] == "ok"
+    assert detail.json()["channel_count"] == 1
+    before = (await app_client.get(f"/api/sources/{sid}/channels", headers=headers)).json()
+    assert [c["name"] for c in before["items"]] == ["Scottish Fitbaw 1"]
+
+    resp = await app_client.patch(
+        f"/api/sources/{sid}", json={"display_name": "Fitbaw One"}, headers=headers
+    )
+    assert resp.status_code == 200, resp.text
+    await _run_refresh(sid)
+    after = (await app_client.get(f"/api/sources/{sid}/channels", headers=headers)).json()
+    assert [c["name"] for c in after["items"]] == ["Fitbaw One"]
+    assert [c["id"] for c in after["items"]] == [c["id"] for c in before["items"]]
