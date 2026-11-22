@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/logo.svg" alt="tvtimes" width="460">
+  <img src="docs/banner.svg" alt="tvtimes: a vintage listings-magazine style banner with a retro TV showing the guide" width="100%">
 </p>
 
 <p align="center">
