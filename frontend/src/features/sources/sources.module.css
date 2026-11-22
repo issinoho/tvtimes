@@ -325,6 +325,19 @@
   color: var(--callout-warn-fg);
 }
 
+/* The "In guide" tick: large enough to hit on a phone or with a TV remote. */
+.inGuide {
+  width: 1.15rem;
+  height: 1.15rem;
+  accent-color: var(--brand-violet);
+  cursor: pointer;
+}
+
+/* A hidden channel's name: dimmed rather than faded, so it stays legible. */
+.hiddenName {
+  color: var(--text-dim);
+}
+
 .legend {
   font-size: 0.78rem;
   font-weight: 600;

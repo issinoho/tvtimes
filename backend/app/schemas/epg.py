@@ -127,6 +127,8 @@ class ChannelPatchIn(BaseModel):
     # An http(s) image URL to use as the logo whatever the source says; empty
     # string restores the source's own.
     logo_override: str | None = Field(default=None, max_length=2048)
+    # Left out of the guide and the exports while true.
+    hidden: bool | None = None
 
 
 class ChannelPatchOut(BaseModel):
@@ -135,6 +137,7 @@ class ChannelPatchOut(BaseModel):
     epg_override_id: str | None = None
     group_override: str | None = None
     logo_override: str | None = None
+    hidden: bool = False
     # The effective values after the patch (override, else the source's).
     group_title: str | None = None
     logo_url: str | None = None

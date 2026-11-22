@@ -12,7 +12,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Literal
 from urllib.parse import urlsplit
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import ColumnElement, delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.crypto import decrypt, encrypt
@@ -478,19 +478,45 @@ async def list_channels(
     limit: int = 200,
     offset: int = 0,
 ) -> tuple[Sequence[Channel], int]:
-    stmt = select(Channel).where(Channel.source_id == source.id)
-    count_stmt = select(func.count()).select_from(Channel).where(Channel.source_id == source.id)
-    if group:
-        stmt = stmt.where(Channel.group_title == group)
-        count_stmt = count_stmt.where(Channel.group_title == group)
-    if search:
-        like = f"%{search.strip()}%"
-        stmt = stmt.where(Channel.name.ilike(like))
-        count_stmt = count_stmt.where(Channel.name.ilike(like))
+    where = _channel_filter(source, group=group, search=search)
+    stmt = select(Channel).where(*where)
+    count_stmt = select(func.count()).select_from(Channel).where(*where)
     stmt = stmt.order_by(Channel.sort_order).limit(limit).offset(offset)
     rows = await session.scalars(stmt)
     total = await session.scalar(count_stmt) or 0
     return list(rows), total
+
+
+def _channel_filter(
+    source: Source, *, group: str | None, search: str | None
+) -> list[ColumnElement[bool]]:
+    """The channel-list filter, shared by the list and the bulk show/hide so
+    "Hide all" acts on exactly the channels the list is showing."""
+    where: list[ColumnElement[bool]] = [Channel.source_id == source.id]
+    if group:
+        where.append(Channel.group_title == group)
+    if search and search.strip():
+        where.append(Channel.name.ilike(f"%{search.strip()}%"))
+    return where
+
+
+async def set_channels_hidden(
+    session: AsyncSession,
+    source: Source,
+    *,
+    hidden: bool,
+    group: str | None = None,
+    search: str | None = None,
+) -> int:
+    """Show or hide every channel of ``source`` the list filter matches; the
+    number of channels that changed."""
+    result = await session.execute(
+        update(Channel)
+        .where(*_channel_filter(source, group=group, search=search), Channel.hidden.is_(not hidden))
+        .values(hidden=hidden)
+        .execution_options(synchronize_session=False)
+    )
+    return int(result.rowcount or 0)  # type: ignore[attr-defined]
 
 
 async def programme_counts(

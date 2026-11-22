@@ -13,6 +13,7 @@ import {
   useChannelGroups,
   usePatchChannel,
   useRefreshSource,
+  useSetChannelsHidden,
   useSource,
   type ChannelPatch,
 } from '@/features/sources/api';
@@ -142,6 +143,8 @@ export function SourceDetailPage() {
 
   const refresh = useRefreshSource();
   const remove = useDeleteSource();
+  const toggle = usePatchChannel(sourceId);
+  const bulk = useSetChannelsHidden(sourceId);
   const patch = usePatchSource(sourceId);
   const [editing, setEditing] = useState(false);
 
@@ -223,7 +226,30 @@ export function SourceDetailPage() {
           }}
         />
         <span className={styles.sub}>{total} channels</span>
+        {/* Acts on whatever the filter matches -- every page of it, not just
+            the rows on screen -- so a whole category or brand goes at once. */}
+        <button
+          type="button"
+          className={styles.btn}
+          disabled={bulk.isPending || total === 0}
+          onClick={() => bulk.mutate({ hidden: false, search: search.trim() || undefined })}
+        >
+          {search.trim() ? `Show ${total} matching` : 'Show all'}
+        </button>
+        <button
+          type="button"
+          className={styles.btn}
+          disabled={bulk.isPending || total === 0}
+          onClick={() => bulk.mutate({ hidden: true, search: search.trim() || undefined })}
+        >
+          {search.trim() ? `Hide ${total} matching` : 'Hide all'}
+        </button>
       </div>
+      {bulk.error ? (
+        <p className={styles.err} role="alert">
+          {bulk.error instanceof Error ? bulk.error.message : 'Could not update the channels.'}
+        </p>
+      ) : null}
 
       {/* One list for every Category cell: the categories already on the
           account, so "Sports" is one keystroke, while a new name still goes. */}
@@ -236,6 +262,7 @@ export function SourceDetailPage() {
         <table className={styles.channels}>
           <thead>
             <tr>
+              <th>In guide</th>
               <th />
               <th>Name</th>
               <th>Category</th>
@@ -249,6 +276,18 @@ export function SourceDetailPage() {
             {(channels.data?.items ?? []).map((c) => (
               <tr key={c.id}>
                 <td>
+                  <input
+                    type="checkbox"
+                    className={styles.inGuide}
+                    checked={!c.hidden}
+                    aria-label={`Show ${c.name} in the guide`}
+                    disabled={toggle.isPending && toggle.variables?.channelId === c.id}
+                    onChange={(e) =>
+                      toggle.mutate({ channelId: c.id, body: { hidden: !e.target.checked } })
+                    }
+                  />
+                </td>
+                <td>
                   {/* Through the proxy, like every other logo in the app: these
                       URLs are usually http:// on a LAN, which an https page
                       blocks outright. */}
@@ -259,9 +298,10 @@ export function SourceDetailPage() {
                     emptyClassName={styles.logoEmpty}
                   />
                 </td>
-                <td>
+                <td className={c.hidden ? styles.hiddenName : undefined}>
                   {c.name}
                   {c.is_hd ? <span className={styles.kindTag}> HD</span> : null}
+                  {c.hidden ? <span className={styles.sub}> · hidden</span> : null}
                 </td>
                 <ChannelOverrides channel={c} sourceId={sourceId} />
               </tr>

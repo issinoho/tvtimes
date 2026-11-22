@@ -7,7 +7,17 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import JSON, Enum, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    Enum,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    false,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base, TZDateTime
@@ -136,6 +146,11 @@ class Channel(PkUuidMixin, TimestampMixin, Base):
 
     # Per-channel clock correction, on top of the source's shift.
     clock_shift_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Unticked on the source's channel list: left out of the guide grid,
+    # now/next, search, highlights and the M3U/XMLTV exports. Still matched to
+    # guide data, so showing it again is instant. Set by hand; survives a
+    # channel refresh.
+    hidden: Mapped[bool] = mapped_column(nullable=False, default=False, server_default=false())
     last_seen_at: Mapped[datetime | None] = mapped_column(TZDateTime)
 
     source: Mapped[Source] = relationship(back_populates="channels")
