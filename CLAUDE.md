@@ -97,6 +97,15 @@ CI pins **newer** ruff/mypy than an old local pin may resolve — if `ruff forma
   override or upstream. Never write the effective columns directly, or a
   refresh silently undoes a user's override (and clearing one can't restore
   the source's value).
+- **Hidden channels.** `Channel.hidden` (the "In guide" tick on a source's
+  channel list) is set by hand and survives a refresh, like the overrides.
+  Every *viewer* of channels filters it out — `epg.guide`, `now_next`,
+  `search_programmes`, `highlights` and `exports._ordered_channels` — while
+  the source's own channel list shows it (so it can be ticked again) and EPG
+  matching keeps it (so showing it is instant). A new reader of channels
+  must add `Channel.hidden.is_(False)` or hidden channels leak back in.
+  Bulk show/hide reuses `list_channels`' filter (`_channel_filter`) so it
+  acts on exactly what the list shows.
 - **EPG fan-out.** `epg._channel_index` maps each XMLTV key to a **list** of
   channel ids; `_resolve_channels` returns all of them and a programme row is
   written per channel — so an East/West pair sharing a tvg-id both get data.

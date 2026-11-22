@@ -151,6 +151,27 @@ export function usePatchChannel(sourceId: string) {
   });
 }
 
+/**
+ * Show or hide every channel of a source the list filter matches (`search`;
+ * none = the whole source). Hidden channels leave the guide and the exports.
+ */
+export function useSetChannelsHidden(sourceId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: { hidden: boolean; search?: string }) =>
+      unwrap(
+        await api.POST('/api/sources/{source_id}/channels/visibility', {
+          params: { path: { source_id: sourceId } },
+          body,
+        }),
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['sources', sourceId, 'channels'] });
+      void qc.invalidateQueries({ queryKey: ['guide'] });
+    },
+  });
+}
+
 /** Every category in use on the account, suggested when setting one by hand. */
 export function useChannelGroups() {
   return useQuery({

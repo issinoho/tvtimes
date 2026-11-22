@@ -559,6 +559,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sources/{source_id}/channels/visibility": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set Channel Visibility
+         * @description Show or hide, in one go, every channel the list's category / search
+         *     filter matches. One channel at a time is ``PATCH /api/channels/{id}``.
+         */
+        post: operations["set_channel_visibility_api_sources__source_id__channels_visibility_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sources/{source_id}/channels": {
         parameters: {
             query?: never;
@@ -669,8 +690,9 @@ export interface paths {
         head?: never;
         /**
          * Patch Channel
-         * @description Per-channel overrides: the clock shift, the guide key to match on, and
-         *     the category and logo to show whatever the source says.
+         * @description Per-channel overrides: the clock shift, the guide key to match on, the
+         *     category and logo to show whatever the source says, and whether it's
+         *     hidden from the guide and exports.
          *
          *     Setting ``epg_override_id`` doesn't backfill anything by itself -- the
          *     channel picks up its programmes on the next guide refresh. A category or
@@ -1188,6 +1210,11 @@ export interface components {
             number: number | null;
             /** Is Hd */
             is_hd: boolean;
+            /**
+             * Hidden
+             * @default false
+             */
+            hidden: boolean;
             /** Epg Override Id */
             epg_override_id?: string | null;
             /** Group Override */
@@ -1228,6 +1255,8 @@ export interface components {
             group_override?: string | null;
             /** Logo Override */
             logo_override?: string | null;
+            /** Hidden */
+            hidden?: boolean | null;
         };
         /** ChannelPatchOut */
         ChannelPatchOut: {
@@ -1244,10 +1273,33 @@ export interface components {
             group_override?: string | null;
             /** Logo Override */
             logo_override?: string | null;
+            /**
+             * Hidden
+             * @default false
+             */
+            hidden: boolean;
             /** Group Title */
             group_title?: string | null;
             /** Logo Url */
             logo_url?: string | null;
+        };
+        /**
+         * ChannelVisibilityIn
+         * @description Show or hide every channel the source's list filter matches (the same
+         *     ``group`` / ``search`` as ``GET …/channels``; neither = all of them).
+         */
+        ChannelVisibilityIn: {
+            /** Hidden */
+            hidden: boolean;
+            /** Group */
+            group?: string | null;
+            /** Search */
+            search?: string | null;
+        };
+        /** ChannelVisibilityOut */
+        ChannelVisibilityOut: {
+            /** Updated */
+            updated: number;
         };
         /** ConnectorCreateIn */
         ConnectorCreateIn: {
@@ -3732,6 +3784,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_channel_visibility_api_sources__source_id__channels_visibility_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChannelVisibilityIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelVisibilityOut"];
                 };
             };
             /** @description Validation Error */

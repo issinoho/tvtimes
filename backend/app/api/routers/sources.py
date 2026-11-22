@@ -17,6 +17,8 @@ from app.schemas.auth import MessageOut
 from app.schemas.source import (
     ChannelOut,
     ChannelPage,
+    ChannelVisibilityIn,
+    ChannelVisibilityOut,
     SourceIn,
     SourceOrderIn,
     SourceOut,
@@ -213,6 +215,19 @@ async def delete_update_token(
         )
     )
     return MessageOut(message="Remote URL updates turned off.")
+
+
+@router.post("/{source_id}/channels/visibility", response_model=ChannelVisibilityOut)
+async def set_channel_visibility(
+    source_id: uuid.UUID, body: ChannelVisibilityIn, user: VerifiedUser, session: SessionDep
+) -> ChannelVisibilityOut:
+    """Show or hide, in one go, every channel the list's category / search
+    filter matches. One channel at a time is ``PATCH /api/channels/{id}``."""
+    source = await _load(session, user, source_id)
+    updated = await svc.set_channels_hidden(
+        session, source, hidden=body.hidden, group=body.group, search=body.search
+    )
+    return ChannelVisibilityOut(updated=updated)
 
 
 @router.get("/{source_id}/channels", response_model=ChannelPage)

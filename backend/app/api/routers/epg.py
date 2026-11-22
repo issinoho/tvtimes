@@ -179,8 +179,9 @@ async def delete_epg_source(
 async def patch_channel(
     channel_id: uuid.UUID, body: ChannelPatchIn, user: VerifiedUser, session: SessionDep
 ) -> ChannelPatchOut:
-    """Per-channel overrides: the clock shift, the guide key to match on, and
-    the category and logo to show whatever the source says.
+    """Per-channel overrides: the clock shift, the guide key to match on, the
+    category and logo to show whatever the source says, and whether it's
+    hidden from the guide and exports.
 
     Setting ``epg_override_id`` doesn't backfill anything by itself -- the
     channel picks up its programmes on the next guide refresh. A category or
@@ -205,9 +206,12 @@ async def patch_channel(
             src_svc.set_channel_logo(channel, body.logo_override)
         except src_svc.InvalidLogoUrl as exc:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
+    if body.hidden is not None:
+        channel.hidden = body.hidden
     await session.flush()
     return ChannelPatchOut(
         id=channel.id,
+        hidden=channel.hidden,
         clock_shift_seconds=channel.clock_shift_seconds,
         epg_override_id=channel.epg_override_id,
         group_override=channel.group_override,

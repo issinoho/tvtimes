@@ -113,12 +113,16 @@ async def tenant_for_token(session: AsyncSession, raw: str) -> Tenant | None:
 
 
 async def _ordered_channels(session: AsyncSession, tenant_id: uuid.UUID) -> list[Channel]:
-    """Every channel of an enabled source, in the Sources-screen order — the
-    same ordering the guide grid uses."""
+    """Every channel of an enabled source that isn't hidden, in the
+    Sources-screen order — the same ordering the guide grid uses."""
     stmt = (
         select(Channel)
         .join(Source, Channel.source_id == Source.id)
-        .where(Channel.tenant_id == tenant_id, Source.enabled.is_(True))
+        .where(
+            Channel.tenant_id == tenant_id,
+            Source.enabled.is_(True),
+            Channel.hidden.is_(False),
+        )
         .order_by(
             Source.sort_rank,
             Channel.number.is_(None),

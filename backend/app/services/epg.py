@@ -464,7 +464,7 @@ async def guide(
     """Programmes for many channels in ``[start, end)``, one row per channel,
     each with times already resolved to that channel's display timezone."""
     stmt = select(Channel).join(Source, Channel.source_id == Source.id)
-    stmt = stmt.where(Channel.tenant_id == tenant_id)
+    stmt = stmt.where(Channel.tenant_id == tenant_id, Channel.hidden.is_(False))
     if source_id is not None:
         stmt = stmt.where(Channel.source_id == source_id)
     if group:
@@ -551,6 +551,7 @@ async def search_programmes(
         .join(Channel, Programme.channel_id == Channel.id)
         .where(
             Programme.tenant_id == tenant_id,
+            Channel.hidden.is_(False),
             Programme.stop_utc > start - MAX_CLOCK_SHIFT,
             Programme.start_utc < end + MAX_CLOCK_SHIFT,
             or_(Programme.title.ilike(like), Programme.sub_title.ilike(like)),
@@ -629,7 +630,7 @@ async def now_next(
     stmt = (
         select(Channel)
         .join(Source, Channel.source_id == Source.id)
-        .where(Channel.tenant_id == tenant_id)
+        .where(Channel.tenant_id == tenant_id, Channel.hidden.is_(False))
     )
     if source_id is not None:
         stmt = stmt.where(Channel.source_id == source_id)
@@ -709,8 +710,10 @@ async def highlights(
     films = list(
         await session.scalars(
             select(Programme)
+            .join(Channel, Programme.channel_id == Channel.id)
             .where(
                 Programme.tenant_id == tenant_id,
+                Channel.hidden.is_(False),
                 Programme.is_movie.is_(True),
                 Programme.start_utc >= now - MAX_CLOCK_SHIFT,
                 Programme.start_utc <= week_end + MAX_CLOCK_SHIFT,

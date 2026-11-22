@@ -201,6 +201,8 @@ class ChannelOut(BaseModel):
     group_title: str | None
     number: int | None
     is_hd: bool
+    # Unticked: left out of the guide and the exports.
+    hidden: bool = False
     # Set by hand when this channel can't find its own guide data.
     epg_override_id: str | None = None
     # Set by hand; ``group_title`` / ``logo_url`` above already apply them.
@@ -210,6 +212,20 @@ class ChannelOut(BaseModel):
     upstream_group_title: str | None = None
     upstream_logo_url: str | None = None
     programme_count: int = 0
+
+
+class ChannelVisibilityIn(BaseModel):
+    """Show or hide every channel the source's list filter matches (the same
+    ``group`` / ``search`` as ``GET …/channels``; neither = all of them)."""
+
+    hidden: bool
+    group: str | None = Field(default=None, max_length=400)
+    search: str | None = Field(default=None, max_length=200)
+
+
+class ChannelVisibilityOut(BaseModel):
+    # How many channels changed (already-matching ones aren't counted).
+    updated: int
 
 
 class ChannelPage(BaseModel):
