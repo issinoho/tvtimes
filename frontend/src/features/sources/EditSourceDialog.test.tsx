@@ -17,6 +17,8 @@ function source(over: Partial<SourceOut>): SourceOut {
     timezone_override: null,
     clock_shift_seconds: 0,
     refresh_interval_minutes: 360,
+    relay_streams: false,
+    relay_supported: true,
     sort_rank: 0,
     last_status: 'ok',
     last_error: null,
@@ -110,4 +112,22 @@ test('an HDHomeRun address starts filled in and can be cleared to auto-discover'
   await user.click(screen.getByRole('button', { name: 'Save' }));
   await waitFor(() => expect(onClose).toHaveBeenCalled());
   expect(bodies).toEqual([{ config: { kind: 'hdhomerun', device_url: '' } }]);
+});
+
+test('the relay toggle is sent when changed', async () => {
+  const { bodies, onClose, user } = setup(source({}));
+  await user.click(screen.getByLabelText('Relay streams through tvtimes'));
+  await user.click(screen.getByRole('button', { name: 'Save' }));
+  await waitFor(() => expect(onClose).toHaveBeenCalled());
+  expect(bodies).toEqual([{ relay_streams: true }]);
+});
+
+test('the relay toggle starts from the saved value, and is also offered for a connector', () => {
+  setup(source({ kind: 'connector', relay_streams: true }));
+  expect(screen.getByLabelText('Relay streams through tvtimes')).toBeChecked();
+});
+
+test('the relay toggle is hidden where relaying is unsupported', () => {
+  setup(source({ kind: 'stalker', relay_supported: false }));
+  expect(screen.queryByLabelText('Relay streams through tvtimes')).toBeNull();
 });

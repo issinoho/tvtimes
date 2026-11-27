@@ -57,6 +57,30 @@ def client_ip(request: Request) -> str | None:
     return peer  # every hop was a trusted proxy — nothing else to attribute it to
 
 
+def is_lan_client(request: Request) -> bool:
+    """Whether the client is on the local network, as far as can be told for sure.
+
+    True only when the address is trustworthy: either the request came straight
+    from the client (no ``X-Forwarded-For``) or through a trusted proxy that
+    named it. A request forwarded by a proxy that *isn't* trusted is never LAN,
+    whatever its TCP peer -- otherwise an unconfigured reverse proxy on the LAN
+    would make every outside client look local."""
+    peer = request.client.host if request.client else None
+    if peer is None:
+        return False
+    forwarded = bool(request.headers.get("x-forwarded-for", "").strip())
+    if forwarded and not _in_nets(peer, _trusted_nets()):
+        return False
+    addr = client_ip(request)
+    try:
+        ip = ipaddress.ip_address(addr) if addr else None
+    except ValueError:
+        return False
+    # ip.is_private covers RFC 1918, loopback, link-local and IPv6 ULA; not the
+    # CGNAT range, so a Tailscale or carrier-NAT client is still relayed.
+    return ip is not None and ip.is_private
+
+
 def _key(request: Request) -> str:
     return client_ip(request) or get_remote_address(request)
 

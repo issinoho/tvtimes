@@ -10,26 +10,34 @@ from typing import Annotated
 
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from fastapi.responses import PlainTextResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import PlainTextResponse, RedirectResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import tokens
 from app.auth.deps import SessionDep
-from app.auth.ratelimit import limiter
+from app.auth.ratelimit import is_lan_client, limiter
 from app.config import get_settings
+from app.db import get_sessionmaker
 from app.models.source import Channel, Source
 from app.models.tenant import Tenant
 from app.services import devices as devices_svc
 from app.services import exports as svc
+from app.services import relay as relay_svc
 from app.services import watch as watch_svc
 
 router = APIRouter(prefix="/exports", tags=["exports"])
+# The relay's segment route lives on its own router: it is an internal detail of
+# a relayed stream, not part of the published export API, and
+# scripts/export_openapi.py publishes every route on ``router``.
+relay_router = APIRouter(prefix="/exports", tags=["exports"], include_in_schema=False)
 
 EXPORT_LIMIT = "30/minute"
 
 
-async def _tenant(session: SessionDep, token: Annotated[str, Query()] = "") -> Tenant:
-    # Every export route depends on this, so one call here covers the lot --
+async def tenant_for_export_token(session: AsyncSession, token: str) -> Tenant:
+    """The tenant an export (or paired-device) token belongs to, or 401."""
+    # Every export route goes through this, so one call here covers the lot --
     # the playlist, the guide, watchlist/favourites polling, a stream request
     # and a watch-state report all count as the token being used.
     tenant = await svc.tenant_for_token(session, token)
@@ -44,6 +52,10 @@ async def _tenant(session: SessionDep, token: Annotated[str, Query()] = "") -> T
             await devices_svc.touch(session, device)
             return device_tenant
     raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or missing export token")
+
+
+async def _tenant(session: SessionDep, token: Annotated[str, Query()] = "") -> Tenant:
+    return await tenant_for_export_token(session, token)
 
 
 TenantDep = Annotated[Tenant, Depends(_tenant)]
@@ -233,8 +245,13 @@ async def watch_events(
     summary="Resolve one channel to its real stream",
     responses={
         302: {
-            "description": "Redirect to the upstream stream URL. Provider credentials "
-            "(Xtream logins and the like) stay on the server and never appear in the playlist."
+            "description": "Redirect to the stream. Usually that's the upstream URL; for a "
+            "source with relaying switched on it's a tvtimes relay URL instead, which carries "
+            "the stream through tvtimes (an HLS playlist rewritten so its segments come "
+            "through too). The relay URL ends in a file name with an extension where one is "
+            "known, so a player can tell HLS from MPEG-TS without opening it. Either way "
+            "provider credentials (Xtream logins and the like) never reach the client from a "
+            "relayed source, nor appear in the playlist from any source."
         },
         401: {"description": "Invalid or missing export token"},
         404: {"description": "Unknown channel, or not on this account"},
@@ -247,18 +264,62 @@ async def watch_events(
 async def stream(
     request: Request,
     channel_id: uuid.UUID,
-    tenant: TenantDep,
-    session: SessionDep,
-) -> RedirectResponse:
-    channel = await session.get(Channel, channel_id)
-    if channel is None or channel.tenant_id != tenant.id:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Unknown channel")
+    token: Annotated[str, Query()] = "",
+) -> Response:
+    # Its own short session rather than SessionDep: resolve, commit, let go
+    # before answering (the relay itself is on the DB-free relay route).
+    async with get_sessionmaker()() as session:
+        tenant = await tenant_for_export_token(session, token)
+        channel = await session.get(Channel, channel_id)
+        if channel is None or channel.tenant_id != tenant.id:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Unknown channel")
+        target, relayed = await _stream_target(session, channel)
+        await session.commit()
+    return await _serve_stream(request, target, relayed)
+
+
+async def _stream_target(
+    session: AsyncSession, channel: Channel
+) -> tuple[relay_svc.RelayTarget, bool]:
     source = await session.get(Source, channel.source_id)
     try:
-        url = svc.resolve_stream(channel, source)
+        target = relay_svc.resolve_target(channel, source)
     except svc.StreamUnavailable as exc:
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, str(exc)) from exc
-    return RedirectResponse(url, status_code=status.HTTP_302_FOUND)
+    relayed = get_settings().relay_enabled and source is not None and source.relay_streams
+    return target, relayed
+
+
+async def _serve_stream(request: Request, target: relay_svc.RelayTarget, relayed: bool) -> Response:
+    if relayed and get_settings().relay_lan_direct and is_lan_client(request):
+        relayed = False  # the device is reachable from here; skip the extra hop
+    if not relayed:
+        return RedirectResponse(target.url, status_code=status.HTTP_302_FOUND)
+    # Relayed: redirect to the relay route rather than stream from here. The
+    # relay URL names a file type players can read without opening the stream,
+    # and a live HLS playlist's re-polls then land on the token-only relay route
+    # instead of going through the export token, the DB and EXPORT_LIMIT here.
+    return RedirectResponse(
+        relay_svc.entry_url(target),
+        status_code=status.HTTP_302_FOUND,
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+@relay_router.get("/relay/{profile}/{rtoken}/{name}")
+@limiter.limit(lambda: get_settings().relay_segment_rate_limit)
+async def relay_segment(request: Request, profile: str, rtoken: str, name: str) -> Response:
+    """One URL out of a rewritten HLS playlist (a nested playlist, segment, key
+    or init section). The token is the whole credential -- encrypted, expiring,
+    and naming its own upstream -- so this needs no DB. ``name`` is cosmetic:
+    the upstream's file name, there for players that pick a demuxer by it."""
+    if profile not in relay_svc.PROFILES:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Unknown relay profile")
+    try:
+        target = relay_svc.decode_token(rtoken, profile=profile)
+    except relay_svc.InvalidRelayToken as exc:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired relay link") from exc
+    return await relay_svc.relay(request, target, profile=profile, from_playlist=target.nested)
 
 
 # --- "Play externally" hand-off (time-limited per-channel ticket) ------------
@@ -266,11 +327,10 @@ async def stream(
 # never mix on one path.
 
 
-async def _play_channel(
-    session: SessionDep,
-    channel_id: uuid.UUID,
-    ticket: Annotated[str, Query()] = "",
+async def play_channel_for_ticket(
+    session: AsyncSession, channel_id: uuid.UUID, ticket: str
 ) -> Channel:
+    """The channel a play ticket grants, or 401/404."""
     try:
         tok_channel_id, tok_tenant_id = tokens.decode_play_token(ticket)
     except jwt.PyJWTError as exc:
@@ -281,6 +341,14 @@ async def _play_channel(
     if channel is None or channel.tenant_id != tok_tenant_id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Unknown channel")
     return channel
+
+
+async def _play_channel(
+    session: SessionDep,
+    channel_id: uuid.UUID,
+    ticket: Annotated[str, Query()] = "",
+) -> Channel:
+    return await play_channel_for_ticket(session, channel_id, ticket)
 
 
 PlayChannelDep = Annotated[Channel, Depends(_play_channel)]
@@ -358,7 +426,7 @@ async def play_epg_xml(
     include_in_schema=False,
     summary="Resolve one channel, behind a play ticket",
     responses={
-        302: {"description": "Redirect to the upstream stream URL."},
+        302: {"description": "Redirect to the upstream URL, or to a relay URL when relayed."},
         401: {"description": "Invalid or expired play link"},
         404: {"description": "Unknown channel"},
         501: {"description": "This source kind can't be resolved to a stream yet"},
@@ -367,12 +435,12 @@ async def play_epg_xml(
 @limiter.limit(EXPORT_LIMIT)
 async def play_stream(
     request: Request,
-    channel: PlayChannelDep,
-    session: SessionDep,
-) -> RedirectResponse:
-    source = await session.get(Source, channel.source_id)
-    try:
-        url = svc.resolve_stream(channel, source)
-    except svc.StreamUnavailable as exc:
-        raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, str(exc)) from exc
-    return RedirectResponse(url, status_code=status.HTTP_302_FOUND)
+    channel_id: uuid.UUID,
+    ticket: Annotated[str, Query()] = "",
+) -> Response:
+    # Same reason as /stream: no session held for the life of the stream.
+    async with get_sessionmaker()() as session:
+        channel = await play_channel_for_ticket(session, channel_id, ticket)
+        target, relayed = await _stream_target(session, channel)
+        await session.commit()
+    return await _serve_stream(request, target, relayed)

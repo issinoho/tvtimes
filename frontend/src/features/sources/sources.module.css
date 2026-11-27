@@ -352,3 +352,10 @@
   max-height: calc(100dvh - 2.5rem);
   overflow-y: auto;
 }
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}

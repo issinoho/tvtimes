@@ -105,6 +105,52 @@ list) is attributed to its real TCP peer and its `X-Forwarded-For` is ignored,
 so it can't spoof its IP to get around a login/registration rate limit or write
 a fake address into the audit log.
 
+### Nginx Proxy Manager, and watching away from home
+
+The export playlist's stream URLs point back at tvtimes
+(`/api/exports/stream/{id}`). For most sources that answers with a redirect to
+the upstream address. A source with **Relay streams through tvtimes** ticked
+(on by default for HDHomeRun) is proxied through tvtimes instead, so a phone on
+mobile data can play a tuner that only exists on your LAN, and provider logins
+never reach the player. In NPM, add this to the proxy host's **Advanced** tab
+so a long-running stream isn't buffered or timed out:
+
+```
+proxy_buffering off;
+proxy_request_buffering off;
+proxy_read_timeout 3600s;
+proxy_send_timeout 3600s;
+proxy_http_version 1.1;
+```
+
+- Set `TVTIMES_TRUSTED_PROXIES` to NPM's address as the tvtimes container sees
+  it. Rate limits and the stream caps key on the client's IP, and without it
+  every viewer looks like NPM.
+- Viewers on your LAN still get the direct redirect for a relayed source, since
+  the device is reachable from where they are and the extra hop through tvtimes
+  only costs CPU. This relies on `TVTIMES_TRUSTED_PROXIES`: a request NPM
+  forwarded without that set is always relayed, never sent direct. Set
+  `TVTIMES_RELAY_LAN_DIRECT=false` to relay LAN viewers too. A player that
+  starts on Wi-Fi keeps its direct LAN link if the phone moves to mobile data;
+  restarting the channel picks up the relay.
+- If you'd rather keep video off the main host, add a second NPM host (say
+  `stream.example.com`) pointing at the same container with the snippet above.
+  `TVTIMES_PUBLIC_ORIGIN` still decides which host appears in the playlist.
+- Relayed streams are capped at `TVTIMES_RELAY_MAX_STREAMS_PER_TENANT` (4) per
+  account and `TVTIMES_RELAY_MAX_STREAMS_TOTAL` (16) overall. Past either cap a
+  player gets `503` with `Retry-After`. The caps are counted per app process.
+- Relaying a LAN **M3U** source (tvheadend, Threadfin, xTeVe) needs its address
+  in `TVTIMES_FETCH_ALLOWLIST`, the same as fetching its playlist. tvtimes won't
+  stream a LAN address out on behalf of a playlist it hasn't been told to trust.
+- **Connector** sources can't be relayed. The tuner is on another network,
+  which is why it needs a connector in the first place.
+- An HLS channel's playlist is rewritten so each segment comes through tvtimes
+  under a short-lived link (10 minutes; 12 hours for nested playlists and VOD).
+  Rotating the export token stops new plays at once, but a player already
+  holding segment links can carry on until they expire.
+- `TVTIMES_RELAY_ENABLED=false` turns relaying off everywhere, and every source
+  redirects again.
+
 ## HDHomeRun tuners
 
 Add a source, choose **HDHomeRun**:

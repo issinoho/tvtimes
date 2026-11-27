@@ -1567,6 +1567,8 @@ export interface components {
              * @default 360
              */
             refresh_interval_minutes: number;
+            /** Relay Streams */
+            relay_streams?: boolean | null;
             /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
@@ -1738,6 +1740,8 @@ export interface components {
              * @default 360
              */
             refresh_interval_minutes: number;
+            /** Relay Streams */
+            relay_streams?: boolean | null;
             /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
@@ -2203,6 +2207,16 @@ export interface components {
             clock_shift_seconds: number;
             /** Refresh Interval Minutes */
             refresh_interval_minutes: number;
+            /**
+             * Relay Streams
+             * @default false
+             */
+            relay_streams: boolean;
+            /**
+             * Relay Supported
+             * @default true
+             */
+            relay_supported: boolean;
             /** Sort Rank */
             sort_rank: number;
             /** Last Status */
@@ -2264,6 +2278,8 @@ export interface components {
             clock_shift_seconds?: number | null;
             /** Refresh Interval Minutes */
             refresh_interval_minutes?: number | null;
+            /** Relay Streams */
+            relay_streams?: boolean | null;
             /** Config */
             config?: (components["schemas"]["M3uConfigPatch"] | components["schemas"]["XtreamConfigPatch"] | components["schemas"]["StalkerConfigPatch"] | components["schemas"]["HdhomerunConfigPatch"]) | null;
         };
@@ -2316,6 +2332,8 @@ export interface components {
              * @default 360
              */
             refresh_interval_minutes: number;
+            /** Relay Streams */
+            relay_streams?: boolean | null;
             /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
@@ -2507,6 +2525,8 @@ export interface components {
              * @default 360
              */
             refresh_interval_minutes: number;
+            /** Relay Streams */
+            relay_streams?: boolean | null;
             /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}

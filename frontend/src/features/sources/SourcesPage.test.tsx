@@ -30,6 +30,8 @@ const M3U_SOURCE = {
   timezone_override: null,
   clock_shift_seconds: 0,
   refresh_interval_minutes: 360,
+  relay_streams: false,
+  relay_supported: true,
   last_status: 'ok',
   last_error: null,
   channel_count: 42,

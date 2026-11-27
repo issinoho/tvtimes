@@ -72,10 +72,16 @@ Full list with defaults: [`.env.example`](../.env.example).
 
 If a tenant enables **Settings → Export feeds**, three unauthenticated,
 token-gated routes open up — `GET /api/exports/playlist.m3u`, `.../epg.xml`, and
-`.../stream/{channel_id}` (a 302 to the resolved upstream). Auth is a
+`.../stream/{channel_id}` (a 302 to the resolved upstream or, for a source with
+**Relay streams** on, to a relay URL that carries the stream through tvtimes).
+Auth is a
 per-tenant token as `?token=`, matched against its sha256; there is nothing to
 configure server-side. They are rate-limited (30/min) and safe to expose
-through the same proxy as the rest of the app.
+through the same proxy as the rest of the app. Relayed streams, and a relayed
+HLS channel's playlists and segments, come through `/api/exports/relay/…` under
+encrypted, expiring links, limited separately
+(`TVTIMES_RELAY_SEGMENT_RATE_LIMIT`, 900/min). The proxy must not
+buffer these responses: see the Nginx Proxy Manager notes in `homelab.md`.
 
 Paired devices (**Settings → Devices**) hold their own tokens for the same
 routes. Pairing uses two unauthenticated, rate-limited calls —

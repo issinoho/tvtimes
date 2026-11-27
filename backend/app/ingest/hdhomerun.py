@@ -113,7 +113,10 @@ async def discover_device_urls(timeout: float = 2.0) -> list[str]:
 # --- LAN address guard -------------------------------------------------------
 
 
-async def _assert_lan_url(url: str) -> None:
+async def assert_lan_url(url: str) -> list[str]:
+    """Refuse anything but a private LAN http(s) address and return the
+    addresses the host resolved to, so a caller can pin its connection to them
+    (the stream relay does)."""
     parts = urlsplit(url)
     if parts.scheme not in {"http", "https"}:
         raise SourceRejected("An HDHomeRun URL must start with http:// or https://.")
@@ -144,6 +147,7 @@ async def _assert_lan_url(url: str) -> None:
                 f"{host!r} ({addr}) is not a private LAN address. Enter the "
                 "HDHomeRun's address on your home network, e.g. http://192.168.1.50."
             )
+    return addresses
 
 
 # --- discover.json + lineup -------------------------------------------------
@@ -183,7 +187,7 @@ async def _fetch_device(
     client: httpx.AsyncClient, base_url: str
 ) -> tuple[list[Channel], str | None, str | None]:
     base_url = base_url.rstrip("/")
-    await _assert_lan_url(base_url)
+    await assert_lan_url(base_url)
     try:
         r = await client.get(f"{base_url}/discover.json", timeout=_DISCOVER_TIMEOUT)
         r.raise_for_status()
@@ -198,7 +202,7 @@ async def _fetch_device(
         raise SourceInvalid(f"{base_url} does not look like an HDHomeRun (no LineupURL).")
 
     lineup_url = urljoin(f"{base_url}/", str(discover["LineupURL"]))
-    await _assert_lan_url(lineup_url)
+    await assert_lan_url(lineup_url)
     try:
         r = await client.get(lineup_url, timeout=_LINEUP_TIMEOUT)
         r.raise_for_status()

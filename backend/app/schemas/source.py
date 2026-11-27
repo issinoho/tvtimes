@@ -17,6 +17,8 @@ class _CommonIn(BaseModel):
     timezone_override: str | None = Field(default=None, max_length=64)
     clock_shift_seconds: int = Field(default=0, ge=-86_400, le=86_400)
     refresh_interval_minutes: int = Field(default=360, ge=15, le=10_080)
+    # None = the kind's default (on for an HDHomeRun, off otherwise).
+    relay_streams: bool | None = None
 
 
 class M3uSourceIn(_CommonIn):
@@ -123,6 +125,7 @@ class SourcePatchIn(BaseModel):
     timezone_override: str | None = Field(default=None, max_length=64)
     clock_shift_seconds: int | None = Field(default=None, ge=-86_400, le=86_400)
     refresh_interval_minutes: int | None = Field(default=None, ge=15, le=10_080)
+    relay_streams: bool | None = None
     config: SourceConfigPatch | None = None
 
     def config_changes(self) -> dict[str, object] | None:
@@ -148,6 +151,9 @@ class SourceOut(BaseModel):
     timezone_override: str | None
     clock_shift_seconds: int
     refresh_interval_minutes: int
+    relay_streams: bool = False
+    # False for kinds that can't be relayed (stalker); filled by the router.
+    relay_supported: bool = True
     sort_rank: int
     last_status: str
     last_error: str | None

@@ -27,6 +27,8 @@ function epg(url: string, source_id: string | null, scope_source_id: string | nu
     programme_count: 1,
     last_fetched_at: null,
     refresh_interval_minutes: 720,
+    relay_streams: false,
+    relay_supported: true,
     created_at: new Date().toISOString(),
   };
 }

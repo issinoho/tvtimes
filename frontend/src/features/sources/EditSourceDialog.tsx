@@ -41,6 +41,7 @@ export function EditSourceDialog({ source, onClose }: { source: SourceOut; onClo
   const [name, setName] = useState(source.display_name);
   const [interval, setRefreshEvery] = useState(source.refresh_interval_minutes);
   const [zone, setZone] = useState(source.timezone_override ?? '');
+  const [relay, setRelay] = useState(source.relay_streams);
   // An HDHomeRun address isn't a secret (the summary already shows it), so it
   // starts filled in; blank there means auto-discover, not "keep".
   const [deviceUrl, setDeviceUrl] = useState(
@@ -90,6 +91,7 @@ export function EditSourceDialog({ source, onClose }: { source: SourceOut; onClo
     if (name.trim() !== source.display_name) body.display_name = name.trim();
     if (interval !== source.refresh_interval_minutes) body.refresh_interval_minutes = interval;
     if ((zone || null) !== source.timezone_override) body.timezone_override = zone || null;
+    if (source.relay_supported && relay !== source.relay_streams) body.relay_streams = relay;
     const config = connection();
     if (config) body.config = config;
     try {
@@ -148,6 +150,23 @@ export function EditSourceDialog({ source, onClose }: { source: SourceOut; onClo
               ))}
             </select>
           </label>
+
+          {source.relay_supported && (
+            <>
+              <label className={styles.check}>
+                <input
+                  type="checkbox"
+                  checked={relay}
+                  onChange={(e) => setRelay(e.target.checked)}
+                />
+                <span>Relay streams through tvtimes</span>
+              </label>
+              <p className={styles.hint}>
+                Proxy playback through this server so LAN-only streams work from outside your
+                network. Uses your upload bandwidth.
+              </p>
+            </>
+          )}
 
           {source.kind === 'connector' ? (
             <p className={styles.hint}>

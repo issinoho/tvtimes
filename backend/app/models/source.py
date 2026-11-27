@@ -35,6 +35,18 @@ class SourceKind(enum.StrEnum):
     connector = "connector"
 
 
+def relay_default(kind: SourceKind) -> bool:
+    """Whether a new source of this kind relays its streams by default. Only a
+    directly-added HDHomeRun: its tuner is LAN-only, whereas a connector's tuner
+    sits on another network the server can't reach."""
+    return kind is SourceKind.hdhomerun
+
+
+def relay_supported(kind: SourceKind) -> bool:
+    """Stalker streams are resolved per play, so they can't be relayed."""
+    return kind is not SourceKind.stalker
+
+
 class SourceStatus(enum.StrEnum):
     pending = "pending"
     ok = "ok"
@@ -60,6 +72,12 @@ class Source(PkUuidMixin, TimestampMixin, Base):
 
     enabled: Mapped[bool] = mapped_column(nullable=False, default=True)
     refresh_interval_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=360)
+
+    # Proxy playback of this source's streams through the server (so LAN-only
+    # streams work from outside the network). Not offered for stalker.
+    relay_streams: Mapped[bool] = mapped_column(
+        nullable=False, default=False, server_default=false()
+    )
 
     # User-defined order on the Sources screen; the guide lists channels
     # source-by-source in this order.

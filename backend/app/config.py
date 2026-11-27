@@ -96,6 +96,32 @@ class Settings(BaseSettings):
         description="Comma-separated hostnames/CIDRs allowed past the private-range block.",
     )
 
+    # Stream relay (services/relay.py). A source with ``relay_streams`` set has
+    # its export /stream URL proxied through tvtimes instead of 302'd to the
+    # upstream, so a LAN-only tuner plays from anywhere and provider credentials
+    # never reach the client. ``relay_enabled=False`` turns every source back
+    # into a 302. The caps are per process (the registry is in memory).
+    relay_enabled: bool = True
+    # A viewer on the LAN gets the 302 even for a relayed source: the direct
+    # path is the cheaper one there. Needs ``trusted_proxies`` set when a
+    # reverse proxy sits in front, or proxied viewers are always relayed.
+    relay_lan_direct: bool = True
+    relay_max_streams_per_tenant: int = 4
+    relay_max_streams_total: int = 16
+    relay_connect_timeout_seconds: float = 10.0
+    # Idle read timeout: how long a relayed upstream may send nothing at all.
+    relay_read_timeout_seconds: float = 30.0
+    # Lifetimes of the opaque tokens in a rewritten HLS playlist: segments and
+    # keys are short, nested playlists (and everything in a VOD playlist) long.
+    relay_segment_ttl_seconds: int = 600
+    relay_playlist_ttl_seconds: int = 43200
+    relay_manifest_max_bytes: int = 2 * 1024 * 1024
+    # HLS fetches a segment every few seconds per viewer; the default 240/min
+    # would throttle a household sharing one public IP.
+    relay_segment_rate_limit: str = "900/minute"
+    # Empty -> the same tvtimes/<version> User-Agent as every other fetch.
+    relay_user_agent: str = ""
+
     @field_validator("database_url", mode="after")
     @classmethod
     def _normalise_db_url(cls, value: str) -> str:

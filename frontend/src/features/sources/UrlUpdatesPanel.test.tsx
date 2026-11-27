@@ -27,6 +27,8 @@ function source(over: Partial<SourceOut> = {}): SourceOut {
     timezone_override: null,
     clock_shift_seconds: 0,
     refresh_interval_minutes: 360,
+    relay_streams: false,
+    relay_supported: true,
     sort_rank: 0,
     last_status: 'ok',
     last_error: null,
