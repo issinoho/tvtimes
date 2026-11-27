@@ -397,9 +397,10 @@ def relay_url_for(
     ttl_seconds: int,
     name: str,
     nested: bool,
+    origin: str,
 ) -> str:
-    """The public relay URL for one upstream URL of ``target``'s channel."""
-    origin = get_settings().public_origin.rstrip("/")
+    """The public relay URL for one upstream URL of ``target``'s channel, under
+    ``origin`` (see ``Settings.origin_for``)."""
     token = issue_token(
         RelayTarget(target.tenant_id, target.channel_id, target.kind, absolute, nested=nested),
         profile=profile,
@@ -408,7 +409,7 @@ def relay_url_for(
     return f"{origin}/api/exports/relay/{profile}/{token}/{name}"
 
 
-def entry_url(target: RelayTarget, *, profile: str = PROFILE_PASSTHROUGH) -> str:
+def entry_url(target: RelayTarget, *, origin: str, profile: str = PROFILE_PASSTHROUGH) -> str:
     """Where ``/stream`` sends a player for a relayed channel: a relay URL whose
     last segment carries a file extension where one can be known. Players
     (ExoPlayer, through radiotimes' StreamResolver) pick HLS vs progressive
@@ -424,10 +425,13 @@ def entry_url(target: RelayTarget, *, profile: str = PROFILE_PASSTHROUGH) -> str
         ttl_seconds=get_settings().relay_playlist_ttl_seconds,
         name=name,
         nested=False,
+        origin=origin,
     )
 
 
-def rewrite_playlist(text: str, *, base_url: str, target: RelayTarget, profile: str) -> str:
+def rewrite_playlist(
+    text: str, *, base_url: str, target: RelayTarget, profile: str, origin: str
+) -> str:
     """Point every URI in an HLS playlist back at the relay. URIs resolve
     against ``base_url`` -- the *final* upstream URL, after redirects."""
     settings = get_settings()
@@ -450,6 +454,7 @@ def rewrite_playlist(text: str, *, base_url: str, target: RelayTarget, profile: 
             ttl_seconds=ttl,
             name=_relay_name(absolute, default),
             nested=True,
+            origin=origin,
         )
 
     out: list[str] = []
@@ -688,6 +693,7 @@ async def relay(
                 base_url=final_url,
                 target=target,
                 profile=profile,
+                origin=settings.origin_for(request.headers.get("host")),
             )
             await _close(upstream, chunks)
             await finish(len(body), "playlist", sticky=True)

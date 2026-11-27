@@ -58,7 +58,7 @@ async def poll(request: Request, body: PairingPollIn, session: SessionDep) -> Pa
     return PairingPollOut(
         status="approved",
         token=collected.token,
-        origin=get_settings().public_origin.rstrip("/"),
+        origin=get_settings().origin_for(request.headers.get("host")),
     )
 
 

@@ -6,6 +6,7 @@ import base64
 import functools
 import sys
 from typing import Literal
+from urllib.parse import urlsplit
 
 from pydantic import Field, computed_field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -39,6 +40,12 @@ class Settings(BaseSettings):
     public_origin: str = "http://localhost:5173"
     webauthn_rp_id: str = "localhost"
     webauthn_rp_name: str = "tvtimes"
+    # Optional second public origin for players outside the LAN (e.g.
+    # https://stream.example.com, its own reverse-proxy host). Export, stream,
+    # relay and pairing URLs answer with the origin the request arrived on:
+    # this one when the Host header is its host, else public_origin. Only these
+    # two configured values can ever be written into a URL.
+    stream_origin: str = ""
 
     # Persistence. Unset -> local SQLite file (dev/test convenience only;
     # several columns need Postgres in real deployments).
@@ -132,6 +139,30 @@ class Settings(BaseSettings):
             if value.startswith(prefix):
                 return "postgresql+asyncpg://" + value[len(prefix) :]
         return value
+
+    @field_validator("stream_origin", mode="after")
+    @classmethod
+    def _check_stream_origin(cls, value: str) -> str:
+        value = value.strip().rstrip("/")
+        if value:
+            parts = urlsplit(value)
+            if parts.scheme not in ("http", "https") or not parts.netloc or parts.path:
+                raise ValueError(
+                    "TVTIMES_STREAM_ORIGIN must be a bare origin like https://stream.example.com"
+                )
+        return value
+
+    def origin_for(self, host: str | None) -> str:
+        """The origin to write into URLs for a request whose Host header is
+        ``host``: ``stream_origin`` if that is the host it came in on, else
+        ``public_origin``. Never the Host header itself."""
+        if (
+            self.stream_origin
+            and host
+            and host.strip().lower() == urlsplit(self.stream_origin).netloc.lower()
+        ):
+            return self.stream_origin
+        return self.public_origin.rstrip("/")
 
     @computed_field  # type: ignore[prop-decorator]
     @property
