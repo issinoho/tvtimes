@@ -22,6 +22,7 @@ from app.config import get_settings
 from app.db import dispose_engine
 from app.ingest.errors import SourceError
 from app.logging import configure_logging, get_logger
+from app.services import relay
 
 
 @asynccontextmanager
@@ -34,6 +35,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     try:
         yield
     finally:
+        await relay.aclose()
         await dispose_engine()
         log.info("shutdown")
 

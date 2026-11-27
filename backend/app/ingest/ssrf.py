@@ -16,9 +16,11 @@ pinned.
 
 from __future__ import annotations
 
+import contextlib
 import contextvars
 import ipaddress
 import socket
+from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urljoin, urlsplit
@@ -161,6 +163,24 @@ class _GuardedTransport(httpx.AsyncHTTPTransport):
         # Duck-typed drop-in for httpcore's AsyncNetworkBackend (delegates
         # everything except connect_tcp).
         self._pool._network_backend = _PinnedBackend(self._pool._network_backend)  # type: ignore[assignment]
+
+
+def pinning_transport(**kwargs: Any) -> httpx.AsyncHTTPTransport:
+    """A transport that connects to the address set by :func:`pin_connections_to`
+    -- for a long-lived client (the stream relay's) that enforces its own
+    destination policy per request instead of going through the fetch helpers."""
+    return _GuardedTransport(**kwargs)
+
+
+@contextlib.contextmanager
+def pin_connections_to(address: str | None) -> Iterator[None]:
+    """Make any connection a :func:`pinning_transport` opens inside this block go
+    to ``address`` (``None``: resolve the hostname normally)."""
+    token = _pin_ctx.set(address)
+    try:
+        yield
+    finally:
+        _pin_ctx.reset(token)
 
 
 # Sent on every guarded fetch unless a caller sets its own (Stalker sends a

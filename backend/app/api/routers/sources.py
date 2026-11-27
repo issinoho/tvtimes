@@ -11,7 +11,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from app.auth.deps import ClientMetaDep, SessionDep, VerifiedUser
 from app.ingest.redact import source_config_summary
 from app.models.audit import AuditLog
-from app.models.source import Source, SourceKind
+from app.models.source import Source, SourceKind, relay_supported
 from app.queue import enqueue_source_refresh
 from app.schemas.auth import MessageOut
 from app.schemas.source import (
@@ -29,6 +29,8 @@ from app.services import sources as svc
 
 router = APIRouter(prefix="/sources", tags=["sources"])
 
+_RELAY_UNSUPPORTED = "Stalker streams can't be relayed through tvtimes."
+
 
 def _to_out(source: Source, health: svc.SourceHealth) -> SourceOut:
     out = SourceOut.model_validate(source)
@@ -39,6 +41,7 @@ def _to_out(source: Source, health: svc.SourceHealth) -> SourceOut:
     out.epg_last_fetched_at = health.epg_last_fetched_at
     out.programme_count = health.programme_count
     out.url_updates_supported = svc.supports_url_updates(source)
+    out.relay_supported = relay_supported(source.kind)
     return out
 
 
@@ -66,15 +69,19 @@ async def list_sources(user: VerifiedUser, session: SessionDep) -> list[SourceOu
 @router.post("", response_model=SourceOut, status_code=status.HTTP_201_CREATED)
 async def create_source(body: SourceIn, user: VerifiedUser, session: SessionDep) -> SourceOut:
     _check_timezone(body.timezone_override)
+    kind = SourceKind(body.kind)
+    if body.relay_streams and not relay_supported(kind):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, _RELAY_UNSUPPORTED)
     source = await svc.create_source(
         session,
         tenant_id=user.tenant_id,
-        kind=SourceKind(body.kind),
+        kind=kind,
         display_name=body.display_name,
         config=body.config_dict(),
         timezone_override=body.timezone_override,
         clock_shift_seconds=body.clock_shift_seconds,
         refresh_interval_minutes=body.refresh_interval_minutes,
+        relay_streams=body.relay_streams,
     )
     # Commit before enqueueing: the worker reads the source in its own session
     # and can pick the job up before the request's teardown commit.
@@ -119,6 +126,8 @@ async def patch_source(
     source = await _load(session, user, source_id)
     _check_timezone(body.timezone_override)
     fields = body.model_dump(exclude_unset=True)
+    if fields.get("relay_streams") and not relay_supported(source.kind):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, _RELAY_UNSUPPORTED)
     try:
         reconnected = await svc.update_source(
             session,
@@ -129,6 +138,7 @@ async def patch_source(
             unset_timezone="timezone_override" in fields and fields["timezone_override"] is None,
             clock_shift_seconds=fields.get("clock_shift_seconds"),
             refresh_interval_minutes=fields.get("refresh_interval_minutes"),
+            relay_streams=fields.get("relay_streams"),
             config_kind=body.config.kind if body.config is not None else None,
             config_changes=body.config_changes(),
         )

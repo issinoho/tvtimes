@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.crypto import decrypt, encrypt
 from app.logging import get_logger
 from app.models.connector import Connector, ConnectorStatus
-from app.models.source import Channel, Source, SourceKind, SourceStatus
+from app.models.source import Channel, Source, SourceKind, SourceStatus, relay_default
 
 _log = get_logger("services.connectors")
 
@@ -207,6 +207,7 @@ async def submit_lineup(session: AsyncSession, connector: Connector, lineup: Lin
         source = Source(
             tenant_id=connector.tenant_id,
             kind=SourceKind.connector,
+            relay_streams=relay_default(SourceKind.connector),
             display_name=lineup.friendly_name or "HDHomeRun",
             config_encrypted=encrypt(
                 json.dumps({"connector_id": str(connector.id), "device_id": lineup.device_id})

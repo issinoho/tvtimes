@@ -390,3 +390,119 @@ async def test_requires_verified_email(
 ) -> None:
     resp = await app_client.get("/api/sources")
     assert resp.status_code == 401
+
+
+STALKER_BODY = {
+    "kind": "stalker",
+    "display_name": "Portal",
+    "portal_url": "http://portal.example.com/c/",
+    "mac": "00:1A:79:00:00:01",
+}
+
+
+async def test_relay_streams_defaults_by_kind(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    headers = await _auth(app_client, captured_emails, "relay@example.com")
+
+    hdhr = await app_client.post(
+        "/api/sources",
+        json={
+            "kind": "hdhomerun",
+            "display_name": "Tuner",
+            "device_url": "http://192.168.1.50",
+        },
+        headers=headers,
+    )
+    assert hdhr.status_code == 201, hdhr.text
+    assert hdhr.json()["relay_streams"] is True
+    assert hdhr.json()["relay_supported"] is True
+
+    m3u = await app_client.post("/api/sources", json=M3U_BODY, headers=headers)
+    assert m3u.json()["relay_streams"] is False
+    assert m3u.json()["relay_supported"] is True
+
+    forced = await app_client.post(
+        "/api/sources", json={**M3U_BODY, "relay_streams": True}, headers=headers
+    )
+    assert forced.json()["relay_streams"] is True
+
+    off = await app_client.post(
+        "/api/sources",
+        json={
+            "kind": "hdhomerun",
+            "display_name": "Tuner 2",
+            "device_url": "http://192.168.1.51",
+            "relay_streams": False,
+        },
+        headers=headers,
+    )
+    assert off.json()["relay_streams"] is False
+
+
+async def test_patch_toggles_relay_streams(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    headers = await _auth(app_client, captured_emails, "relay2@example.com")
+    sid = (await app_client.post("/api/sources", json=M3U_BODY, headers=headers)).json()["id"]
+
+    on = await app_client.patch(
+        f"/api/sources/{sid}", json={"relay_streams": True}, headers=headers
+    )
+    assert on.status_code == 200, on.text
+    assert on.json()["relay_streams"] is True
+    got = await app_client.get(f"/api/sources/{sid}", headers=headers)
+    assert got.json()["relay_streams"] is True
+
+    off = await app_client.patch(
+        f"/api/sources/{sid}", json={"relay_streams": False}, headers=headers
+    )
+    assert off.json()["relay_streams"] is False
+
+
+async def test_stalker_cannot_be_relayed(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    headers = await _auth(app_client, captured_emails, "relay3@example.com")
+    created = await app_client.post("/api/sources", json=STALKER_BODY, headers=headers)
+    assert created.status_code == 201, created.text
+    assert created.json()["relay_streams"] is False
+    assert created.json()["relay_supported"] is False
+    sid = created.json()["id"]
+
+    resp = await app_client.patch(
+        f"/api/sources/{sid}", json={"relay_streams": True}, headers=headers
+    )
+    assert resp.status_code == 422
+    assert "relay" in resp.json()["detail"].lower()
+    # Turning it off (a no-op) is still fine.
+    ok = await app_client.patch(
+        f"/api/sources/{sid}", json={"relay_streams": False}, headers=headers
+    )
+    assert ok.status_code == 200
+
+    refused = await app_client.post(
+        "/api/sources", json={**STALKER_BODY, "relay_streams": True}, headers=headers
+    )
+    assert refused.status_code == 422
+
+
+async def test_connector_source_can_patch_relay_streams(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    from app.db import get_sessionmaker
+    from app.models.source import Source, SourceKind
+
+    headers = await _auth(app_client, captured_emails, "relay4@example.com")
+    sid = (await app_client.post("/api/sources", json=M3U_BODY, headers=headers)).json()["id"]
+    async with get_sessionmaker()() as session:
+        source = await session.get(Source, uuid.UUID(sid))
+        assert source is not None
+        source.kind = SourceKind.connector
+        await session.commit()
+
+    resp = await app_client.patch(
+        f"/api/sources/{sid}", json={"relay_streams": True}, headers=headers
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["relay_streams"] is True

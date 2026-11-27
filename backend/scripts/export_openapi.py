@@ -79,7 +79,7 @@ way doesn't hand them the account.
 # string and make the CI drift check depend on the environment. This tracks the
 # export contract instead: bump it when these routes or their payloads change in
 # a way a consumer would notice.
-EXPORT_API_VERSION = "1.0"
+EXPORT_API_VERSION = "1.1"
 
 # FastAPI can't infer these: both credentials are plain query parameters rather
 # than Security dependencies, and making them Security() would change runtime

@@ -63,6 +63,8 @@ function renderPage(onPatch: (body: unknown) => void) {
         timezone_override: null,
         clock_shift_seconds: 0,
         refresh_interval_minutes: 360,
+        relay_streams: false,
+        relay_supported: true,
         last_status: 'ok',
         last_error: null,
         channel_count: 2,

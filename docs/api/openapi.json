@@ -142,7 +142,7 @@
       "url": "https://github.com/issinoho/tvtimes/blob/main/LICENSE"
     },
     "title": "tvtimes Export API",
-    "version": "1.0"
+    "version": "1.1"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -431,7 +431,7 @@
             "description": "Successful Response"
           },
           "302": {
-            "description": "Redirect to the upstream stream URL."
+            "description": "Redirect to the upstream URL, or to a relay URL when relayed."
           },
           "401": {
             "description": "Invalid or expired play link"
@@ -556,7 +556,7 @@
             "description": "Successful Response"
           },
           "302": {
-            "description": "Redirect to the upstream stream URL. Provider credentials (Xtream logins and the like) stay on the server and never appear in the playlist."
+            "description": "Redirect to the stream. Usually that's the upstream URL; for a source with relaying switched on it's a tvtimes relay URL instead, which carries the stream through tvtimes (an HLS playlist rewritten so its segments come through too). The relay URL ends in a file name with an extension where one is known, so a player can tell HLS from MPEG-TS without opening it. Either way provider credentials (Xtream logins and the like) never reach the client from a relayed source, nor appear in the playlist from any source."
           },
           "401": {
             "description": "Invalid or missing export token"

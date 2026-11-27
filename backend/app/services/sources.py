@@ -24,7 +24,7 @@ from app.ingest.models import Playlist
 from app.ingest.ssrf import assert_allowed_url
 from app.logging import get_logger
 from app.models.epg import EpgSource, EpgStatus, Programme
-from app.models.source import Channel, Source, SourceKind, SourceStatus
+from app.models.source import Channel, Source, SourceKind, SourceStatus, relay_default
 
 _CONFIG_URL_FIELD = {
     SourceKind.m3u: "url",
@@ -107,6 +107,7 @@ async def create_source(
     timezone_override: str | None = None,
     clock_shift_seconds: int = 0,
     refresh_interval_minutes: int = 360,
+    relay_streams: bool | None = None,
 ) -> Source:
     normalized = _normalize_config(kind, config)
     await assert_config_url_allowed(kind, normalized)
@@ -121,6 +122,7 @@ async def create_source(
         timezone_override=timezone_override,
         clock_shift_seconds=clock_shift_seconds,
         refresh_interval_minutes=refresh_interval_minutes,
+        relay_streams=relay_default(kind) if relay_streams is None else relay_streams,
         sort_rank=(max_rank + 1) if max_rank is not None else 0,
         last_status=SourceStatus.pending,
     )
@@ -169,6 +171,7 @@ async def update_source(
     unset_timezone: bool = False,
     clock_shift_seconds: int | None = None,
     refresh_interval_minutes: int | None = None,
+    relay_streams: bool | None = None,
     config_kind: str | None = None,
     config_changes: dict[str, object] | None = None,
 ) -> bool:
@@ -203,6 +206,8 @@ async def update_source(
         source.clock_shift_seconds = clock_shift_seconds
     if refresh_interval_minutes is not None:
         source.refresh_interval_minutes = refresh_interval_minutes
+    if relay_streams is not None:
+        source.relay_streams = relay_streams
     if new_config is None:
         return False
     source.config_encrypted = encrypt(json.dumps(new_config))

@@ -72,7 +72,10 @@ case "${1:-web}" in
         # trusts X-Forwarded-For from TVTIMES_TRUSTED_PROXIES. Letting uvicorn
         # rewrite request.client from XFF sent by anyone (which
         # --forwarded-allow-ips '*' did) let a direct client spoof its address.
-        exec uvicorn app.main:app --host 0.0.0.0 --port "${TVTIMES_PORT:-8000}"
+        # --timeout-graceful-shutdown: a relayed stream never ends on its own,
+        # so without a bound `docker stop` would wait out its whole timeout.
+        exec uvicorn app.main:app --host 0.0.0.0 --port "${TVTIMES_PORT:-8000}" \
+            --timeout-graceful-shutdown 5
         ;;
     worker)
         exec arq app.worker.WorkerSettings
