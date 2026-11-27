@@ -129,6 +129,32 @@ async def ensure_epg_source_for(
         if existing is not None:
             await session.delete(existing)
         return None
+    # The URL is unique per tenant, and another row may already fetch it: one
+    # attached by hand on a source page, or discovered by another playlist from
+    # the same provider. Inserting a second row (or repointing ours at it)
+    # violates the constraint, and the rollback takes the whole source refresh
+    # with it, so the source sits at "pending" for good. Reuse that row.
+    taken_stmt = select(EpgSource).where(
+        EpgSource.tenant_id == source.tenant_id, EpgSource.url == url
+    )
+    if existing is not None:
+        taken_stmt = taken_stmt.where(EpgSource.id != existing.id)
+    taken = await session.scalar(taken_stmt)
+    if taken is not None:
+        if existing is not None:
+            await session.delete(existing)  # our old row pointed at a feed we no longer advertise
+        if taken.source_id is None and taken.scope_source_id not in (None, source.id):
+            # Hand-scoped to a different source on purpose; widening it here
+            # would undo that, so this source gets no guide from it.
+            _log.warning(
+                "epg.discovered_url_scoped_elsewhere",
+                source_id=str(source.id),
+                epg_source_id=str(taken.id),
+            )
+            return None
+        if reset_cache:
+            taken.etag = taken.last_modified = None
+        return taken
     if existing is None:
         existing = EpgSource(
             tenant_id=source.tenant_id,

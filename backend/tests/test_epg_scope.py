@@ -198,3 +198,110 @@ async def test_deleting_the_source_removes_its_scoped_feed(
     assert deleted.status_code in (200, 204), deleted.text
     listed = await app_client.get("/api/epg-sources", headers=headers)
     assert listed.json() == []
+
+
+async def _advertise(monkeypatch: pytest.MonkeyPatch, url: str) -> None:
+    async def fake_ingest(_kind: object, _config: object) -> Playlist:
+        return Playlist(
+            channels=[ParsedChannel(name="TCM", stream_ref="http://s/1", tvg_id="TCM.us")],
+            epg_url=url,
+        )
+
+    monkeypatch.setattr("app.services.sources._ingest", fake_ingest)
+
+
+async def _refresh_source(source_id: str) -> tuple[str, uuid.UUID | None]:
+    """The worker's refresh_source body: channels, then the discovered feed,
+    in one transaction. Returns the source's status and the feed row id."""
+    from app.db import get_sessionmaker
+    from app.models.source import Source
+    from app.services import epg as epg_svc
+    from app.services import sources as src_svc
+
+    async with get_sessionmaker()() as session:
+        source = await session.get(Source, uuid.UUID(source_id))
+        assert source is not None
+        changed = await src_svc.refresh_source(session, source)
+        row = await epg_svc.ensure_epg_source_for(session, source, reset_cache=changed)
+        await session.commit()
+        return source.last_status.value, row.id if row else None
+
+
+async def _epg_rows() -> list[tuple[uuid.UUID | None, uuid.UUID | None]]:
+    from app.db import get_sessionmaker
+    from app.models.epg import EpgSource
+    from sqlalchemy import select
+
+    async with get_sessionmaker()() as session:
+        rows = await session.scalars(select(EpgSource).where(EpgSource.url == _GUIDE_URL))
+        return [(r.source_id, r.scope_source_id) for r in rows]
+
+
+async def test_playlist_advertising_an_attached_url_reuses_it(
+    app_client: AsyncClient,
+    captured_emails: list[dict[str, str]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A playlist that advertises a URL already attached by hand must not try
+    to insert a second row (unique per tenant): that rolled the whole refresh
+    back and left the source stuck at "pending"."""
+    headers, a, _b = await _two_sources(app_client, captured_emails, monkeypatch)
+    resp = await app_client.post(
+        "/api/epg-sources", json={"url": _GUIDE_URL, "scope_source_id": a}, headers=headers
+    )
+    assert resp.status_code in (200, 201), resp.text
+    attached = uuid.UUID(resp.json()["id"])
+
+    await _advertise(monkeypatch, _GUIDE_URL)
+    status, row_id = await _refresh_source(a)
+    assert status == "ok"
+    assert row_id == attached
+    assert await _epg_rows() == [(None, uuid.UUID(a))]
+
+
+async def test_two_playlists_advertising_one_url_share_the_row(
+    app_client: AsyncClient,
+    captured_emails: list[dict[str, str]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _headers, a, b = await _two_sources(app_client, captured_emails, monkeypatch)
+    await _advertise(monkeypatch, _GUIDE_URL)
+    status_a, row_a = await _refresh_source(a)
+    status_b, row_b = await _refresh_source(b)
+    assert (status_a, status_b) == ("ok", "ok")
+    assert row_a is not None and row_a == row_b
+    assert await _epg_rows() == [(uuid.UUID(a), None)]  # discovered: tenant-wide
+
+
+async def test_advertised_url_scoped_to_another_source_is_left_alone(
+    app_client: AsyncClient,
+    captured_emails: list[dict[str, str]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    headers, a, b = await _two_sources(app_client, captured_emails, monkeypatch)
+    resp = await app_client.post(
+        "/api/epg-sources", json={"url": _GUIDE_URL, "scope_source_id": a}, headers=headers
+    )
+    assert resp.status_code in (200, 201), resp.text
+
+    await _advertise(monkeypatch, _GUIDE_URL)
+    status, row_id = await _refresh_source(b)
+    assert status == "ok"
+    assert row_id is None
+    assert await _epg_rows() == [(None, uuid.UUID(a))]  # scope not widened
+
+
+async def test_switching_to_an_already_known_url_drops_the_old_row(
+    app_client: AsyncClient,
+    captured_emails: list[dict[str, str]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _headers, a, b = await _two_sources(app_client, captured_emails, monkeypatch)
+    await _advertise(monkeypatch, "http://guide.example.com/other.xml")
+    await _refresh_source(b)  # b discovers its own feed first
+    await _advertise(monkeypatch, _GUIDE_URL)
+    _, row_a = await _refresh_source(a)
+    status, row_b = await _refresh_source(b)  # b now advertises the URL a already has
+    assert status == "ok"
+    assert row_b == row_a
+    assert await _epg_rows() == [(uuid.UUID(a), None)]
