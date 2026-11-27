@@ -133,9 +133,18 @@ proxy_http_version 1.1;
   `TVTIMES_RELAY_LAN_DIRECT=false` to relay LAN viewers too. A player that
   starts on Wi-Fi keeps its direct LAN link if the phone moves to mobile data;
   restarting the channel picks up the relay.
-- If you'd rather keep video off the main host, add a second NPM host (say
-  `stream.example.com`) pointing at the same container with the snippet above.
-  `TVTIMES_PUBLIC_ORIGIN` still decides which host appears in the playlist.
+- To keep the web app on an internal address and give players outside the
+  LAN their own host, add a second NPM host (say `stream.example.com`) pointing
+  at the same container with the snippet above, and set
+  `TVTIMES_STREAM_ORIGIN=https://stream.example.com`. URLs then follow the host
+  a request came in on: a playlist fetched through `stream.example.com` lists
+  streams and relay links on it, and a device paired through it (type
+  `stream.example.com` at "Enter its address") saves it as its address. On
+  `TVTIMES_PUBLIC_ORIGIN` nothing changes, and no other Host header is ever
+  written into a URL. The web app's Exports page shows playlist links on the
+  main host; for a player outside the LAN, swap the host for the stream one
+  (the token stays the same). A device paired at home on the internal address
+  keeps it, so pair a travelling device through the stream host.
 - Relayed streams are capped at `TVTIMES_RELAY_MAX_STREAMS_PER_TENANT` (4) per
   account and `TVTIMES_RELAY_MAX_STREAMS_TOTAL` (16) overall. Past either cap a
   player gets `503` with `Retry-After`. The caps are counted per app process.

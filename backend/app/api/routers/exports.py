@@ -87,7 +87,7 @@ async def playlist(
     Sources screen shows. Each entry's stream URL points back at
     ``/api/exports/stream/{channel_id}`` rather than the upstream provider, so
     provider credentials never leave the server."""
-    base = get_settings().public_origin.rstrip("/")
+    base = get_settings().origin_for(request.headers.get("host"))
     body = await svc.render_m3u(session, tenant, base_url=base, token=token)
     return PlainTextResponse(
         body,
@@ -146,7 +146,7 @@ async def watchlist_json(
     recorder to act on without understanding tvtimes — see
     ``exports.render_watchlist``. Same per-tenant token as the playlist and
     guide feeds; consumed by tvdinner's ``--record-watchlist``."""
-    base = get_settings().public_origin.rstrip("/")
+    base = get_settings().origin_for(request.headers.get("host"))
     return await svc.render_watchlist(session, tenant, base_url=base, token=token)
 
 
@@ -187,7 +187,7 @@ async def favourites_json(
     """Channels anyone on this account has favourited, so a player can show the
     same stars — see ``exports.render_favourites``. Consumed by tvdinner's
     ``--sync-favourites``."""
-    base = get_settings().public_origin.rstrip("/")
+    base = get_settings().origin_for(request.headers.get("host"))
     return await svc.render_favourites(session, tenant, base_url=base, token=token)
 
 
@@ -300,7 +300,7 @@ async def _serve_stream(request: Request, target: relay_svc.RelayTarget, relayed
     # and a live HLS playlist's re-polls then land on the token-only relay route
     # instead of going through the export token, the DB and EXPORT_LIMIT here.
     return RedirectResponse(
-        relay_svc.entry_url(target),
+        relay_svc.entry_url(target, origin=get_settings().origin_for(request.headers.get("host"))),
         status_code=status.HTTP_302_FOUND,
         headers={"Cache-Control": "no-store"},
     )
@@ -378,7 +378,7 @@ async def play_playlist(
     """The "Play externally" hand-off: what the web app's **Play** button emits.
     Authenticated by a 24-hour per-channel ticket rather than the export token,
     so handing someone a programme doesn't hand them the whole account."""
-    root = f"{get_settings().public_origin.rstrip('/')}/api/exports/play/{channel.id}"
+    root = f"{get_settings().origin_for(request.headers.get('host'))}/api/exports/play/{channel.id}"
     return PlainTextResponse(
         svc.render_channel_m3u(
             channel,

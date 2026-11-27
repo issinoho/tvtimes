@@ -263,7 +263,7 @@ async def create_play_link(
     else:
         push_title, push_body, push_image = "Playing now", label, None
     await enqueue_activity_notification(user.tenant_id, "play", push_title, push_body, push_image)
-    root = f"{get_settings().public_origin.rstrip('/')}/api/exports/play/{channel.id}"
+    root = f"{get_settings().origin_for(request.headers.get('host'))}/api/exports/play/{channel.id}"
     return PlayLinkOut(
         m3u_url=f"{root}/playlist.m3u?ticket={ticket}",
         stream_url=f"{root}/stream?ticket={ticket}",
