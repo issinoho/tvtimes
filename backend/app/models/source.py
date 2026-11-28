@@ -78,6 +78,13 @@ class Source(PkUuidMixin, TimestampMixin, Base):
     relay_streams: Mapped[bool] = mapped_column(
         nullable=False, default=False, server_default=false()
     )
+    # When relaying an HLS master playlist, offer one quality (plus one
+    # rendition of each audio/subtitle group it uses) instead of all of them:
+    # ffmpeg-based players open every rendition before playing, and through a
+    # home upload that makes startup take tens of seconds.
+    relay_single_variant: Mapped[bool] = mapped_column(
+        nullable=False, default=False, server_default=false()
+    )
 
     # User-defined order on the Sources screen; the guide lists channels
     # source-by-source in this order.

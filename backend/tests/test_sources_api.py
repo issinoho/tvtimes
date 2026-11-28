@@ -460,6 +460,22 @@ async def test_patch_toggles_relay_streams(
     assert off.json()["relay_streams"] is False
 
 
+async def test_patch_toggles_relay_single_variant(
+    app_client: AsyncClient, captured_emails: list[dict[str, str]]
+) -> None:
+    headers = await _auth(app_client, captured_emails, "relay4@example.com")
+    created = await app_client.post("/api/sources", json=M3U_BODY, headers=headers)
+    assert created.json()["relay_single_variant"] is False
+    sid = created.json()["id"]
+    on = await app_client.patch(
+        f"/api/sources/{sid}", json={"relay_single_variant": True}, headers=headers
+    )
+    assert on.status_code == 200, on.text
+    assert on.json()["relay_single_variant"] is True
+    got = await app_client.get(f"/api/sources/{sid}", headers=headers)
+    assert got.json()["relay_single_variant"] is True
+
+
 async def test_stalker_cannot_be_relayed(
     app_client: AsyncClient, captured_emails: list[dict[str, str]]
 ) -> None:
@@ -475,6 +491,10 @@ async def test_stalker_cannot_be_relayed(
     )
     assert resp.status_code == 422
     assert "relay" in resp.json()["detail"].lower()
+    single = await app_client.patch(
+        f"/api/sources/{sid}", json={"relay_single_variant": True}, headers=headers
+    )
+    assert single.status_code == 422
     # Turning it off (a no-op) is still fine.
     ok = await app_client.patch(
         f"/api/sources/{sid}", json={"relay_streams": False}, headers=headers

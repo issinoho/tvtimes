@@ -2213,6 +2213,11 @@ export interface components {
              */
             relay_streams: boolean;
             /**
+             * Relay Single Variant
+             * @default false
+             */
+            relay_single_variant: boolean;
+            /**
              * Relay Supported
              * @default true
              */
@@ -2280,6 +2285,8 @@ export interface components {
             refresh_interval_minutes?: number | null;
             /** Relay Streams */
             relay_streams?: boolean | null;
+            /** Relay Single Variant */
+            relay_single_variant?: boolean | null;
             /** Config */
             config?: (components["schemas"]["M3uConfigPatch"] | components["schemas"]["XtreamConfigPatch"] | components["schemas"]["StalkerConfigPatch"] | components["schemas"]["HdhomerunConfigPatch"]) | null;
         };

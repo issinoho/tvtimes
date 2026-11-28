@@ -31,6 +31,7 @@ const M3U_SOURCE = {
   clock_shift_seconds: 0,
   refresh_interval_minutes: 360,
   relay_streams: false,
+  relay_single_variant: false,
   relay_supported: true,
   last_status: 'ok',
   last_error: null,

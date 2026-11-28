@@ -145,6 +145,15 @@ proxy_http_version 1.1;
   main host; for a player outside the LAN, swap the host for the stream one
   (the token stays the same). A device paired at home on the internal address
   keeps it, so pair a travelling device through the stream host.
+- For HLS sources offering several qualities (Pluto through FastChannels, for
+  instance), tick **Relay a single quality** on the source too. Players built
+  on ffmpeg (mpv, tvdinner) open every quality, audio track and subtitle
+  playlist before showing a frame, and through a home upload that can take
+  30-40 s. With it ticked, tvtimes passes on one quality (the best at or under
+  `TVTIMES_RELAY_SINGLE_VARIANT_MAX_BANDWIDTH`, 4 Mbit/s by default) and one of
+  each audio and subtitle track it uses. Players that switch quality as the
+  connection changes (VLC, ExoPlayer) then can't, so leave it off if they're
+  all you use.
 - Relayed streams are capped at `TVTIMES_RELAY_MAX_STREAMS_PER_TENANT` (4) per
   account and `TVTIMES_RELAY_MAX_STREAMS_TOTAL` (16) overall. Past either cap a
   player gets `503` with `Retry-After`. The caps are counted per app process.

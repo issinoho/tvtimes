@@ -172,6 +172,7 @@ async def update_source(
     clock_shift_seconds: int | None = None,
     refresh_interval_minutes: int | None = None,
     relay_streams: bool | None = None,
+    relay_single_variant: bool | None = None,
     config_kind: str | None = None,
     config_changes: dict[str, object] | None = None,
 ) -> bool:
@@ -208,6 +209,8 @@ async def update_source(
         source.refresh_interval_minutes = refresh_interval_minutes
     if relay_streams is not None:
         source.relay_streams = relay_streams
+    if relay_single_variant is not None:
+        source.relay_single_variant = relay_single_variant
     if new_config is None:
         return False
     source.config_encrypted = encrypt(json.dumps(new_config))

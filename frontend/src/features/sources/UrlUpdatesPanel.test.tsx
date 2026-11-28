@@ -28,6 +28,7 @@ function source(over: Partial<SourceOut> = {}): SourceOut {
     clock_shift_seconds: 0,
     refresh_interval_minutes: 360,
     relay_streams: false,
+    relay_single_variant: false,
     relay_supported: true,
     sort_rank: 0,
     last_status: 'ok',

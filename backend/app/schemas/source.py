@@ -126,6 +126,7 @@ class SourcePatchIn(BaseModel):
     clock_shift_seconds: int | None = Field(default=None, ge=-86_400, le=86_400)
     refresh_interval_minutes: int | None = Field(default=None, ge=15, le=10_080)
     relay_streams: bool | None = None
+    relay_single_variant: bool | None = None
     config: SourceConfigPatch | None = None
 
     def config_changes(self) -> dict[str, object] | None:
@@ -152,6 +153,7 @@ class SourceOut(BaseModel):
     clock_shift_seconds: int
     refresh_interval_minutes: int
     relay_streams: bool = False
+    relay_single_variant: bool = False
     # False for kinds that can't be relayed (stalker); filled by the router.
     relay_supported: bool = True
     sort_rank: int

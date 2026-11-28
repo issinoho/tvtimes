@@ -18,6 +18,7 @@ function source(over: Partial<SourceOut>): SourceOut {
     clock_shift_seconds: 0,
     refresh_interval_minutes: 360,
     relay_streams: false,
+    relay_single_variant: false,
     relay_supported: true,
     sort_rank: 0,
     last_status: 'ok',
@@ -125,6 +126,16 @@ test('the relay toggle is sent when changed', async () => {
 test('the relay toggle starts from the saved value, and is also offered for a connector', () => {
   setup(source({ kind: 'connector', relay_streams: true }));
   expect(screen.getByLabelText('Relay streams through tvtimes')).toBeChecked();
+});
+
+test('the single-quality option shows once relaying is on, and is sent when changed', async () => {
+  const { bodies, onClose, user } = setup(source({}));
+  expect(screen.queryByLabelText('Relay a single quality')).toBeNull();
+  await user.click(screen.getByLabelText('Relay streams through tvtimes'));
+  await user.click(screen.getByLabelText('Relay a single quality'));
+  await user.click(screen.getByRole('button', { name: 'Save' }));
+  await waitFor(() => expect(onClose).toHaveBeenCalled());
+  expect(bodies).toEqual([{ relay_streams: true, relay_single_variant: true }]);
 });
 
 test('the relay toggle is hidden where relaying is unsupported', () => {
