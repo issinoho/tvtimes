@@ -42,6 +42,7 @@ export function EditSourceDialog({ source, onClose }: { source: SourceOut; onClo
   const [interval, setRefreshEvery] = useState(source.refresh_interval_minutes);
   const [zone, setZone] = useState(source.timezone_override ?? '');
   const [relay, setRelay] = useState(source.relay_streams);
+  const [single, setSingle] = useState(source.relay_single_variant);
   // An HDHomeRun address isn't a secret (the summary already shows it), so it
   // starts filled in; blank there means auto-discover, not "keep".
   const [deviceUrl, setDeviceUrl] = useState(
@@ -92,6 +93,8 @@ export function EditSourceDialog({ source, onClose }: { source: SourceOut; onClo
     if (interval !== source.refresh_interval_minutes) body.refresh_interval_minutes = interval;
     if ((zone || null) !== source.timezone_override) body.timezone_override = zone || null;
     if (source.relay_supported && relay !== source.relay_streams) body.relay_streams = relay;
+    if (source.relay_supported && single !== source.relay_single_variant)
+      body.relay_single_variant = single;
     const config = connection();
     if (config) body.config = config;
     try {
@@ -165,6 +168,23 @@ export function EditSourceDialog({ source, onClose }: { source: SourceOut; onClo
                 Proxy playback through this server so LAN-only streams work from outside your
                 network. Uses your upload bandwidth.
               </p>
+              {relay && (
+                <>
+                  <label className={styles.check}>
+                    <input
+                      type="checkbox"
+                      checked={single}
+                      onChange={(e) => setSingle(e.target.checked)}
+                    />
+                    <span>Relay a single quality</span>
+                  </label>
+                  <p className={styles.hint}>
+                    For HLS channels offering several qualities (Pluto and the like), pass on just
+                    one. Players such as mpv and tvdinner open every quality before playing, which
+                    over a home connection can take half a minute.
+                  </p>
+                </>
+              )}
             </>
           )}
 

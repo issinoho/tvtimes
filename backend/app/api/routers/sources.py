@@ -126,7 +126,9 @@ async def patch_source(
     source = await _load(session, user, source_id)
     _check_timezone(body.timezone_override)
     fields = body.model_dump(exclude_unset=True)
-    if fields.get("relay_streams") and not relay_supported(source.kind):
+    if (fields.get("relay_streams") or fields.get("relay_single_variant")) and not relay_supported(
+        source.kind
+    ):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, _RELAY_UNSUPPORTED)
     try:
         reconnected = await svc.update_source(
@@ -139,6 +141,7 @@ async def patch_source(
             clock_shift_seconds=fields.get("clock_shift_seconds"),
             refresh_interval_minutes=fields.get("refresh_interval_minutes"),
             relay_streams=fields.get("relay_streams"),
+            relay_single_variant=fields.get("relay_single_variant"),
             config_kind=body.config.kind if body.config is not None else None,
             config_changes=body.config_changes(),
         )

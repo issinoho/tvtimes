@@ -764,3 +764,87 @@ async def test_play_ticket_route_relays(app_client: AsyncClient) -> None:
         app_client, f"/api/exports/play/{cid}/stream", params={"ticket": "junk"}
     )
     assert resp.status_code == 401
+
+
+# --- single quality ---------------------------------------------------------
+
+PLUTO_MASTER = """#EXTM3U
+#EXT-X-VERSION:5
+#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="English",DEFAULT=NO,URI="subs/en.m3u8"
+#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio",NAME="English [Original]",DEFAULT=YES,URI="a/orig.m3u8"
+#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio",NAME="English",DEFAULT=NO,URI="a/en.m3u8"
+#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="other",NAME="Unused",URI="a/unused.m3u8"
+#EXT-X-MEDIA:TYPE=CLOSED-CAPTIONS,GROUP-ID="cc",NAME="CC1",INSTREAM-ID="CC1"
+#EXT-X-STREAM-INF:BANDWIDTH=1042180,CODECS="avc1.4d401e,mp4a.40.2",SUBTITLES="subs",AUDIO="audio"
+v/1000.m3u8
+#EXT-X-STREAM-INF:BANDWIDTH=3321280,SUBTITLES="subs",AUDIO="audio",CLOSED-CAPTIONS="cc"
+v/3300.m3u8
+#EXT-X-STREAM-INF:BANDWIDTH=6500000,SUBTITLES="subs",AUDIO="audio"
+v/6500.m3u8
+#EXT-X-STREAM-INF:BANDWIDTH=640930,SUBTITLES="subs",AUDIO="audio"
+v/640.m3u8
+#EXT-X-I-FRAME-STREAM-INF:BANDWIDTH=86000,URI="iframes.m3u8"
+"""
+
+
+def test_single_variant_keeps_the_best_quality_under_the_cap() -> None:
+    out = relay.keep_single_variant(PLUTO_MASTER, 4_000_000)
+    uris = [line for line in out.splitlines() if line and not line.startswith("#")]
+    assert uris == ["v/3300.m3u8"]
+    assert "BANDWIDTH=3321280" in out
+    # One rendition per group the variant uses: the default audio, the subs.
+    assert 'URI="a/orig.m3u8"' in out and 'URI="subs/en.m3u8"' in out
+    assert "a/en.m3u8" not in out and "unused" not in out and "iframes" not in out
+    # No request behind it, so closed captions stay.
+    assert 'CLOSED-CAPTIONS,GROUP-ID="cc"' in out
+
+
+def test_single_variant_falls_back_to_the_lowest_and_leaves_simple_playlists() -> None:
+    out = relay.keep_single_variant(PLUTO_MASTER, 500_000)
+    assert [ln for ln in out.splitlines() if ln and not ln.startswith("#")] == ["v/640.m3u8"]
+    one = "#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1\nonly.m3u8\n"
+    assert relay.keep_single_variant(one, 4_000_000) == one
+
+
+@respx.mock
+async def test_relayed_master_is_trimmed_only_when_the_source_asks(
+    app_client: AsyncClient,
+) -> None:
+    token, cid, _ = await _seed(f"{UPSTREAM}/hls/master.m3u8")
+    respx.get(f"{UPSTREAM}/hls/master.m3u8").mock(
+        return_value=Response(
+            200, text=PLUTO_MASTER, headers={"content-type": "application/vnd.apple.mpegurl"}
+        )
+    )
+
+    async def variants() -> int:
+        resp = await _get_stream(app_client, f"/api/exports/stream/{cid}", params={"token": token})
+        assert resp.status_code == 200
+        return resp.text.count("#EXT-X-STREAM-INF")
+
+    assert await variants() == 4
+    async with get_sessionmaker()() as session:
+        channel = await session.get(Channel, cid)
+        assert channel is not None
+        source = await session.get(Source, channel.source_id)
+        assert source is not None
+        source.relay_single_variant = True
+        await session.commit()
+    relay.registry.clear()
+    assert await variants() == 1
+
+
+def test_single_variant_rides_along_in_nested_tokens() -> None:
+    target = relay.RelayTarget(
+        uuid.uuid4(), uuid.uuid4(), SourceKind.m3u, f"{UPSTREAM}/m.m3u8", single_variant=True
+    )
+    url = relay.relay_url_for(
+        target,
+        f"{UPSTREAM}/v/1.m3u8",
+        profile="passthrough",
+        ttl_seconds=60,
+        name="1.m3u8",
+        nested=True,
+        origin="http://localhost:5173",
+    )
+    assert relay.decode_token(_token_of(url), profile="passthrough").single_variant is True

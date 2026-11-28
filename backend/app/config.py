@@ -128,6 +128,9 @@ class Settings(BaseSettings):
     relay_segment_rate_limit: str = "900/minute"
     # Empty -> the same tvtimes/<version> User-Agent as every other fetch.
     relay_user_agent: str = ""
+    # For a source with "relay a single quality" on: the highest-bandwidth HLS
+    # variant at or under this (bits/s) is kept; the lowest if none fits.
+    relay_single_variant_max_bandwidth: int = Field(default=4_000_000, ge=100_000)
 
     @field_validator("database_url", mode="after")
     @classmethod

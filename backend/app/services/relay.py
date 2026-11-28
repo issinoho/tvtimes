@@ -99,6 +99,8 @@ class RelayTarget:
     # part of an HLS session, so its slot outlives the fetch, and it logs at
     # debug. False for the entry link /stream hands out.
     nested: bool = False
+    # The source's "relay a single quality": trim HLS master playlists.
+    single_variant: bool = False
 
 
 def resolve_target(channel: Channel, source: Source | None) -> RelayTarget:
@@ -106,7 +108,8 @@ def resolve_target(channel: Channel, source: Source | None) -> RelayTarget:
     :class:`~app.services.exports.StreamUnavailable`."""
     url = exports_svc.resolve_stream(channel, source)
     kind = source.kind if source is not None else SourceKind.m3u
-    return RelayTarget(channel.tenant_id, channel.id, kind, url)
+    single = source is not None and source.relay_single_variant
+    return RelayTarget(channel.tenant_id, channel.id, kind, url, single_variant=single)
 
 
 # --- tokens -----------------------------------------------------------------
@@ -144,6 +147,7 @@ def issue_token(target: RelayTarget, *, profile: str, ttl_seconds: int) -> str:
         "u": target.url,
         "p": profile,
         "n": target.nested,
+        "sv": target.single_variant,
         "exp": int(_now()) + ttl_seconds,
     }
     raw = json.dumps(payload, separators=(",", ":")).encode("utf-8")
@@ -166,6 +170,7 @@ def decode_token(token: str, *, profile: str) -> RelayTarget:
             SourceKind(data["k"]),
             str(data["u"]),
             nested=bool(data.get("n", False)),
+            single_variant=bool(data.get("sv", False)),
         )
     except (InvalidToken, ValueError, KeyError, TypeError) as exc:
         raise InvalidRelayToken from exc
@@ -402,7 +407,14 @@ def relay_url_for(
     """The public relay URL for one upstream URL of ``target``'s channel, under
     ``origin`` (see ``Settings.origin_for``)."""
     token = issue_token(
-        RelayTarget(target.tenant_id, target.channel_id, target.kind, absolute, nested=nested),
+        RelayTarget(
+            target.tenant_id,
+            target.channel_id,
+            target.kind,
+            absolute,
+            nested=nested,
+            single_variant=target.single_variant,
+        ),
         profile=profile,
         ttl_seconds=ttl_seconds,
     )
@@ -429,6 +441,78 @@ def entry_url(target: RelayTarget, *, origin: str, profile: str = PROFILE_PASSTH
     )
 
 
+_ATTR_RE = re.compile(r'([A-Z0-9-]+)=("[^"]*"|[^,]*)')
+# A variant's attribute naming a rendition group, and that group's TYPE.
+_GROUP_ATTRS = {"AUDIO": "AUDIO", "VIDEO": "VIDEO", "SUBTITLES": "SUBTITLES"}
+
+
+def _attrs(tag_line: str) -> dict[str, str]:
+    _, _, body = tag_line.partition(":")
+    return {k: v.strip('"') for k, v in _ATTR_RE.findall(body)}
+
+
+def keep_single_variant(text: str, max_bandwidth: int) -> str:
+    """Trim an HLS master playlist to one variant: the highest ``BANDWIDTH``
+    at or under ``max_bandwidth``, else the lowest. Of the ``EXT-X-MEDIA``
+    renditions, one per group that variant uses is kept (its ``DEFAULT=YES``
+    one, else the first); renditions of other groups, and I-frame playlists,
+    go. ffmpeg-based players (mpv, tvdinner) open every rendition a master
+    lists before showing anything, so through a home upload an 8-rendition
+    Pluto feed takes 25-40 s to start; trimmed, a handful of requests."""
+    lines = text.splitlines()
+    variants: list[tuple[int, int, int, dict[str, str]]] = []  # tag, uri, bandwidth, attrs
+    i = 0
+    while i < len(lines):
+        if lines[i].strip().startswith("#EXT-X-STREAM-INF:"):
+            j = i + 1
+            while j < len(lines) and (not lines[j].strip() or lines[j].strip().startswith("#")):
+                j += 1
+            if j < len(lines):
+                attrs = _attrs(lines[i].strip())
+                try:
+                    bandwidth = int(attrs.get("BANDWIDTH", "0"))
+                except ValueError:
+                    bandwidth = 0
+                variants.append((i, j, bandwidth, attrs))
+            i = j + 1
+            continue
+        i += 1
+    if len(variants) < 2:
+        return text
+    fitting = [v for v in variants if 0 < v[2] <= max_bandwidth]
+    chosen = max(fitting, key=lambda v: v[2]) if fitting else min(variants, key=lambda v: v[2])
+    drop: set[int] = set()
+    for v in variants:
+        if v is not chosen:
+            drop.update((v[0], v[1]))
+
+    used = {(kind, chosen[3][attr]) for attr, kind in _GROUP_ATTRS.items() if attr in chosen[3]}
+    keep_for: dict[tuple[str, str], int] = {}
+    media: list[tuple[int, tuple[str, str], dict[str, str]]] = []
+    for idx, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith("#EXT-X-I-FRAME-STREAM-INF:"):
+            drop.add(idx)
+        elif stripped.startswith("#EXT-X-MEDIA:"):
+            attrs = _attrs(stripped)
+            group = (attrs.get("TYPE", ""), attrs.get("GROUP-ID", ""))
+            media.append((idx, group, attrs))
+            if group in used and (
+                group not in keep_for
+                or (
+                    attrs.get("DEFAULT") == "YES"
+                    and _attrs(lines[keep_for[group]].strip()).get("DEFAULT") != "YES"
+                )
+            ):
+                keep_for[group] = idx
+    for idx, group, attrs in media:
+        # A rendition without a URI (muxed into the variant, or closed
+        # captions) costs no request; leave it.
+        if "URI" in attrs and keep_for.get(group) != idx:
+            drop.add(idx)
+    return "\n".join(line for idx, line in enumerate(lines) if idx not in drop) + "\n"
+
+
 def rewrite_playlist(
     text: str, *, base_url: str, target: RelayTarget, profile: str, origin: str
 ) -> str:
@@ -436,6 +520,8 @@ def rewrite_playlist(
     against ``base_url`` -- the *final* upstream URL, after redirects."""
     settings = get_settings()
     is_master = "#EXT-X-STREAM-INF" in text
+    if is_master and target.single_variant:
+        text = keep_single_variant(text, settings.relay_single_variant_max_bandwidth)
     is_vod = "#EXT-X-ENDLIST" in text
 
     def relay_url(uri: str, *, playlist: bool, default: str) -> str:
